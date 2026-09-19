@@ -2,6 +2,7 @@
 -- Target: Neon / Supabase behind Cloudflare Hyperdrive. Run: psql $DATABASE_URL -f scaffold/schema.sql
 -- Invariants: every query scoped by org_id · IDs are ULIDs (text) · all DB access through one db() adapter.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS citext;   -- users.email, contacts.email, platform_users.email
 
 CREATE TYPE user_role     AS ENUM ('rep','admin');
 CREATE TYPE channel       AS ENUM ('voice','sms','email','form','chat');
@@ -183,7 +184,54 @@ CREATE OR REPLACE FUNCTION touch_updated_at() RETURNS trigger LANGUAGE plpgsql A
 BEGIN NEW.updated_at = now(); RETURN NEW; END $$;
 CREATE TRIGGER leads_touch BEFORE UPDATE ON leads FOR EACH ROW EXECUTE FUNCTION touch_updated_at();
 
--- Row-level security: the Worker sets `SET LOCAL app.org_id = '...'` per request.
-ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
-CREATE POLICY leads_org ON leads USING (org_id = current_setting('app.org_id', true));
--- repeat for contacts, companies, messages (via lead), chat_*, sequences, enrollments, list_imports, activity
+-- ── Row-level security ──────────────────────────────────
+-- The Worker runs `SET LOCAL app.org_id = '…'` inside a transaction (see src/db.ts withOrg()).
+-- current_setting(..., true) returns NULL when unset, and `org_id = NULL` matches no rows,
+-- so a query that forgets to set the org context fails closed rather than leaking across tenants.
+--
+-- FORCE is load-bearing: Neon connects as the role that owns these tables, and a table owner
+-- bypasses its own RLS policies unless forced. Without FORCE every policy below is inert.
+--
+-- orgs / org_domains / platform_users are deliberately NOT under RLS: tenant resolution reads
+-- them before an org context exists.
+
+-- direct org_id column
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['users','companies','contacts','leads','chat_flows','chat_sessions',
+                           'sequences','list_imports','activity','counters']
+  LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('ALTER TABLE %I FORCE  ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_org', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON %I USING (org_id = current_setting(''app.org_id'', true))
+                             WITH CHECK (org_id = current_setting(''app.org_id'', true))',
+      t || '_org', t);
+  END LOOP;
+END $$;
+
+-- scoped through leads
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['messages','attachments','enrollments']
+  LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('ALTER TABLE %I FORCE  ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_org', t);
+    EXECUTE format(
+      'CREATE POLICY %I ON %I USING (EXISTS (SELECT 1 FROM leads l WHERE l.id = %I.lead_id))
+                             WITH CHECK (EXISTS (SELECT 1 FROM leads l WHERE l.id = %I.lead_id))',
+      t || '_org', t, t, t);
+  END LOOP;
+END $$;
+
+-- scoped through sequences
+ALTER TABLE sequence_steps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sequence_steps FORCE  ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sequence_steps_org ON sequence_steps;
+CREATE POLICY sequence_steps_org ON sequence_steps
+  USING      (EXISTS (SELECT 1 FROM sequences s WHERE s.id = sequence_steps.sequence_id))
+  WITH CHECK (EXISTS (SELECT 1 FROM sequences s WHERE s.id = sequence_steps.sequence_id));

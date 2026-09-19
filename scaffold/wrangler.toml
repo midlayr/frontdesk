@@ -1,0 +1,53 @@
+name = "dumont-frontdesk"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Relational data — Postgres (Neon/Supabase) pooled through Hyperdrive
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "<wrangler hyperdrive create frontdesk --connection-string=$DATABASE_URL>"
+
+# Artwork, voicemail audio, CSV imports
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "frontdesk-files"
+
+# Published chat flow + widget settings, read on every widget load (edge-cached)
+[[kv_namespaces]]
+binding = "CONFIG"
+id = "<wrangler kv namespace create CONFIG>"
+
+# One object per live chat session / per org inbox for realtime fan-out
+[[durable_objects.bindings]]
+name = "CHAT_SESSION"
+class_name = "ChatSession"
+[[durable_objects.bindings]]
+name = "INBOX_ROOM"
+class_name = "InboxRoom"
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatSession", "InboxRoom"]
+
+# Async work: transcription, spec extraction, enrichment, drip sends
+[[queues.producers]]
+binding = "JOBS"
+queue = "frontdesk-jobs"
+[[queues.consumers]]
+queue = "frontdesk-jobs"
+max_batch_size = 10
+max_retries = 3
+dead_letter_queue = "frontdesk-dlq"
+
+# Whisper for voicemail, LLM for spec extraction / intent
+[ai]
+binding = "AI"
+
+# Drip scheduler + SLA checks
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+PLATFORM_DOMAIN = "midlayr.app"          # <slug>.midlayr.app default per tenant; custom hostnames via Cloudflare for SaaS
+WIDGET_ORIGIN = "https://cdn.midlayr.com"
+# secrets (wrangler secret put): DATABASE_URL (local dev only; prod uses Hyperdrive), TWILIO_AUTH_TOKEN, TWILIO_SID, RESEND_API_KEY, ENRICH_API_KEY, SESSION_SECRET

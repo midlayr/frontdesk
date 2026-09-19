@@ -57,7 +57,8 @@ leads.get('/:id', async (c) => {
         FROM leads l LEFT JOIN contacts c ON c.id = l.contact_id
        WHERE l.id = ${id}`;
     if (!lead) return null;
-    const messages = await tx`SELECT id, channel, direction, author, body, provider_id, sent_at
+    const messages = await tx`SELECT id, channel, direction, author, body, provider_id, sent_at,
+                                     audio_r2_key IS NOT NULL AS has_audio, transcript_status
                                 FROM messages WHERE lead_id = ${id} ORDER BY sent_at`;
     const attachments = await tx`SELECT id, r2_key, filename, mime, bytes FROM attachments WHERE lead_id = ${id}`;
     const activity = await tx`SELECT id, actor, kind, detail, at FROM activity WHERE lead_id = ${id} ORDER BY at`;
@@ -146,6 +147,45 @@ leads.post('/:id/takeover', async (c) => {
   });
 
   return c.json({ ok: true });
+});
+
+/**
+ * Stream a voicemail recording.
+ *
+ * The R2 key comes from the message row inside the tenant's own transaction, never from the
+ * request, so this cannot be pointed at another tenant's audio — and RLS means a message id
+ * belonging to someone else simply does not resolve. Range requests are honoured so the
+ * browser's audio scrubber works.
+ */
+leads.get('/:id/audio/:messageId', async (c) => {
+  const org = c.get('org');
+  const { id, messageId } = c.req.param();
+
+  const [row] = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ audio_r2_key: string | null }[]>`
+      SELECT m.audio_r2_key FROM messages m
+        JOIN leads l ON l.id = m.lead_id
+       WHERE m.id = ${messageId} AND m.lead_id = ${id}`);
+
+  const key = row?.audio_r2_key;
+  if (!key || !key.startsWith(`org/${org.id}/`)) return c.json({ error: 'not found' }, 404);
+
+  const range = c.req.header('range');
+  const obj = await c.env.FILES.get(key, range ? { range: c.req.raw.headers } : undefined);
+  if (!obj) return c.json({ error: 'recording missing' }, 404);
+
+  const headers = new Headers({
+    'content-type': obj.httpMetadata?.contentType ?? 'audio/mpeg',
+    'accept-ranges': 'bytes',
+    'cache-control': 'private, max-age=3600',
+  });
+  if (obj.range && 'offset' in obj.range) {
+    const start = obj.range.offset ?? 0;
+    const end = start + (obj.range.length ?? obj.size) - 1;
+    headers.set('content-range', `bytes ${start}-${end}/${obj.size}`);
+    return new Response(obj.body, { status: 206, headers });
+  }
+  return new Response(obj.body, { headers });
 });
 
 const Reply = z.object({ body: z.string().min(1).max(1600) });

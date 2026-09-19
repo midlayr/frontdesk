@@ -211,3 +211,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
            background: var(--paper); color: var(--accent); border: 1px solid var(--accent);
            border-radius: var(--radius); font: 500 12.5px var(--font-body); box-shadow: var(--shadow-float); }
 .newpill:hover { background: var(--accent-tint); }
+
+/* voicemail bubble: player above the transcript */
+.vm { display: flex; flex-direction: column; gap: 5px; margin-bottom: 7px; }
+.vm audio { width: 100%; max-width: 320px; height: 32px; }
+.vm .label { color: var(--ink-3); }

@@ -4,6 +4,8 @@ import type { Env, Job, Org } from './env';
 import { connect, withOrg, type Sql } from './db';
 import { resolveOrg } from './org';
 import { twilioSms } from './hooks/twilio-sms';
+import { twilioVoice, twilioRecording } from './hooks/twilio-voice';
+import { transcribe } from './jobs/transcribe';
 import { extractSpecs } from './jobs/extract-specs';
 import { leads } from './api/leads';
 import { internal } from './api/internal';
@@ -66,6 +68,8 @@ app.get('/widget/chat.js', serveWidget);
 
 // Webhooks resolve their own tenant (from the number dialled, not the hostname).
 app.post('/hooks/twilio/sms', (c) => twilioSms(c.req.raw, c.env, c.get('sql')));
+app.post('/hooks/twilio/voice', (c) => twilioVoice(c.req.raw, c.env, c.get('sql')));
+app.post('/hooks/twilio/recording', (c) => twilioRecording(c.req.raw, c.env, c.get('sql'), c.executionCtx));
 
 // Everything below is tenant-scoped by hostname.
 app.use('/api/*', async (c, next) => {
@@ -188,6 +192,9 @@ export default {
           switch (job.kind) {
             case 'extract_specs':
               await extractSpecs(env, sql, job.orgId, job.leadId);
+              break;
+            case 'transcribe':
+              await transcribe(env, sql, job.orgId, job.messageId);
               break;
             default:
               // transcribe / score_intent / enrich / import_rows / drip_send land here as

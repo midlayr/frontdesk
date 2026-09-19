@@ -36,7 +36,7 @@ function urgency(l: Lead): { color: string; label: string } {
   if (l.rush || (hoursLeft !== null && hoursLeft < 0)) {
     return { color: 'var(--rush)', label: hoursLeft !== null && hoursLeft < 0 ? 'overdue' : 'rush' };
   }
-  if (l.status === 'live') return { color: 'var(--accent)', label: 'live' };
+  if (l.status === 'live') return { color: 'var(--ok)', label: 'live' };
   if (hoursLeft !== null && hoursLeft < 24) return { color: 'var(--warn)', label: 'due today' };
   if (l.status === 'needs_info') return { color: 'var(--warn)', label: 'needs info' };
   if (l.status === 'replied' || l.status === 'quoted') return { color: 'var(--ok)', label: l.status };
@@ -428,6 +428,16 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error }: {
           {d.messages.map((m) => (
             <div key={m.id} className={`bubble ${m.direction === 'in' ? 'in' : m.author === 'bot' ? 'bot' : 'out'}`}>
               <span className="who">{m.author === 'visitor' ? who : m.author === 'bot' ? 'Bot' : 'Rep'} · {age(m.sent_at)} ago</span>
+              {m.has_audio && (
+                <div className="vm">
+                  <audio controls preload="none" src={`/api/leads/${l.id}/audio/${m.id}?org=${encodeURIComponent(orgSlug)}`} />
+                  <span className="label">
+                    {m.transcript_status === 'pending' ? 'Transcribing…'
+                      : m.transcript_status === 'failed' ? 'Could not read the audio — listen and fill the spec in by hand'
+                      : 'Voicemail · transcript below'}
+                  </span>
+                </div>
+              )}
               {m.body}
             </div>
           ))}

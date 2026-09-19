@@ -15,6 +15,7 @@ export interface Lead {
 export interface Message {
   id: string; channel: string; direction: 'in' | 'out';
   author: string; body: string | null; sent_at: string;
+  has_audio?: boolean; transcript_status?: 'pending' | 'done' | 'failed' | null;
 }
 
 export interface Org {

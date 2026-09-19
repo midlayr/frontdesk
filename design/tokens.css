@@ -1,0 +1,50 @@
+/* Midlayr Front Desk · design tokens · v1
+   Platform defaults. Tenant overrides come from orgs.brand at runtime (see theme.ts). */
+:root {
+  /* paper & ink */
+  --paper: #FBFAF8;        /* app background */
+  --paper-2: #F2F1EE;      /* rails, panels, sunk rows */
+  --rule: #E3E1DC;         /* every 1px border */
+  --ink: #14161A;          /* primary text, dark surfaces */
+  --ink-2: #5C6169;        /* secondary text, mono labels */
+  --ink-3: #9AA0A8;        /* placeholders, disabled, tertiary labels */
+
+  /* accent — tenant-overridable (orgs.brand.color) */
+  --accent: #0B7FA8;
+  --accent-deep: #075E7C;  /* hover, borders on accent buttons */
+  --accent-wash: #E6F2F7;  /* selection, chips, arrive flash */
+  --accent-text: #CFE8F2;  /* small labels on accent surfaces */
+
+  /* status */
+  --ok: #1F7A4D;           /* live, ticket created, checks */
+  --ok-bright: #4FC28A;    /* live dot on dark header */
+  --warn: #B4690E;         /* rush, needs info, handoff rule */
+  --danger: #B4261B;       /* delete, failed send */
+
+  /* type */
+  --font-display: 'Archivo', sans-serif;            /* wdth 125, weights 500/600/700 — headings, wordmarks */
+  --font-body: 'Inter Tight', system-ui, sans-serif; /* 400/500/600/700 */
+  --font-mono: 'IBM Plex Mono', monospace;          /* 400/500 — labels, ids, statuses, timestamps */
+  --display-settings: 'wdth' 125;
+
+  /* scale (px) */
+  --text-xs: 10px;  --text-sm: 11px;  --text-label: 12px; --text-body: 13.5px; --text-md: 14px;
+  --text-lg: 16px;  --text-h2: 24px;  --text-h1: 30px;   --text-hero: 40px;
+  --tracking-label: .08em;  --tracking-wide: .1em;  --tracking-tight: -.02em;
+
+  /* shape */
+  --radius: 2px;           /* everything. no pills, no 8px cards */
+  --shadow-float: 0 8px 24px rgba(20,22,26,.10);
+  --shadow-widget: 0 12px 32px rgba(20,22,26,.16);
+
+  /* layout */
+  --header-h: 56px;  --rail-w: 220px;  --rail-collapsed: 56px;  --queue-w: 320px;
+  --control-h: 28px; --control-h-lg: 34px; --input-h: 36px;
+}
+body { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: var(--text-md); -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-decoration: none; } a:hover { color: var(--accent-deep); text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: var(--accent-wash); }
+@keyframes arrive { 0%,70% { background: var(--accent-wash) } 100% { background: transparent } }
+@keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important } }

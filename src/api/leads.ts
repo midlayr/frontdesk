@@ -1,204 +1,102 @@
+// GET /api/leads · GET /api/leads/:id · PATCH /api/leads/:id · POST /api/leads/:id/reply
 import { Hono } from 'hono';
 import { ulid } from 'ulid';
-import { z } from 'zod';
-import type { Env, Org } from '../env';
-import { withOrg, type Sql } from '../db';
-import { sendSms } from '../lib/twilio';
+import type { Env } from '../index';
+import { connect, withOrg, type Org } from '../db';
 
-type Vars = { org: Org; sql: Sql; userId: string };
-
+type Vars = { org: Org; userId: string };
 export const leads = new Hono<{ Bindings: Env; Variables: Vars }>();
 
-// queue order: live chats first, then rush, then soonest deadline, then oldest.
+// queue: live → rush → deadline → arrived
 leads.get('/', async (c) => {
-  const org = c.get('org');
-  const status = c.req.query('status');
-  const assignee = c.req.query('assignee');
-  const q = c.req.query('q');
-
-  const rows = await withOrg(c.get('sql'), org.id, (tx) => tx`
-    SELECT l.id, l.ticket_no, l.channel, l.status, l.rush, l.deadline_at, l.assignee_id,
-           l.product, l.qty, l.size, l.stock, l.color, l.finish,
-           l.confidence, l.intent_score, l.first_reply_at, l.created_at,
-           -- to_jsonb: Hyperdrive needs fetch_types:false, which leaves postgres.js unable to
-           -- parse text[] — without this the client receives the string '{}' instead of [].
-           to_jsonb(l.missing_fields) AS missing_fields,
-           c.name AS contact_name, c.phone AS contact_phone, c.email AS contact_email,
-           cs.do_id AS chat_sid
-      FROM leads l
-      LEFT JOIN contacts c ON c.id = l.contact_id
-      LEFT JOIN LATERAL (
-        SELECT do_id FROM chat_sessions WHERE lead_id = l.id ORDER BY started_at DESC LIMIT 1
-      ) cs ON true
-     WHERE (${status ?? null}::text IS NULL OR l.status = ${status ?? null}::lead_status)
-       AND (${assignee ?? null}::text IS NULL OR l.assignee_id = ${assignee ?? null})
-       AND (${q ?? null}::text IS NULL OR l.search @@ plainto_tsquery('simple', ${q ?? null}))
-     ORDER BY (l.status = 'live') DESC, l.rush DESC, l.deadline_at NULLS LAST, l.created_at
-     LIMIT 200`);
-
-  return c.json({ leads: rows });
+  const org = c.get('org'); const q = c.req.query();
+  const sql = connect(c.env);
+  const rows = await withOrg(sql, org.id, (tx) => tx`
+    SELECT l.id, l.ticket_no, l.channel, l.status, l.rush, l.deadline_at, l.product, l.qty, l.size, l.stock, l.finish,
+           l.missing_fields, l.confidence, l.intent_score, l.created_at, l.assignee_id,
+           ct.name AS contact_name, ct.phone, ct.email, co.name AS company
+    FROM leads l LEFT JOIN contacts ct ON ct.id = l.contact_id LEFT JOIN companies co ON co.id = l.company_id
+    WHERE l.org_id = ${org.id}
+      ${q.status ? tx`AND l.status = ${q.status}::lead_status` : tx`AND l.status NOT IN ('closed','spam')`}
+      ${q.assignee ? tx`AND l.assignee_id = ${q.assignee}` : tx``}
+      ${q.q ? tx`AND (l.search @@ plainto_tsquery('simple', ${q.q}) OR co.name ILIKE ${'%' + q.q + '%'} OR ct.name ILIKE ${'%' + q.q + '%'})` : tx``}
+    ORDER BY (l.status = 'live') DESC, l.rush DESC, l.deadline_at NULLS LAST, l.created_at ASC
+    LIMIT 200`);
+  return c.json(rows);
 });
 
 leads.get('/:id', async (c) => {
-  const org = c.get('org');
-  const id = c.req.param('id');
-
-  const found = await withOrg(c.get('sql'), org.id, async (tx) => {
-    // trailing to_jsonb wins over the text[] from SELECT * (see note above)
-    const [lead] = await tx`
-      SELECT l.*, to_jsonb(l.missing_fields) AS missing_fields,
-             (SELECT do_id FROM chat_sessions WHERE lead_id = l.id ORDER BY started_at DESC LIMIT 1) AS chat_sid
-        FROM leads l WHERE l.id = ${id}`;
+  const org = c.get('org'); const id = c.req.param('id');
+  const sql = connect(c.env);
+  const data = await withOrg(sql, org.id, async (tx) => {
+    const [lead] = await tx`SELECT l.*, ct.name AS contact_name, ct.phone, ct.email, co.name AS company FROM leads l
+      LEFT JOIN contacts ct ON ct.id = l.contact_id LEFT JOIN companies co ON co.id = l.company_id WHERE l.id = ${id}`;
     if (!lead) return null;
-    const messages = await tx`SELECT id, channel, direction, author, body, provider_id, sent_at
-                                FROM messages WHERE lead_id = ${id} ORDER BY sent_at`;
-    const attachments = await tx`SELECT id, r2_key, filename, mime, bytes FROM attachments WHERE lead_id = ${id}`;
-    const activity = await tx`SELECT id, actor, kind, detail, at FROM activity WHERE lead_id = ${id} ORDER BY at`;
-    return { lead, messages, attachments, activity };
+    const [messages, attachments, activity] = await Promise.all([
+      tx`SELECT id, channel, direction, author, body, audio_r2_key, transcript_status, sent_at FROM messages WHERE lead_id = ${id} ORDER BY sent_at`,
+      tx`SELECT id, filename, mime, bytes, created_at FROM attachments WHERE lead_id = ${id} ORDER BY created_at`,
+      tx`SELECT actor, kind, detail, at FROM activity WHERE lead_id = ${id} ORDER BY at`,
+    ]);
+    return { ...lead, messages, attachments, activity };
   });
-
-  return found ? c.json(found) : c.json({ error: 'not found' }, 404);
+  return data ? c.json(data) : c.notFound();
 });
 
-/**
- * Re-run extraction over a ticket's inbound messages.
- *
- * Needed whenever the prompt or model changes, or a job died into the DLQ — otherwise the
- * only way to re-extract is to ask the customer to text again.
- */
-leads.post('/:id/reextract', async (c) => {
-  const org = c.get('org');
-  const id = c.req.param('id');
-
-  const exists = await withOrg(c.get('sql'), org.id, async (tx) => {
-    const [row] = await tx<{ id: string }[]>`SELECT id FROM leads WHERE id = ${id}`;
-    return !!row;
+// inline spec edit — correcting the AI is the normal case
+const EDITABLE = new Set(['product', 'qty', 'size', 'stock', 'color', 'finish', 'deadline_at', 'rush', 'status', 'assignee_id']);
+leads.patch('/:id', async (c) => {
+  const org = c.get('org'); const id = c.req.param('id'); const body = await c.req.json();
+  const patch = Object.fromEntries(Object.entries(body).filter(([k]) => EDITABLE.has(k)));
+  if (!Object.keys(patch).length) return c.json({ error: 'nothing editable' }, 400);
+  const sql = connect(c.env);
+  const row = await withOrg(sql, org.id, async (tx) => {
+    const [r] = await tx`UPDATE leads SET ${tx(patch)},
+      confidence = confidence || ${tx.json(Object.fromEntries(Object.keys(patch).map((k) => [k, 1])))},
+      missing_fields = array_remove(array_remove(array_remove(missing_fields, ${patch.product ? 'product' : null}), ${patch.qty ? 'qty' : null}), ${patch.deadline_at ? 'deadline' : null})
+      WHERE id = ${id} RETURNING *`;
+    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail) VALUES (${ulid()}, ${org.id}, ${id}, ${c.get('userId')}, 'spec.edited', ${tx.json(patch)})`;
+    return r;
   });
-  if (!exists) return c.json({ error: 'not found' }, 404);
-
-  await c.env.JOBS.send({ kind: 'extract_specs', orgId: org.id, leadId: id });
-  return c.json({ ok: true, queued: 'extract_specs' });
+  return c.json(row);
 });
 
-/**
- * The rep's end of a live chat.
- *
- * Deliberately separate from /widget/session: that route is public and always opens a
- * visitor socket, so a rep socket has to sit behind /api where auth already applies.
- */
-leads.get('/:id/chat', async (c) => {
-  if (c.req.header('upgrade') !== 'websocket') return c.text('expected websocket', 426);
-  const org = c.get('org');
-  const id = c.req.param('id');
-
-  const [row] = await withOrg(c.get('sql'), org.id, (tx) =>
-    tx<{ do_id: string }[]>`
-      SELECT do_id FROM chat_sessions
-       WHERE lead_id = ${id} AND do_id IS NOT NULL
-       ORDER BY started_at DESC LIMIT 1`);
-  if (!row) return c.text('no chat session for this lead', 404);
-
-  const url = new URL('https://do/');
-  url.searchParams.set('role', 'rep');
-  url.searchParams.set('sid', row.do_id);
-  return c.env.CHAT_SESSION.get(c.env.CHAT_SESSION.idFromName(row.do_id)).fetch(url.toString(), c.req.raw);
-});
-
-/** Rep joins a live chat: hand the DO the rep's identity so both sides see the switch. */
-leads.post('/:id/takeover', async (c) => {
-  const org = c.get('org');
-  const userId = c.get('userId');
-  const id = c.req.param('id');
-
-  const found = await withOrg(c.get('sql'), org.id, async (tx) => {
-    const [row] = await tx<{ do_id: string | null; name: string }[]>`
-      SELECT cs.do_id, u.name
-        FROM chat_sessions cs
-        JOIN leads l ON l.id = cs.lead_id
-        LEFT JOIN users u ON u.id = ${userId}
-       WHERE cs.lead_id = ${id}
-       ORDER BY cs.started_at DESC LIMIT 1`;
-    return row ?? null;
-  });
-
-  if (!found?.do_id) return c.json({ error: 'no chat session for this lead' }, 404);
-
-  const stub = c.env.CHAT_SESSION.get(c.env.CHAT_SESSION.idFromName(found.do_id));
-  const res = await stub.fetch('https://do/takeover', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-internal-token': c.env.SESSION_SECRET },
-    body: JSON.stringify({ repId: userId, repName: found.name ?? 'A rep' }),
-  });
-  if (!res.ok) return c.json({ error: `takeover failed: ${await res.text()}` }, 502);
-
-  await withOrg(c.get('sql'), org.id, async (tx) => {
-    await tx`UPDATE chat_sessions SET rep_id = ${userId}, state = 'live' WHERE do_id = ${found.do_id}`;
-    await tx`UPDATE leads SET status = 'live' WHERE id = ${id}`;
-    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
-             VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'takeover', ${tx.json({})})`;
-  });
-
-  return c.json({ ok: true });
-});
-
-const Reply = z.object({ body: z.string().min(1).max(1600) });
-
-/**
- * POST /api/leads/:id/reply
- *
- * Sends on the lead's own channel, from the tenant's number, then records the message and
- * flips the ticket to replied. The send happens before the write so a Twilio failure surfaces
- * as a 502 instead of a ticket that claims a reply the customer never got.
- */
+// reply on the channel the lead came in on, from the tenant's own number / address
 leads.post('/:id/reply', async (c) => {
-  const org = c.get('org');
-  const userId = c.get('userId');
-  const id = c.req.param('id');
-
-  const parsed = Reply.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) return c.json({ error: 'body required' }, 400);
-  const { body } = parsed.data;
-
-  const sql = c.get('sql');
-
-  const target = await withOrg(sql, org.id, async (tx) => {
-    const [row] = await tx<{ channel: string; phone: string | null; email: string | null }[]>`
-      SELECT l.channel, c.phone, c.email
-        FROM leads l LEFT JOIN contacts c ON c.id = l.contact_id
-       WHERE l.id = ${id}`;
-    return row ?? null;
+  const org = c.get('org'); const id = c.req.param('id'); const { body: text } = await c.req.json();
+  const sql = connect(c.env);
+  const result = await withOrg(sql, org.id, async (tx) => {
+    const [lead] = await tx`SELECT l.channel, l.first_reply_at, ct.phone, ct.email, ct.name, ct.opted_out FROM leads l JOIN contacts ct ON ct.id = l.contact_id WHERE l.id = ${id}`;
+    if (!lead) return null;
+    if (lead.opted_out && (lead.channel === 'sms' || lead.channel === 'voice')) throw new Error('contact opted out of SMS');
+    let providerId: string | null = null;
+    if (lead.channel === 'sms' || lead.channel === 'voice') providerId = await sendSms(c.env, org, lead.phone, text);
+    else if (lead.channel === 'email' || lead.channel === 'form') providerId = await sendEmail(c.env, org, lead.email, `Re: your quote request`, text);
+    // chat: ChatSession DO handles delivery; just log
+    await tx`INSERT INTO messages (id, lead_id, channel, direction, author, body, provider_id) VALUES (${ulid()}, ${id}, ${lead.channel}, 'out', ${c.get('userId')}, ${text}, ${providerId})`;
+    await tx`UPDATE leads SET status = CASE WHEN status IN ('new','needs_info','live') THEN 'replied'::lead_status ELSE status END,
+      first_reply_at = COALESCE(first_reply_at, now()) WHERE id = ${id}`;
+    await tx`UPDATE enrollments SET state = 'replied' WHERE lead_id = ${id} AND state = 'active'`;
+    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail) VALUES (${ulid()}, ${org.id}, ${id}, ${c.get('userId')}, 'reply.sent', ${tx.json({ channel: lead.channel })})`;
+    return { ok: true };
   });
-
-  if (!target) return c.json({ error: 'not found' }, 404);
-
-  if (target.channel !== 'sms') {
-    // voice/email/chat replies land here once those channels ship (GETTING-STARTED §5).
-    return c.json({ error: `reply on ${target.channel} not implemented yet` }, 501);
-  }
-  if (!target.phone) return c.json({ error: 'contact has no phone' }, 422);
-
-  const from = org.comms.sms_number;
-  if (!from) return c.json({ error: 'tenant has no comms.sms_number configured' }, 500);
-
-  let sent;
-  try {
-    sent = await sendSms(c.env, from, target.phone, body);
-  } catch (err) {
-    console.error('reply send failed', err);
-    return c.json({ error: String(err instanceof Error ? err.message : err) }, 502);
-  }
-
-  await withOrg(sql, org.id, async (tx) => {
-    await tx`INSERT INTO messages (id, lead_id, channel, direction, author, body, provider_id)
-             VALUES (${ulid()}, ${id}, 'sms', 'out', ${userId}, ${body}, ${sent.sid})`;
-    await tx`UPDATE leads
-                SET status = 'replied',
-                    first_reply_at = COALESCE(first_reply_at, now())
-              WHERE id = ${id}`;
-    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
-             VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'replied',
-                     ${tx.json({ channel: 'sms', provider_id: sent.sid })})`;
-  });
-
-  return c.json({ ok: true, provider_id: sent.sid, status: 'replied' });
+  return result ? c.json(result) : c.notFound();
 });
+
+async function sendSms(env: Env, org: Org, to: string, body: string) {
+  // Prefer the A2P-registered Messaging Service; fall back to the bare number
+  const sender = org.comms.messaging_service_sid ? { MessagingServiceSid: org.comms.messaging_service_sid } : { From: org.comms.sms_number! };
+  if (!sender.MessagingServiceSid && !sender.From) throw new Error('org has no SMS sender');
+  const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_SID}/Messages.json`, {
+    method: 'POST', headers: { Authorization: 'Basic ' + btoa(`${env.TWILIO_SID}:${env.TWILIO_AUTH_TOKEN}`), 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ ...sender, To: to, Body: body }),
+  });
+  const j = await r.json() as any; if (!r.ok) throw new Error(j.message); return j.sid as string;
+}
+async function sendEmail(env: Env, org: Org, to: string, subject: string, text: string) {
+  const from = org.comms.email_from; if (!from) throw new Error('org has no email_from');
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST', headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ from: `${org.name} <${from}>`, to, subject, text: text + (org.comms.signature ? `\n\n${org.comms.signature}` : '') }),
+  });
+  const j = await r.json() as any; if (!r.ok) throw new Error(j.message); return j.id as string;
+}

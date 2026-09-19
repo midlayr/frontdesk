@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,500;125,600;125,700&family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#FBFAF8;color:#14161A;font-family:'Inter Tight',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box}
+a{color:#0B7FA8;text-decoration:none}
+a:hover{color:#075E7C;text-decoration:underline}
+input,textarea,select,button{font-family:inherit;color:inherit}
+:focus-visible{outline:2px solid #0B7FA8;outline-offset:2px}
+::selection{background:#E6F2F7}
+[data-scroll]{overflow-y:auto;overflow-x:hidden}
+[data-scroll]::-webkit-scrollbar{width:10px}
+[data-scroll]::-webkit-scrollbar-thumb{background:#E3E1DC}
+@keyframes arrive{0%{background:#E6F2F7}70%{background:#E6F2F7}100%{background:transparent}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+
+<div style="height:100vh;display:grid;background:#FBFAF8;color:#14161A;font-size:14px;grid-template-rows:{{ shellRows }}">
+
+  <sc-if value="{{ headerB }}" hint-placeholder-val="{{ false }}">
+    <header style="display:grid;grid-template-rows:38px 1fr;background:#F2F1EE;border-bottom:1px solid #E3E1DC">
+      <div style="display:flex;align-items:center;gap:12px;padding:0 20px 0 24px;border-bottom:1px solid #E3E1DC">
+        <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:18px;width:auto;object-fit:contain;display:block" />
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169;white-space:nowrap">FRONT DESK · POWERED BY MIDLAYR</span>
+        <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169;white-space:nowrap;display:{{ showCounts }}">{{ headerCounts }}</span>
+        <button onClick="{{ toggleShortcuts }}" style="margin-left:16px;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:22px;width:22px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5C6169;cursor:pointer">?</button>
+        <button onClick="{{ signOut }}" title="Sign out" style="margin-left:14px;font-size:12.5px;color:#5C6169;white-space:nowrap;background:transparent;border:0;padding:0;cursor:pointer">Susan R. ▾</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;padding:0 20px 0 24px;background:#FBFAF8">
+        <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ toggleRailSheet }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:28px;padding:0 10px;font-size:13px;cursor:pointer">Filter</button>
+        </sc-if>
+        <div style="display:flex;border:1px solid #E3E1DC;border-radius:2px;overflow:hidden;flex:0 0 auto">
+          <sc-for list="{{ tabsB }}" as="tb" hint-placeholder-count="4">
+            <button onClick="{{ tb.onClick }}" style="border:0;border-left:{{ tb.divider }};padding:6px 14px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;background:{{ tb.bg }};color:{{ tb.color }}">{{ tb.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:0 10px;height:30px;flex:1 1 auto;min-width:120px;max-width:340px">
+          <span style="color:#9AA0A8;font-size:13px">⌕</span>
+          <input ref="{{ searchRef }}" value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search company, contact, phone, job" style="border:0;outline:0;background:transparent;width:100%;min-width:0;font-size:13px" />
+        </div>
+      </div>
+    </header>
+  </sc-if>
+
+  <sc-if value="{{ headerA }}" hint-placeholder-val="{{ true }}">
+  <header style="display:grid;align-items:center;gap:24px;padding:0 20px 0 24px;border-bottom:1px solid #E3E1DC;background:#FBFAF8;grid-template-columns:{{ topCols }}">
+    <div style="display:flex;align-items:center;gap:12px">
+      <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ toggleRailSheet }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:28px;padding:0 10px;font-size:13px;cursor:pointer">Filter</button>
+      </sc-if>
+      <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:22px;width:auto;object-fit:contain;display:block" />
+      <div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding-left:10px;border-left:1px solid #E3E1DC">{{ wordmark }}</div>
+      <sc-if value="{{ showPoweredBy }}" hint-placeholder-val="{{ true }}">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#9AA0A8;white-space:nowrap;padding-left:2px;border-left:1px solid #E3E1DC;padding-left:10px">powered by Midlayr</span>
+      </sc-if>
+    </div>
+    <div style="display:flex;align-items:center;gap:20px;min-width:0">
+      <div style="display:flex;align-items:stretch;gap:18px;height:56px;flex:0 0 auto">
+        <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="3">
+          <button onClick="{{ tab.onClick }}" style="background:transparent;border:0;border-bottom:{{ tab.border }};padding:0 2px;font-size:13.5px;cursor:pointer;color:{{ tab.color }};font-weight:{{ tab.weight }}">{{ tab.label }}</button>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:0 10px;height:30px;flex:1 1 auto;min-width:120px;max-width:280px">
+        <span style="color:#9AA0A8;font-size:13px">⌕</span>
+        <input ref="{{ searchRef }}" value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search leads" style="border:0;outline:0;background:transparent;width:100%;min-width:0;font-size:13px" />
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169;white-space:nowrap;flex:0 0 auto;display:{{ showCounts }}">{{ headerCounts }}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <button onClick="{{ toggleShortcuts }}" style="border:1px solid #E3E1DC;background:transparent;border-radius:2px;height:26px;width:26px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5C6169;cursor:pointer">?</button>
+      <button onClick="{{ signOut }}" title="Sign out" style="display:flex;align-items:center;gap:6px;font-size:13px;color:#14161A;background:transparent;border:0;padding:0;cursor:pointer">Susan R. <span style="color:#9AA0A8;font-size:10px">▾</span></button>
+    </div>
+  </header>
+  </sc-if>
+
+  <sc-if value="{{ isInbox }}" hint-placeholder-val="{{ true }}">
+  <div style="display:grid;min-height:0;grid-template-columns:{{ gridCols }}">
+
+    <nav data-scroll style="background:#F2F1EE;border-right:1px solid #E3E1DC;padding:16px 0;left:0;top:56px;bottom:0;z-index:20;display:{{ railDisplay }};position:{{ railPos }};width:{{ railWidth }};box-shadow:{{ railShadow }}">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#9AA0A8;padding:0 8px 8px;padding-left:{{ railHPad }}">VIEWS</div>
+      <sc-for list="{{ views }}" as="v" hint-placeholder-count="6">
+        <button onClick="{{ v.onClick }}" title="{{ v.title }}" style="width:100%;display:flex;background:transparent;border:0;border-left:3px solid {{ v.bar }};cursor:pointer;text-align:left;flex-direction:{{ railDir }};align-items:{{ railAlign }};justify-content:{{ railJustify }};gap:{{ railGap }};padding:{{ railViewPad }}">
+          <span style="color:{{ v.color }};font-weight:{{ v.weight }};font-size:{{ railFont }}">{{ v.label }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ v.countColor }}">{{ v.count }}</span>
+        </button>
+      </sc-for>
+      <div style="height:1px;background:#E3E1DC;margin:16px 16px"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#9AA0A8;padding:0 8px 8px;padding-left:{{ railHPad }}">CHANNEL</div>
+      <sc-for list="{{ channelToggles }}" as="c" hint-placeholder-count="5">
+        <button onClick="{{ c.onClick }}" title="{{ c.label }}" style="width:100%;display:flex;align-items:center;gap:9px;background:transparent;border:0;cursor:pointer;text-align:left;padding:6px 8px 6px {{ railHPad }}">
+          <span style="width:13px;height:13px;border:1px solid #E3E1DC;border-radius:2px;display:grid;place-items:center;background:{{ c.box }};color:#FBFAF8;font-size:9px;line-height:1;flex:0 0 auto">{{ c.tick }}</span>
+          <span style="font-size:13.5px;color:{{ c.color }};display:{{ railLabelDisplay }}">{{ c.label }}</span>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#9AA0A8">{{ c.code }}</span>
+        </button>
+      </sc-for>
+    </nav>
+
+    <section data-scroll data-list-scroll style="background:#FBFAF8;border-right:1px solid #E3E1DC;position:relative;display:{{ listDisplay }}">
+      <sc-if value="{{ newPill }}" hint-placeholder-val="{{ false }}">
+        <div style="position:sticky;top:0;z-index:5;display:flex;justify-content:center;padding:8px 0 0">
+          <button onClick="{{ dismissPill }}" style="border:1px solid #0B7FA8;background:#E6F2F7;color:#075E7C;border-radius:2px;padding:4px 10px;font-size:12px;cursor:pointer">1 new lead</button>
+        </div>
+      </sc-if>
+      <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+        <div>
+          <div style="position:sticky;top:0;z-index:2;background:#F2F1EE;border-bottom:1px solid #E3E1DC;padding:6px 16px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">{{ g.label }}</div>
+          <sc-for list="{{ g.rows }}" as="row" hint-placeholder-count="4">
+            <div role="option" aria-selected="{{ row.selected }}" onClick="{{ row.onClick }}" tabIndex="0" style="position:relative;padding:11px 16px 12px 19px;border-bottom:1px solid #E3E1DC;cursor:pointer;transition:background 90ms ease-out;background:{{ row.bg }};animation:{{ row.anim }}">
+              <span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{{ row.bar }}"></span>
+              <span style="position:absolute;left:8px;top:17px;width:6px;height:6px;border-radius:50%;background:{{ row.dot }}"></span>
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.04em;color:#E0115F">{{ row.rush }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.04em;color:#1F7A4D">{{ row.live }}</span>
+                <span style="font-size:15px;font-weight:{{ row.nameWeight }};color:#14161A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ row.company }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#B4690E;white-space:nowrap">{{ row.callback }}</span>
+                <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169;white-space:nowrap">{{ row.time }}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:7px">
+                <span style="flex:0 0 auto;width:22px;height:16px;border:1px solid #E3E1DC;border-radius:1px;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.04em;color:#5C6169" title="{{ row.channelWord }}">{{ row.channelCode }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ row.qtyColor }};white-space:nowrap">{{ row.qty }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#9AA0A8">·</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ row.stockColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ row.stock }}</span>
+              </div>
+              <div style="margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:#5C6169;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                <span style="color:#5C6169">{{ row.finish }}</span>
+                <span style="color:{{ row.deadlineColor }}">{{ row.deadline }}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+      <sc-if value="{{ listEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:48px 24px;text-align:center">
+          <div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:600;font-size:16px;color:#14161A">No leads match this filter.</div>
+          <button onClick="{{ clearFilter }}" style="margin-top:14px;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:6px 12px;font-size:13px;cursor:pointer">Clear filter</button>
+        </div>
+      </sc-if>
+    </section>
+
+    <section aria-live="polite" style="grid-template-rows:1fr auto;min-height:0;background:#FBFAF8;display:{{ ticketDisplay }}">
+      <sc-if value="{{ hasTicket }}" hint-placeholder-val="{{ true }}">
+        <div data-scroll style="padding:20px 24px 28px">
+          <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ backToList }}" style="margin-bottom:14px;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:5px 11px;font-size:13px;cursor:pointer">← Inbox</button>
+          </sc-if>
+
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <span style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.06em;color:#E0115F">{{ t.rushMark }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#9AA0A8">TICKET</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:500;letter-spacing:-.02em;color:#14161A;white-space:nowrap">{{ t.ticket }}</span>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+              <label style="display:flex;align-items:center;gap:7px;border:1px solid #E3E1DC;border-radius:2px;padding:0 9px;height:30px;background:#FBFAF8">
+                <span style="width:6px;height:6px;border-radius:50%;background:{{ t.statusColor }}"></span>
+                <select value="{{ t.status }}" onChange="{{ onStatus }}" style="border:0;outline:0;background:transparent;font-family:'IBM Plex Mono',monospace;font-size:13px;cursor:pointer">
+                  <option value="New">New</option>
+                  <option value="Working">Working</option>
+                  <option value="Replied">Replied</option>
+                  <option value="Quoted">Quoted</option>
+                  <option value="Won">Won</option>
+                  <option value="Lost">Lost</option>
+                  <option value="Spam">Spam</option>
+                </select>
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;border:1px solid #E3E1DC;border-radius:2px;padding:0 9px;height:30px;background:#FBFAF8">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#9AA0A8">ASSIGN</span>
+                <select ref="{{ assignRef }}" value="{{ t.assignee }}" onChange="{{ onAssign }}" style="border:0;outline:0;background:transparent;font-family:'IBM Plex Mono',monospace;font-size:13px;cursor:pointer">
+                  <option value="Unassigned">Unassigned</option>
+                  <option value="Susan R.">Susan R.</option>
+                  <option value="Danny O.">Danny O.</option>
+                  <option value="Alma T.">Alma T.</option>
+                  <option value="Ruben C.">Ruben C.</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <h1 style="margin:16px 0 4px;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1.1">{{ t.company }}</h1>
+          <div style="font-size:15px;color:#14161A">{{ t.contact }}</div>
+          <div style="margin-top:8px;display:flex;align-items:center;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:13px">
+            <a href="{{ t.telHref }}" onClick="{{ t.copyPhone }}" style="color:#0B7FA8">{{ t.phone }}</a>
+            <span style="color:#9AA0A8">·</span>
+            <a href="{{ t.mailHref }}" onClick="{{ t.copyEmail }}" style="color:#0B7FA8">{{ t.email }}</a>
+            <span style="font-family:'Inter Tight',sans-serif;font-size:11px;color:#9AA0A8">{{ t.copyHint }}</span>
+          </div>
+          <div style="margin-top:10px;padding-bottom:16px;border-bottom:1px solid #E3E1DC;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#5C6169">{{ t.provenance }}</div>
+
+          <sc-if value="{{ t.extractionFailed }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:16px;border:1px solid #B4690E;border-left:3px solid #B4690E;border-radius:2px;padding:10px 12px;font-size:13.5px;color:#B4690E">Couldn't read specs from this one. Fill them in below.</div>
+          </sc-if>
+
+          <div style="margin-top:20px;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:600;font-size:16px;letter-spacing:-.01em">SPEC</div>
+          <div style="margin-top:10px;border-top:1px solid #E3E1DC;display:grid;column-gap:32px;grid-template-columns:{{ specCols }}">
+            <sc-for list="{{ t.spec }}" as="f" hint-placeholder-count="8">
+              <div style="display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid #E3E1DC">
+                <span style="flex:0 0 110px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">{{ f.label }}</span>
+                <sc-if value="{{ f.editing }}" hint-placeholder-val="{{ false }}">
+                  <input ref="{{ f.inputRef }}" value="{{ f.draft }}" onChange="{{ f.onInput }}" onBlur="{{ f.commit }}" onKeyDown="{{ f.onKey }}" style="flex:1;min-width:0;border:1px solid #0B7FA8;border-radius:2px;background:#FBFAF8;padding:2px 5px;font-family:'IBM Plex Mono',monospace;font-size:13px" />
+                </sc-if>
+                <sc-if value="{{ f.showValue }}" hint-placeholder-val="{{ true }}">
+                  <span onClick="{{ f.edit }}" title="{{ f.title }}" style="flex:1;font-family:'IBM Plex Mono',monospace;font-size:13px;color:{{ f.color }};cursor:text;border-bottom:{{ f.underline }};padding-bottom:1px">{{ f.value }}</span>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="margin-top:22px;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:600;font-size:16px;letter-spacing:-.01em">JOB DESCRIPTION</div>
+          <p style="margin:8px 0 0;max-width:68ch;font-size:14px;line-height:1.55;text-wrap:pretty">{{ t.jobDescription }}</p>
+
+          <div style="margin-top:24px;padding-top:16px;border-top:1px solid #E3E1DC;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:600;font-size:16px;letter-spacing:-.01em">WHAT THEY ASKED FOR</div>
+
+          <sc-if value="{{ t.isVoice }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;max-width:68ch">
+              <div style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 12px 10px;background:#F2F1EE">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <button onClick="{{ t.togglePlay }}" title="{{ t.playTitle }}" style="width:28px;height:28px;border:1px solid {{ t.playColor }};background:#FBFAF8;color:{{ t.playColor }};border-radius:2px;cursor:pointer;font-size:11px;line-height:1">{{ t.playGlyph }}</button>
+                  <div style="flex:1;height:3px;background:#E3E1DC;position:relative"><span style="position:absolute;left:0;top:0;bottom:0;background:{{ t.playColor }};width:{{ t.playPct }}"></span></div>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169;white-space:nowrap">{{ t.audioLen }}</span>
+                </div>
+                <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">{{ t.liveHint }}</span>
+                  <select value="{{ t.voiceName }}" onChange="{{ t.onVoice }}" title="Voice" style="margin-left:auto;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:2px 4px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5C6169;max-width:230px;cursor:pointer">
+                    <sc-for list="{{ t.voices }}" as="vo" hint-placeholder-count="3">
+                      <option value="{{ vo.name }}">{{ vo.label }}</option>
+                    </sc-for>
+                  </select>
+                </div>
+              </div>
+              <p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:#5C6169;text-wrap:pretty"><span style="color:#14161A;background:#E6F2F7">{{ t.tSpoken }}</span><span>{{ t.tRest }}</span></p>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isLive }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;max-width:60ch;border:1px solid #1F7A4D;border-radius:2px;background:#FBFAF8;padding:10px 12px;display:flex;align-items:center;gap:10px">
+              <span style="width:7px;height:7px;border-radius:50%;background:#1F7A4D"></span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:.08em;color:#1F7A4D">LIVE ON DUMONT.COM</span>
+              <span style="font-size:13px;color:#5C6169">She's on the site now — type below and she sees it in the widget.</span>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isThread }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;max-width:60ch;display:flex;flex-direction:column;gap:8px">
+              <sc-for list="{{ t.messages }}" as="m" hint-placeholder-count="3">
+                <div style="align-self:{{ m.align }};max-width:80%;background:{{ m.bg }};border:1px solid #E3E1DC;padding:8px 10px">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169">{{ m.meta }}</div>
+                  <div style="margin-top:4px;font-size:14px;line-height:1.5">{{ m.text }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isLive }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;max-width:60ch;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:10px 12px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <input value="{{ t.liveDraft }}" onChange="{{ t.onLiveDraft }}" onKeyDown="{{ t.onLiveKey }}" placeholder="Answer her in the chat…" style="flex:1;min-width:0;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:8px 10px;font-size:14px" />
+                <button onClick="{{ t.sendLive }}" style="border:1px solid #1F7A4D;background:#1F7A4D;color:#FBFAF8;border-radius:2px;padding:8px 14px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap">Send in chat</button>
+              </div>
+              <div style="margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169">TAKING OVER FROM THE BOT · SPECS SHE CONFIRMS LAND IN THE SPEC BLOCK</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isEmail }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;max-width:68ch;border:1px solid #E3E1DC">
+              <div style="padding:9px 12px;background:#F2F1EE;border-bottom:1px solid #E3E1DC;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169;line-height:1.7">{{ t.emailHeader }}</div>
+              <p style="margin:0;padding:12px;font-size:14px;line-height:1.6;white-space:pre-line;text-wrap:pretty">{{ t.emailBody }}</p>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isForm }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;max-width:68ch;border-top:1px solid #E3E1DC">
+              <sc-for list="{{ t.formFields }}" as="fld" hint-placeholder-count="5">
+                <div style="display:flex;gap:14px;padding:8px 0;border-bottom:1px solid #E3E1DC">
+                  <span style="flex:0 0 160px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">{{ fld.label }}</span>
+                  <span style="flex:1;font-size:14px;line-height:1.45">{{ fld.value }}</span>
+                </div>
+              </sc-for>
+              <sc-if value="{{ t.hasFiles }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:18px">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:8px">FILES THEY SENT</div>
+                  <sc-for list="{{ t.files }}" as="file" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid #E3E1DC">
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#1F7A4D">✓</span>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ file.name }}</div>
+                        <div style="margin-top:3px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169">{{ file.meta }}</div>
+                      </div>
+                      <a href="#" style="font-size:13px">Open</a>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <button onClick="{{ toggleActivity }}" style="margin-top:24px;display:flex;align-items:center;gap:8px;background:transparent;border:0;padding:0;cursor:pointer;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:600;font-size:16px;letter-spacing:-.01em;color:#14161A">
+            <span>ACTIVITY</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9AA0A8">{{ activityGlyph }}</span>
+          </button>
+          <sc-if value="{{ activityOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:10px;border-top:1px solid #E3E1DC">
+              <sc-for list="{{ t.activity }}" as="a" hint-placeholder-count="3">
+                <div style="display:flex;gap:16px;padding:7px 0;border-bottom:1px solid #E3E1DC;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#5C6169">
+                  <span style="flex:0 0 150px;letter-spacing:.04em;color:#9AA0A8">{{ a.when }}</span>
+                  <span style="flex:1;color:#14161A">{{ a.what }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="border-top:1px solid #E3E1DC;background:#FBFAF8;box-shadow:{{ composerShadow }};transition:height 160ms ease-out">
+          <sc-if value="{{ sendFailed }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:9px 24px 0;font-size:13.5px;color:#E0115F">Reply didn't send — Twilio rejected the number. Check the phone number and send again.</div>
+          </sc-if>
+          <sc-if value="{{ composerCollapsed }}" hint-placeholder-val="{{ true }}">
+            <div style="height:44px;display:flex;align-items:center;gap:16px;padding:0 24px">
+              <button onClick="{{ openComposer }}" style="flex:1;text-align:left;background:transparent;border:0;padding:0;font-size:14px;color:#9AA0A8;cursor:text">{{ replyPlaceholder }}</button>
+              <div style="display:flex;border:1px solid #E3E1DC;border-radius:2px;overflow:hidden">
+                <button onClick="{{ setSms }}" disabled="{{ noPhone }}" style="padding:4px 10px;border:0;background:{{ smsBg }};color:{{ smsColor }};font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer">SMS</button>
+                <button onClick="{{ setEmail }}" disabled="{{ noEmail }}" style="padding:4px 10px;border:0;border-left:1px solid #E3E1DC;background:{{ emailBg }};color:{{ emailColor }};font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer">Email</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ composerOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:14px 24px 16px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">{{ composerLabel }}</span>
+                <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+                  <button onClick="{{ toggleTemplates }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:4px 10px;font-size:12.5px;cursor:pointer">Templates <span style="font-family:'IBM Plex Mono',monospace;color:#9AA0A8">⌘K</span></button>
+                  <div style="display:flex;border:1px solid #E3E1DC;border-radius:2px;overflow:hidden">
+                    <button onClick="{{ setSms }}" disabled="{{ noPhone }}" style="padding:4px 10px;border:0;background:{{ smsBg }};color:{{ smsColor }};font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer">SMS</button>
+                    <button onClick="{{ setEmail }}" disabled="{{ noEmail }}" style="padding:4px 10px;border:0;border-left:1px solid #E3E1DC;background:{{ emailBg }};color:{{ emailColor }};font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer">Email</button>
+                  </div>
+                </div>
+              </div>
+              <sc-if value="{{ templatesOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:10px;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8">
+                  <sc-for list="{{ templates }}" as="tp" hint-placeholder-count="4">
+                    <button onClick="{{ tp.onClick }}" style="display:block;width:100%;text-align:left;padding:8px 12px;border:0;border-bottom:1px solid #E3E1DC;background:transparent;font-size:13.5px;cursor:pointer">{{ tp.label }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ isEmailMode }}" hint-placeholder-val="{{ false }}">
+                <input value="{{ subject }}" onChange="{{ onSubject }}" style="margin-top:10px;width:100%;border:1px solid #E3E1DC;border-radius:2px;padding:7px 9px;font-size:14px" />
+              </sc-if>
+              <textarea ref="{{ draftRef }}" value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onDraftKey }}" style="margin-top:10px;width:100%;height:96px;resize:none;border:1px solid #E3E1DC;border-radius:2px;padding:9px;font-size:14px;line-height:1.5"></textarea>
+              <div style="margin-top:10px;display:flex;align-items:center;gap:14px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:{{ counterColor }}">{{ counterText }}</span>
+                <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+                  <button onClick="{{ closeComposer }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:7px 12px;font-size:13.5px;cursor:pointer">Cancel</button>
+                  <button onClick="{{ send }}" style="border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;padding:7px 16px;font-size:13.5px;font-weight:600;cursor:pointer">Send reply</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ noTicket }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;place-items:center;height:100%">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#9AA0A8">SELECT A LEAD TO OPEN ITS TICKET</div>
+        </div>
+      </sc-if>
+    </section>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isCampaigns }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;min-height:0;grid-template-columns:{{ campCols }}">
+
+      <section data-scroll style="background:#F2F1EE;border-right:1px solid #E3E1DC;display:{{ campListDisplay }}">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #E3E1DC">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">SEQUENCES</span>
+          <button style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:3px 9px;font-size:12.5px;cursor:pointer">New</button>
+        </div>
+        <sc-for list="{{ seqRows }}" as="q" hint-placeholder-count="4">
+          <div onClick="{{ q.onClick }}" style="position:relative;padding:12px 16px 13px 19px;border-bottom:1px solid #E3E1DC;cursor:pointer;background:{{ q.bg }}">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{{ q.bar }}"></span>
+            <div style="display:flex;align-items:baseline;gap:8px">
+              <span style="font-size:15px;font-weight:600">{{ q.name }}</span>
+              <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:{{ q.stateColor }}">{{ q.state }}</span>
+            </div>
+            <div style="margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:#14161A">{{ q.trigger }}</div>
+            <div style="margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169">{{ q.stats }}</div>
+          </div>
+        </sc-for>
+
+        <div style="padding:16px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:8px">LOAD A LIST</div>
+          <sc-if value="{{ csvIdle }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ dropCsv }}" style="width:100%;border:1px dashed #9AA0A8;background:#FBFAF8;border-radius:2px;padding:22px 14px;cursor:pointer;text-align:center">
+              <div style="font-size:13.5px;color:#14161A">Drop a CSV here</div>
+              <div style="margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#9AA0A8">NAME · COMPANY · EMAIL · PHONE</div>
+            </button>
+          </sc-if>
+          <sc-if value="{{ csvDone }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid #1F7A4D;border-radius:2px;background:#FBFAF8;padding:14px">
+              <div style="font-size:13.5px;color:#1F7A4D;font-weight:600">412 contacts added</div>
+              <div style="margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169">reorder-list-2026-Q3.csv · 6 skipped, no email</div>
+              <button onClick="{{ resetCsv }}" style="margin-top:10px;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:4px 10px;font-size:12.5px;cursor:pointer">Load another</button>
+            </div>
+          </sc-if>
+        </div>
+      </section>
+
+      <section data-scroll style="background:#FBFAF8;border-right:1px solid #E3E1DC;padding:20px 24px 32px;display:{{ campBuilderDisplay }}" data-shot="camp-steps">
+        <sc-if value="{{ campBack }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ backToSeqs }}" style="margin-bottom:14px;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:5px 11px;font-size:13px;cursor:pointer">← Sequences</button>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <span style="width:6px;height:6px;border-radius:50%;background:{{ seq.stateColor }}"></span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">{{ seq.stateLabel }}</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+            <button onClick="{{ seq.toggle }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:6px 12px;font-size:13px;cursor:pointer">{{ seq.toggleLabel }}</button>
+            <button style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:6px 12px;font-size:13px;cursor:pointer">Add step</button>
+          </div>
+        </div>
+        <h1 style="margin:14px 0 0;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:28px;letter-spacing:-.02em;line-height:1.1">{{ seq.name }}</h1>
+
+        <div style="margin-top:16px;border-top:1px solid #E3E1DC">
+          <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #E3E1DC"><span style="flex:0 0 120px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">TRIGGER</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px">{{ seq.trigger }}</span></div>
+          <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #E3E1DC"><span style="flex:0 0 120px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">AUDIENCE</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px">{{ seq.audience }}</span></div>
+          <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #E3E1DC"><span style="flex:0 0 120px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">SEND WINDOW</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px">Mon–Fri · 8:00 AM – 5:00 PM · America/Los_Angeles</span></div>
+          <div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid #E3E1DC"><span style="flex:0 0 120px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">STOPS ON</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px">Any reply · opt-out · status set to Won or Lost</span></div>
+        </div>
+
+        <div style="margin-top:22px;display:flex;align-items:baseline;gap:16px">
+          <span style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:600;font-size:16px;letter-spacing:-.01em">STEPS</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#5C6169">{{ seq.sent }} SENT · {{ seq.openRate }} OPEN RATE · {{ seq.replied }} REPLIED</span>
+        </div>
+
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ steps }}" as="st" hint-placeholder-count="6">
+            <div>
+              <div onClick="{{ st.onClick }}" style="border-radius:2px;padding:12px 14px;cursor:pointer;background:{{ st.bg }};border:{{ st.border }}">
+                <div style="display:flex;align-items:baseline;gap:12px">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;width:44px">{{ st.kindLabel }}</span>
+                  <span style="font-size:14.5px;font-weight:600">{{ st.title }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169">{{ st.when }}</span>
+                </div>
+                <div style="margin-top:6px;padding-left:56px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169">{{ st.stats }}</div>
+              </div>
+              <sc-for list="{{ st.branches }}" as="b" hint-placeholder-count="0">
+                <div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 0 40px;padding:7px 12px;border-left:1px solid #E3E1DC;background:#F2F1EE">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#5C6169">IF</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#14161A">{{ b.cond }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9AA0A8">→</span>
+                  <span style="font-size:13.5px;color:#5C6169">{{ b.then }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <sc-if value="{{ emailScrim }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeEmail }}" style="position:fixed;left:0;right:0;top:56px;bottom:0;background:rgba(20,22,26,.20);z-index:14"></div>
+      </sc-if>
+
+      <section data-scroll style="background:#FBFAF8;padding:20px 24px 32px;right:0;top:56px;bottom:0;z-index:15;position:{{ emailPos }};width:{{ emailWidth }};box-shadow:{{ emailShadow }};border-left:{{ emailBorder }};display:{{ emailPaneDisplay }}">
+        <sc-if value="{{ hasEmail }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">EMAIL COPY</span>
+              <sc-if value="{{ emailOverlay }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ closeEmail }}" style="margin-left:auto;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:4px 10px;font-size:12.5px;cursor:pointer">Close</button>
+              </sc-if>
+            </div>
+            <div style="margin-top:12px;border:1px solid #E3E1DC">
+              <div style="padding:10px 12px;background:#F2F1EE;border-bottom:1px solid #E3E1DC;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169">SUBJECT</div>
+              <div style="padding:11px 12px;font-size:14px;font-weight:600;border-bottom:1px solid #E3E1DC">{{ email.subject }}</div>
+              <div style="padding:14px 12px;font-size:13.5px;line-height:1.6;white-space:pre-line;text-wrap:pretty">{{ email.body }}</div>
+            </div>
+            <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#9AA0A8">MERGE FIELDS — FIRST NAME · QUANTITY · STOCK</div>
+            <div style="margin-top:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">FOOTER, EVERY SEND</div>
+            <div style="margin-top:10px;border:1px solid #E3E1DC;padding:12px;font-size:13px;line-height:1.55;color:#5C6169">Dumont Printing · 2831 N Weber Ave, Fresno CA 93705 · <a href="#">Stop these emails</a></div>
+            <div style="margin-top:20px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">OPT-OUTS</div>
+            <div style="margin-top:10px;border-top:1px solid #E3E1DC">
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #E3E1DC;font-family:'IBM Plex Mono',monospace;font-size:12px"><span>mfeld@shawaveauto.com</span><span style="color:#9AA0A8">Jul 22</span></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #E3E1DC;font-family:'IBM Plex Mono',monospace;font-size:12px"><span>office@stanthonyfresno.org</span><span style="color:#9AA0A8">Jul 09</span></div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noEmailSel }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;place-items:center;height:100%">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#9AA0A8">SELECT AN EMAIL STEP</div>
+          </div>
+        </sc-if>
+      </section>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isChat }}" hint-placeholder-val="{{ false }}">
+    <div style="min-height:0;position:relative;background:#F2F1EE;overflow:hidden">
+      <div style="position:absolute;inset:0;padding:40px 56px;display:flex;flex-direction:column;gap:24px">
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#FBFAF8;border:1px solid #E3E1DC;padding:14px 20px">
+          <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:26px;width:auto;object-fit:contain;display:block" />
+          <div style="display:flex;gap:26px;font-size:13.5px;color:#5C6169">
+            <span>Services</span><span>Portfolio</span><span>Request a quote</span><span>Contact</span>
+          </div>
+        </div>
+        <div style="flex:1;display:grid;gap:24px;min-height:0;grid-template-columns:{{ chatHeroCols }}">
+          <div style="background:#FBFAF8;border:1px solid #E3E1DC;padding:44px 48px;display:flex;flex-direction:column;justify-content:center">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#9AA0A8">DUMONT.COM · HOME</div>
+            <h1 style="margin:16px 0 0;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:44px;line-height:1.05;letter-spacing:-.02em;max-width:22ch">Commercial printing in Fresno since 1974.</h1>
+            <p style="margin:16px 0 0;max-width:44ch;font-size:15px;line-height:1.55;color:#5C6169;text-wrap:pretty">Booklets, mailers, labels, menus, banners. Sheetfed and digital under one roof.</p>
+            <div style="margin-top:22px;display:flex;gap:10px">
+              <span style="border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;padding:9px 16px;font-size:13.5px;font-weight:600">Request a quote</span>
+              <span style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 16px;font-size:13.5px">See our work</span>
+            </div>
+          </div>
+          <div style="background:repeating-linear-gradient(135deg,#E9E7E2 0 12px,#F2F1EE 12px 24px);border:1px solid #E3E1DC;place-items:center;display:{{ chatPhotoDisplay }}">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#9AA0A8">PRESS FLOOR PHOTO</span>
+          </div>
+        </div>
+      </div>
+
+      <sc-if value="{{ chatClosed }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ toggleChat }}" style="position:absolute;right:32px;bottom:32px;border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;padding:12px 18px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 8px 24px rgba(20,22,26,.14)">Get a quote</button>
+      </sc-if>
+
+      <sc-if value="{{ chatOpen }}" hint-placeholder-val="{{ true }}">
+        <div data-shot="chat-widget" style="position:absolute;right:32px;bottom:32px;width:min(380px,calc(100% - 64px));max-height:calc(100% - 64px);display:flex;flex-direction:column;background:#FBFAF8;border:1px solid #E3E1DC;box-shadow:0 12px 32px rgba(20,22,26,.16)">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #E3E1DC;background:#14161A;color:#FBFAF8">
+            <span style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase">Dumont Printing</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#9AA0A8">· quotes</span>
+            <button onClick="{{ toggleChat }}" style="margin-left:auto;background:transparent;border:0;color:#9AA0A8;font-size:14px;cursor:pointer">✕</button>
+          </div>
+          <div data-scroll style="flex:1;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:180px">
+            <sc-for list="{{ chatTurns }}" as="c" hint-placeholder-count="3">
+              <div style="align-self:{{ c.align }};max-width:86%;background:{{ c.bg }};border:1px solid #E3E1DC;padding:9px 11px">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#9AA0A8">{{ c.who }}</div>
+                <div style="margin-top:4px;font-size:13.5px;line-height:1.5">{{ c.text }}</div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ chatDone }}" hint-placeholder-val="{{ false }}">
+              <div style="align-self:stretch;border:1px solid #1F7A4D;padding:9px 11px;background:#FBFAF8">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#1F7A4D">TICKET DL-2036 CREATED · CB</div>
+                <div style="margin-top:4px;font-size:13px;color:#5C6169">Landed in the inbox with qty, stock, finish, and deadline already filled in.</div>
+              </div>
+            </sc-if>
+          </div>
+          <div style="border-top:1px solid #E3E1DC;padding:10px 14px 12px">
+            <sc-for list="{{ chatChips }}" as="chip" hint-placeholder-count="1">
+              <button onClick="{{ chip.onClick }}" style="border:1px solid #0B7FA8;background:#E6F2F7;color:#075E7C;border-radius:2px;padding:6px 11px;font-size:13px;cursor:pointer;margin-bottom:10px">{{ chip.label }}</button>
+            </sc-for>
+            <sc-if value="{{ chatDone }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ chatRestart }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:6px 11px;font-size:13px;cursor:pointer;margin-bottom:10px">Start over</button>
+            </sc-if>
+            <div style="display:flex;align-items:center;gap:8px;border:1px solid #E3E1DC;border-radius:2px;padding:0 10px;height:34px">
+              <input placeholder="Type your message" style="flex:1;border:0;outline:0;background:transparent;font-size:13.5px" />
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9AA0A8">↵</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isForm }}" hint-placeholder-val="{{ false }}">
+    <div data-scroll style="min-height:0;background:#F2F1EE;padding:32px 56px 48px">
+      <div style="display:flex;align-items:center;justify-content:space-between;background:#FBFAF8;border:1px solid #E3E1DC;padding:14px 20px">
+        <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:26px;width:auto;object-fit:contain;display:block" />
+        <div style="display:flex;gap:26px;font-size:13.5px;color:#5C6169"><span>Services</span><span>Portfolio</span><span style="color:#14161A;font-weight:600">Request a quote</span><span>Contact</span></div>
+      </div>
+
+      <sc-if value="{{ formOpen }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:24px;display:grid;gap:24px;align-items:start;grid-template-columns:{{ formCols }}">
+
+          <div data-shot="order-form" style="background:#FBFAF8;border:1px solid #E3E1DC;padding:28px 32px 32px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#9AA0A8">DUMONT.COM · REQUEST A QUOTE</div>
+            <h1 style="margin:12px 0 0;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:32px;letter-spacing:-.02em;line-height:1.1">Tell us about the job.</h1>
+            <p style="margin:10px 0 0;max-width:56ch;font-size:14px;line-height:1.55;color:#5C6169;text-wrap:pretty">Fill in what you know. Blank fields are fine — an estimator will call to fill the gaps.</p>
+
+            <div style="margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">COMPANY</span><input placeholder="Fresno Unified School District" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-size:14px" /></label>
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">YOUR NAME</span><input placeholder="Maria Ochoa" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-size:14px" /></label>
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">PHONE</span><input placeholder="(559) 555-0142" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px" /></label>
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">EMAIL</span><input placeholder="mochoa@fusd.org" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px" /></label>
+            </div>
+
+            <div style="margin-top:26px;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:600;font-size:16px;letter-spacing:-.01em">THE JOB</div>
+            <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">QUANTITY</span><input placeholder="2,500" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px" /></label>
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">FLAT SIZE</span><input placeholder="8.5 × 11" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px" /></label>
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">PAGES</span><input placeholder="24" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px" /></label>
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">STOCK</span><input placeholder="100# gloss text" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px" /></label>
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">INK</span><select style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px"><option>4/4</option><option>4/1</option><option>4/0</option><option>1/1</option><option>1/0</option><option>Not sure</option></select></label>
+              <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">NEEDED BY</span><input placeholder="Fri Aug 7" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px" /></label>
+            </div>
+            <div style="margin-top:16px">
+              <span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:8px">FINISHING</span>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <span style="border:1px solid #0B7FA8;background:#E6F2F7;color:#075E7C;border-radius:2px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px">saddle stitch</span>
+                <span style="border:1px solid #E3E1DC;border-radius:2px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#5C6169">perfect bind</span>
+                <span style="border:1px solid #E3E1DC;border-radius:2px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#5C6169">coil</span>
+                <span style="border:1px solid #E3E1DC;border-radius:2px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#5C6169">fold</span>
+                <span style="border:1px solid #E3E1DC;border-radius:2px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#5C6169">score</span>
+                <span style="border:1px solid #E3E1DC;border-radius:2px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#5C6169">die cut</span>
+                <span style="border:1px solid #E3E1DC;border-radius:2px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#5C6169">UV coat</span>
+                <span style="border:1px solid #E3E1DC;border-radius:2px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#5C6169">foil stamp</span>
+                <span style="border:1px solid #E3E1DC;border-radius:2px;padding:6px 11px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#5C6169">laminate</span>
+              </div>
+            </div>
+            <label style="display:block;margin-top:20px"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">ANYTHING ELSE</span><textarea placeholder="Reprint of last year's handbook with two new schools added. Board meeting Aug 7." style="width:100%;height:76px;resize:none;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:9px 10px;font-size:14px;line-height:1.5"></textarea></label>
+
+            <div style="margin-top:24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+              <button onClick="{{ submitForm }}" style="border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;padding:11px 20px;font-size:14px;font-weight:600;cursor:pointer">Send request</button>
+              <span style="font-size:13px;color:#5C6169">{{ fileCount }}</span>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:24px">
+            <div style="background:#FBFAF8;border:1px solid #E3E1DC;padding:24px 26px 26px">
+              <div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:600;font-size:16px;letter-spacing:-.01em">YOUR FILES</div>
+              <sc-if value="{{ noFiles }}" hint-placeholder-val="{{ true }}">
+                <div>
+                  <button onClick="{{ addFiles }}" style="margin-top:14px;width:100%;border:1px dashed #9AA0A8;background:#FBFAF8;border-radius:2px;padding:30px 16px;cursor:pointer;text-align:center">
+                    <div style="font-size:14px;color:#14161A;font-weight:600">Drop artwork here</div>
+                    <div style="margin-top:6px;font-size:13px;color:#5C6169">or click to browse</div>
+                    <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#9AA0A8">PDF · AI · INDD PACKAGE · EPS · TIFF · ZIP · UP TO 2 GB</div>
+                  </button>
+                  <p style="margin:14px 0 0;font-size:13px;line-height:1.55;color:#5C6169;text-wrap:pretty">No artwork yet? Send the form without it — we'll quote from the specs and pick up files later.</p>
+                </div>
+              </sc-if>
+              <sc-if value="{{ hasFiles }}" hint-placeholder-val="{{ false }}">
+                <div>
+                  <div style="margin-top:14px;border-top:1px solid #E3E1DC">
+                    <sc-for list="{{ formFiles }}" as="f" hint-placeholder-count="3">
+                      <div style="display:flex;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px solid #E3E1DC">
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#1F7A4D">✓</span>
+                        <div style="flex:1;min-width:0">
+                          <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#14161A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.name }}</div>
+                          <div style="margin-top:4px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#5C6169">{{ f.meta }}</div>
+                        </div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <button onClick="{{ clearFiles }}" style="margin-top:12px;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:6px 11px;font-size:12.5px;cursor:pointer">Remove all</button>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="background:#FBFAF8;border:1px solid #E3E1DC;padding:24px 26px 26px">
+              <div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:600;font-size:16px;letter-spacing:-.01em">OR EMAIL YOUR FILES</div>
+              <p style="margin:12px 0 0;font-size:13.5px;line-height:1.6;color:#5C6169;text-wrap:pretty">Forward the email you already have — specs, artwork, a purchase order, a photo of the old piece — to the front desk. It lands in the same queue as this form.</p>
+              <div style="margin-top:14px;border:1px solid #E3E1DC;background:#F2F1EE;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:14px"><a href="mailto:files@dumontprinting.com">files@dumontprinting.com</a></div>
+              <div style="margin-top:12px;border-top:1px solid #E3E1DC">
+                <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #E3E1DC"><span style="flex:0 0 92px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">ATTACHMENTS</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px">up to 2 GB per email</span></div>
+                <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #E3E1DC"><span style="flex:0 0 92px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">BIGGER</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px">send a Drive or Dropbox link</span></div>
+                <div style="display:flex;gap:12px;padding:9px 0"><span style="flex:0 0 92px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">SUBJECT</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px">anything — we read it</span></div>
+              </div>
+            </div>
+
+            <div style="background:#14161A;color:#FBFAF8;padding:24px 26px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#9AA0A8">PREFER TO TALK?</div>
+              <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:20px">(559) 555-0100</div>
+              <div style="margin-top:8px;font-size:13.5px;color:#9AA0A8">Mon–Fri, 8 to 5. Voicemail after hours lands in the same queue.</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ formDone }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:24px;background:#FBFAF8;border:1px solid #E3E1DC;padding:44px 48px;max-width:760px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#1F7A4D">REQUEST RECEIVED · TICKET DL-2046</div>
+          <h1 style="margin:14px 0 0;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:34px;letter-spacing:-.02em;line-height:1.1">Your request is in.</h1>
+          <p style="margin:14px 0 0;max-width:56ch;font-size:15px;line-height:1.6;color:#5C6169;text-wrap:pretty">An estimator has it now. You'll hear back today with a price and a date we can hit. We sent a copy of the specs to your email so you have the ticket number.</p>
+          <div style="margin-top:24px;border-top:1px solid #E3E1DC">
+            <div style="display:flex;gap:16px;padding:11px 0;border-bottom:1px solid #E3E1DC"><span style="flex:0 0 130px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">SPECS</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px">2,500 · 100# gloss text · saddle stitch · Fri Aug 7</span></div>
+            <div style="display:flex;gap:16px;padding:11px 0;border-bottom:1px solid #E3E1DC"><span style="flex:0 0 130px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">FILES</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px">{{ fileCount }}</span></div>
+            <div style="display:flex;gap:16px;padding:11px 0"><span style="flex:0 0 130px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169">MORE FILES?</span><span style="font-family:'IBM Plex Mono',monospace;font-size:13px"><a href="mailto:files@dumontprinting.com">files@dumontprinting.com</a> · reference DL-2046</span></div>
+          </div>
+          <button onClick="{{ resetForm }}" style="margin-top:24px;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:9px 14px;font-size:13.5px;cursor:pointer">Start another request</button>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ signInScreen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:60;background:#FBFAF8;display:grid;grid-template-rows:minmax(0,1fr);grid-template-columns:{{ signInCols }}">
+      <div data-scroll style="display:flex;flex-direction:column;justify-content:center;padding:56px 72px;min-width:0;min-height:0;overflow-y:auto">
+        <div style="display:flex;align-items:center;gap:14px">
+          <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:26px;width:auto;object-fit:contain;display:block" />
+          <span style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding-left:14px;border-left:1px solid #E3E1DC">Front Desk</span>
+        </div>
+        <h1 style="margin:36px 0 0;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:38px;line-height:1.08;letter-spacing:-.02em;max-width:22ch">Every quote request, one counter.</h1>
+        <p style="margin:14px 0 0;max-width:44ch;font-size:15px;line-height:1.55;color:#5C6169;text-wrap:pretty">Voicemail, text, the website form, email, and chat — parsed into print specs and ordered by what's on fire.</p>
+
+        <div style="margin-top:32px;max-width:360px">
+          <label style="display:block"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">EMAIL</span><input value="{{ signInEmail }}" onChange="{{ onSignInEmail }}" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:10px 11px;font-family:'IBM Plex Mono',monospace;font-size:13px" /></label>
+          <label style="display:block;margin-top:14px"><span style="display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#5C6169;padding-bottom:6px">PASSWORD</span><input type="password" value="{{ signInPass }}" onChange="{{ onSignInPass }}" onKeyDown="{{ onSignInKey }}" style="width:100%;border:1px solid #E3E1DC;border-radius:2px;background:#FBFAF8;padding:10px 11px;font-family:'IBM Plex Mono',monospace;font-size:13px" /></label>
+          <button onClick="{{ signIn }}" style="margin-top:20px;width:100%;border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer">Sign in</button>
+          <div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <a href="#">Trouble signing in?</a>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:#9AA0A8">SSO AVAILABLE</span>
+          </div>
+        </div>
+        <div style="margin-top:auto;padding-top:36px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#9AA0A8">DUMONT PRINTING · FRESNO, CA · POWERED BY MIDLAYR</div>
+      </div>
+
+      <div data-scroll style="background:#14161A;color:#FBFAF8;padding:56px 60px;flex-direction:column;justify-content:center;min-width:0;min-height:0;overflow-y:auto;display:{{ signInAsideDisplay }}">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#9AA0A8">ON THE COUNTER RIGHT NOW</div>
+        <div style="margin-top:20px;display:flex;align-items:baseline;gap:18px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:52px;letter-spacing:-.02em">{{ signInWaiting }}</span>
+          <span style="font-size:15px;color:#9AA0A8">leads waiting</span>
+        </div>
+        <div style="margin-top:28px;border-top:1px solid #5C6169">
+          <div style="display:flex;gap:16px;padding:13px 0;border-bottom:1px solid #5C6169"><span style="flex:0 0 92px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#E0115F">RUSH</span><span style="font-size:14px;color:#FBFAF8">{{ signInRush }}</span></div>
+          <div style="display:flex;gap:16px;padding:13px 0;border-bottom:1px solid #5C6169"><span style="flex:0 0 92px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#1F7A4D">IN CHAT</span><span style="font-size:14px;color:#FBFAF8">1 visitor on dumont.com right now</span></div>
+          <div style="display:flex;gap:16px;padding:13px 0"><span style="flex:0 0 92px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#B4690E">NEEDS INFO</span><span style="font-size:14px;color:#FBFAF8">{{ signInNeeds }}</span></div>
+        </div>
+        <div style="margin-top:32px;font-size:14px;line-height:1.6;color:#9AA0A8;max-width:38ch;text-wrap:pretty">Sign in and the oldest rush job is already at the top of the list. Nothing to sort, nothing to re-type.</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#14161A;color:#FBFAF8;border-radius:2px;padding:9px 16px;font-size:13.5px">{{ toast }}</div>
+  </sc-if>
+
+  <sc-if value="{{ shortcutsOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ toggleShortcuts }}" style="position:fixed;inset:0;background:rgba(20,22,26,.28);display:grid;place-items:center">
+      <div style="background:#FBFAF8;border:1px solid #E3E1DC;border-radius:2px;padding:20px 24px;width:420px">
+        <div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:16px;letter-spacing:-.01em">Keyboard shortcuts</div>
+        <div style="margin-top:12px;border-top:1px solid #E3E1DC">
+          <sc-for list="{{ shortcuts }}" as="s" hint-placeholder-count="9">
+            <div style="display:flex;gap:16px;padding:6px 0;border-bottom:1px solid #E3E1DC">
+              <span style="flex:0 0 96px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#14161A">{{ s.key }}</span>
+              <span style="flex:1;font-size:13.5px;color:#5C6169">{{ s.action }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;headerStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;one-row&quot;,&quot;two-tier&quot;],&quot;default&quot;:&quot;two-tier&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Header&quot;},&quot;startSignedIn&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const L = (o) => Object.assign({ status: 'New', assignee: 'Unassigned', rush: false, reprint: false, callback: false, budget: null, finishing: null, deadline: null, days: null, bucket: 'today', lowConf: [], activity: [] }, o);
+    this.state = {
+      leads: [
+        L({ id: 46, ticket: 'DL-2046', company: 'Fresno Ag Hardware', contact: 'Trina Beltrán', phone: '(559) 555-0193', email: 'trina@fresnoaghardware.com', channel: 'CB', live: true, qty: null, stock: '12pt C2S', finishing: 'score, trim', deadline: 'Fri Aug 14', days: 16, jobDescription: 'Counter cards for the fall tool promotion. Bot is still working out quantity and stock — she is on the site right now.', mins: 1,
+          messages: [['Trina · 1m ago', 'hi, do you print counter cards? like the little standing ones by the register'], ['Dumont chat · 1m ago', 'We do — 5.5 × 8.5 on 12pt C2S with a score and easel back is our standard counter card. How many do you need?'], ['Trina · just now', "not sure yet, we have 14 stores. can someone tell me what's cheapest"]],
+          activity: [['1m ago', 'Lead created — website chat'], ['just now', 'Visitor still on the site — chat open']] }),
+        L({ id: 44, ticket: 'DL-2044', company: 'Golden State Water Tech', contact: 'Dev Patel', phone: '(559) 555-0187', email: 'dpatel@gswatertech.com', channel: 'WF', rush: true, qty: 3, stock: '13oz scrim vinyl', finishing: 'grommets, hem, 4/0', deadline: 'Thu Jul 30', days: 1, budget: '~$640', jobDescription: '10ft × 3ft hanging banners for the Ag Expo booth. Same artwork as last year with the new tagline. They need them in hand Thursday morning to ship with the booth crate.', mins: 9, assignee: 'Danny O.',
+          form: [['Company', 'Golden State Water Tech'], ['Contact', 'Dev Patel'], ['Phone', '(559) 555-0187'], ['What do you need printed?', '3 hanging banners, 10ft x 3ft, scrim vinyl, grommets top and bottom'], ['When do you need it?', 'Thursday 7/30 — hard date, booth ships Friday'], ['Budget', 'around $600-700'], ['Reprint of a prior job?', 'Yes — 2025 Ag Expo banners, new tagline'] ],
+          activity: [['Jul 29, 9:14 AM', 'Lead created — website form'], ['Jul 29, 9:14 AM', 'Rush flag set — deadline inside 48h'], ['Jul 29, 9:16 AM', 'Assigned to Danny O.'], ['Jul 29, 9:16 AM', 'Synced to monday.com']] }),
+        L({ id: 39, ticket: 'DL-2039', company: 'Sierra Sun Vineyards', contact: 'Renée Laurent', phone: '(559) 555-0231', email: 'renee@sierrasunwine.com', channel: 'SM', rush: true, qty: 6000, stock: '60# uncoated label stock', finishing: 'die cut, foil stamp, bleed', deadline: 'Fri Jul 31', days: 3, budget: '~$5,200', callback: true, jobConf: true, jobDescription: 'Front and back labels for the 2025 estate cabernet, plus 200 shelf talkers. Bottling line is booked Monday, so labels have to be on the dock Friday.', mins: 41, status: 'Working', assignee: 'Alma T.', lowConf: ['BUDGET'],
+          messages: [['Renée · Jul 29, 8:32 AM', 'Hi — need 6,000 wine labels for the 2025 cab, die cut with the gold foil like last run. Bottling Monday so I need them Friday. Can you hit that?'], ['Renée · Jul 29, 8:33 AM', 'Also 200 shelf talkers if you can squeeze them in. Budget is somewhere around 5k. Call me if easier.'], ['Alma T. · Jul 29, 8:51 AM', 'Got it Renée — pulling the foil die from your last job. Confirming press time and I will call you before noon.']],
+          activity: [['Jul 29, 8:32 AM', 'Lead created — text message'], ['Jul 29, 8:33 AM', 'Callback requested'], ['Jul 29, 8:40 AM', 'Assigned to Alma T.'], ['Jul 29, 8:51 AM', 'Reply sent by text'], ['Jul 29, 8:51 AM', 'Status changed to Working']] }),
+        L({ id: 41, ticket: 'DL-2041', company: 'Fresno Unified School District', contact: 'Maria Ochoa', phone: '(559) 555-0142', email: 'mochoa@fusd.org', channel: 'VM', rush: true, qty: 2500, stock: '100# gloss text', finishing: 'saddle stitch, trim', deadline: 'Fri Aug 7', days: 9, budget: '~$3,800', jobDescription: '24-page family handbook booklets for fall registration, 8.5 × 11 folded to 5.5 × 8.5, full color throughout. Board wants them at the August 7 principals meeting.', mins: 14, lowConf: ['BUDGET', 'QTY'],
+          transcript: "Hi, this is Maria Ochoa over at Fresno Unified, curriculum office. We need to get quotes on the family handbook booklets again — it's twenty-four pages, we're thinking twenty-five hundred copies this year since we added the two new schools. Hundred pound gloss text like last time, saddle stitched. Our board meeting is August seventh so we'd need them before that. I think we have somewhere around thirty-eight hundred in the budget. My number is 559-555-0142. Thanks.",
+          audioLen: '0:47',
+          activity: [['Jul 29, 9:00 AM', 'Lead created — voicemail'], ['Jul 29, 9:00 AM', 'Specs read from voicemail — 2 fields low confidence'], ['Jul 29, 9:00 AM', 'Synced to monday.com']] }),
+        L({ id: 40, ticket: 'DL-2040', company: 'Valley Ag Supply', contact: 'Curt Brenneman', phone: '(559) 555-0119', email: 'curt@valleyagsupply.com', channel: 'WF', qty: 1000, stock: '14pt C1S cover', finishing: 'UV coat, score, fold', deadline: 'Wed Aug 12', days: 14, budget: '~$1,150', jobDescription: 'Co-op mailer, 6 × 11 folded to 6 × 5.5, listing fall chemical program pricing. Mailing list comes from them as a CSV.', hrs: 1, assignee: 'Danny O.',
+          files: [['fall-program-mailer-2026.pdf', '6 × 11 · press-ready, bleeds included · 24.6 MB'], ['pricing-table-final.xlsx', '88 KB · replaces page 2 table'], ['mailing-list-Q3.csv', '1,042 rows · addresses only']],
+          form: [['Company', 'Valley Ag Supply'], ['Contact', 'Curt Brenneman'], ['Email', 'curt@valleyagsupply.com'], ['What do you need printed?', '1,000 fall program mailers, 6x11 folded, 14pt C1S cover, UV coat one side'], ['When do you need it?', 'August 12'], ['Budget', '$1,100ish'], ['Notes', 'We will send the mailing list as a CSV. Same layout as spring, new pricing table.']],
+          activity: [['Jul 29, 8:05 AM', 'Lead created — website form'], ['Jul 29, 8:12 AM', 'Assigned to Danny O.']] }),
+        L({ id: 38, ticket: 'DL-2038', company: 'Casa Verde Cantina', contact: 'Ana Ruiz', phone: '(559) 555-0164', email: 'ana@casaverdefresno.com', channel: 'EM', qty: 300, stock: '100# cover matte', finishing: 'laminate 1.5mil, round corner', deadline: 'Mon Aug 10', days: 12, jobDescription: 'Single-panel laminated dinner menus, 8.5 × 14, plus 100 kids menus on plain text stock. New fall items, prices changing.', hrs: 2,
+          emailHeader: 'From  ana@casaverdefresno.com\nTo    quotes@dumontprinting.com\nSubj  Menu reprint — fall items',
+          emailBody: "Hi Dumont,\n\nWe're changing over to the fall menu and need 300 of the laminated dinner menus reprinted, 8.5x14, same 100# matte cover with the 1.5mil laminate and rounded corners you did in March.\n\nAlso 100 kids menus, just plain text stock, black only is fine.\n\nI'll send the updated PDF once our chef signs off — probably Thursday. Need them by August 10 for the menu changeover.\n\nThanks,\nAna",
+          activity: [['Jul 29, 7:10 AM', 'Lead created — email'], ['Jul 29, 7:10 AM', 'Specs read from email']] }),
+        L({ id: 37, ticket: 'DL-2037', company: 'St. Anthony Parish', contact: 'Deacon Ray Molina', phone: '(559) 555-0198', email: 'office@stanthonyfresno.org', channel: 'VM', qty: null, stock: '70# offset text', finishing: 'fold, staple', deadline: 'Sun Aug 2', days: 4, callback: true, jobDescription: 'Weekly bulletin, 4 pages folded, black plus one spot. He never gave a count — last standing order was 900 a week.', hrs: 3,
+          transcript: "Good morning, Deacon Ray at St. Anthony. We're looking at moving the weekly bulletin over to you folks. Four pages, folded, seventy pound offset, black and the blue spot we use. I don't have the count in front of me — whatever we've been running, I can get it from Angela. We'd want the first run for the weekend of the second. Please give me a call back, I'm in the office until three.",
+          audioLen: '0:31',
+          activity: [['Jul 29, 6:32 AM', 'Lead created — voicemail'], ['Jul 29, 6:32 AM', 'Callback requested'], ['Jul 29, 6:32 AM', 'Quantity not found in voicemail']] }),
+        L({ id: 36, ticket: 'DL-2036', company: 'Herrera Heating & Air', contact: 'Luis Herrera', phone: '(559) 555-0176', email: 'luis@herreraheating.com', channel: 'CB', qty: 5000, stock: '12pt C2S', finishing: 'die cut, hole punch, 4/4', deadline: 'Mon Aug 17', days: 19, budget: '~$890', jobDescription: 'Door hangers for the fall tune-up push, 4.25 × 11 with a die-cut hook. Crews hang them in Clovis and northeast Fresno.', hrs: 4, status: 'Working', assignee: 'Ruben C.',
+          messages: [['Luis · Jul 28, 4:41 PM', 'do you guys do door hangers with the hole punched out'], ['Dumont chat · Jul 28, 4:41 PM', 'We do — 4.25 x 11 on 12pt C2S is our standard. How many and when do you need them?'], ['Luis · Jul 28, 4:43 PM', '5000, need them by mid august for the fall tune up campaign. full color both sides'], ['Luis · Jul 28, 4:44 PM', 'ballpark under a grand if possible']],
+          activity: [['Jul 28, 4:41 PM', 'Lead created — website chat'], ['Jul 28, 4:50 PM', 'Assigned to Ruben C.'], ['Jul 29, 7:05 AM', 'Status changed to Working']] }),
+        L({ id: 35, ticket: 'DL-2035', company: 'Clovis Rodeo Association', contact: 'Bev Tanaka', phone: '(559) 555-0155', email: 'bev@clovisrodeo.org', channel: 'SM', qty: 500, stock: null, reprint: true, finishing: 'trim', deadline: 'Fri Aug 14', days: 16, jobDescription: 'Reprint of the 2025 program insert card, PO 8842. She says "same as last time" — stock is not in the text and needs confirming against the prior job.', hrs: 5,
+          messages: [['Bev · Jul 29, 4:20 AM', 'Morning! Need a reprint of the insert card from PO 8842, 500 more. Same as last time.'], ['Bev · Jul 29, 4:21 AM', 'By the 14th would be great.']],
+          activity: [['Jul 29, 4:20 AM', 'Lead created — text message'], ['Jul 29, 4:21 AM', 'Reprint flag set — PO 8842'], ['Jul 29, 4:21 AM', 'Stock not found in message']] }),
+        L({ id: 34, ticket: 'DL-2034', company: 'Blossom Trail Realty', contact: 'Gary Nunes', phone: '(559) 555-0102', email: 'gary@blossomtrail.com', channel: 'EM', qty: 2000, stock: '14pt C2S', finishing: '4/4, bleed, trim', deadline: null, jobDescription: '6 × 9 just-listed postcards, full bleed both sides. No date given — he asked what our turnaround is.', hrs: 6,
+          emailHeader: 'From  gary@blossomtrail.com\nTo    quotes@dumontprinting.com\nSubj  postcard pricing',
+          emailBody: "What would 2,000 6x9 postcards run, 14pt C2S, 4/4 with full bleed? No rush, just building a budget for Q4 farming.\n\nAlso what's your normal turnaround on those?\n\nGary",
+          activity: [['Jul 29, 2:55 AM', 'Lead created — email'], ['Jul 29, 2:55 AM', 'No deadline found in email']] }),
+        L({ id: 33, ticket: 'DL-2033', company: 'Kingsburg Almond Growers', contact: 'Unknown caller', phone: '(559) 555-0221', email: null, channel: 'VM', qty: null, stock: null, finishing: null, deadline: null, extractionFailed: true, jobDescription: 'Nothing readable. Play the voicemail and fill the spec in by hand.', hrs: 7,
+          transcript: '[Line noise, partially inaudible.] …calling about, uh, the harvest — [30 seconds of wind and equipment noise] — need something printed up for the, for the growers meeting, call me back at this number.',
+          audioLen: '1:12',
+          activity: [['Jul 29, 1:40 AM', 'Lead created — voicemail'], ['Jul 29, 1:40 AM', "Couldn't read specs — audio unclear"]] }),
+        L({ id: 32, ticket: 'DL-2032', company: 'Woodward Park Conservancy', contact: 'Priya Raman', phone: '(559) 555-0133', email: 'priya@woodwardconservancy.org', channel: 'WF', qty: 250, stock: '80# dull cover', finishing: 'perfect bind, 4/4, score', deadline: 'Fri Aug 21', days: 23, budget: '~$2,400', jobDescription: '96-page donor annual report, perfect bound, 8.5 × 11. Board mails them the first week of September.', hrs: 8, status: 'Working', assignee: 'Susan R.',
+          form: [['Organization', 'Woodward Park Conservancy'], ['Contact', 'Priya Raman'], ['Email', 'priya@woodwardconservancy.org'], ['What do you need printed?', '250 annual reports, 96 pages, 8.5x11, perfect bound, 80# dull cover'], ['When do you need it?', 'August 21'], ['Budget', 'up to $2,400 approved'], ['Notes', 'Cover has a French fold on the flap — need a dummy before we approve.']],
+          activity: [['Jul 28, 11:02 PM', 'Lead created — website form'], ['Jul 29, 7:22 AM', 'Assigned to Susan R.'], ['Jul 29, 7:22 AM', 'Status changed to Working']] }),
+        L({ id: 28, ticket: 'DL-2028', company: 'Shaw Ave Auto Group', contact: 'Marcus Feld', phone: '(559) 555-0148', email: 'mfeld@shawaveauto.com', channel: 'CB', qty: 10000, stock: '70# gloss text', finishing: '4/4, fold', deadline: 'Mon Aug 31', days: 33, budget: '~$1,980', status: 'Quoted', assignee: 'Danny O.', bucket: 'earlier', day: 'Jul 26', jobDescription: 'Labor Day sale flyers, 11 × 17 folded to 8.5 × 11, full color. Quoted Monday, waiting on his GM to approve.',
+          messages: [['Marcus · Jul 26, 10:12 AM', 'need 10k flyers for the labor day sale, 11x17 folded, full color both sides'], ['Dumont chat · Jul 26, 10:15 AM', '70# gloss text is the usual for that run. When do they need to drop?'], ['Marcus · Jul 26, 10:16 AM', 'in stores by aug 31']],
+          activity: [['Jul 26, 10:12 AM', 'Lead created — website chat'], ['Jul 26, 10:40 AM', 'Assigned to Danny O.'], ['Jul 27, 9:15 AM', 'Reply sent by text'], ['Jul 27, 2:31 PM', 'Status changed to Quoted'], ['Jul 27, 2:31 PM', 'Synced to monday.com']] })
+      ],
+      unread: { 46: true, 44: true, 41: true, 40: true, 38: true, 34: true, 33: true },
+      liveDraft: '', liveQueue: 0,
+      selectedId: 46, view: 'all', channels: {}, query: '',
+      composerOpen: false, replyMode: null, draft: '', subject: 'Re: your print quote request',
+      templatesOpen: false, activityOpen: false, shortcutsOpen: false, toast: null,
+      editing: null, editDraft: '', playing: false, playPos: 0, spokenAt: 0, audioSecs: 0, newPill: false, arrivedId: null,
+      w: typeof window !== 'undefined' ? window.innerWidth : 1440, pane: 'list', railSheet: false,
+      app: 'inbox', seqId: 'quote', stepId: 'q2', campPane: 'list', csvDone: false, live: { autoreply: true, quote: true, reorder: true, cold: false },
+      signedIn: props && props.startSignedIn === true,
+      signInEmail: 'susan@dumontprinting.com', signInPass: '••••••••••',
+      chatOpen: true, chatOpenNarrow: false, chatIdx: 2, stepPicked: false,
+      files: [], formDone: false
+    };
+    this._seedLeads = this.state.leads;
+    this.SEQS = [
+      { id: 'autoreply', name: 'New lead auto-reply', trigger: 'A lead arrives · any channel', stats: [142, 96, 11], audience: 'Every inbound lead, all five channels' },
+      { id: 'quote', name: 'Quote follow-up', trigger: 'Quoted · no reply after 2 days', stats: [88, 51, 19], audience: 'Leads with status Quoted' },
+      { id: 'reorder', name: 'Past customer reorder', trigger: 'Uploaded list · 412 contacts', stats: [412, 174, 26], audience: 'reorder-list-2026-Q3.csv' },
+      { id: 'cold', name: 'Cold prospect intro', trigger: 'Uploaded list · not started', stats: [0, 0, 0], audience: 'fresno-ag-prospects.csv' }
+    ];
+    this.STEPS = {
+      autoreply: [
+        { id: 'a1', kind: 'email', title: 'We got your request', when: 'Immediately', stats: [142, 96, 11] }
+      ],
+      quote: [
+        { id: 'q1', kind: 'wait', title: 'Wait 2 business days', when: 'after the quote goes out' },
+        { id: 'q2', kind: 'email', title: 'Checking in on your quote', when: 'Day 2', stats: [88, 51, 19], branches: [['Replied', 'Sequence stops'], ['Opened, no reply', 'Continue to day 5'], ['Not opened', 'Resend with a new subject line']] },
+        { id: 'q3', kind: 'wait', title: 'Wait 3 days', when: '' },
+        { id: 'q4', kind: 'email', title: 'Anything you want changed?', when: 'Day 5', stats: [61, 34, 9], branches: [['Clicked the quote', 'Assign back to the estimator'], ['No open', 'Continue to day 10']] },
+        { id: 'q5', kind: 'wait', title: 'Wait 5 days', when: '' },
+        { id: 'q6', kind: 'email', title: 'Closing this one out', when: 'Day 10', stats: [38, 22, 7], branches: [['No reply', 'Status set to Lost']] }
+      ],
+      reorder: [
+        { id: 'r1', kind: 'email', title: 'Time to reorder?', when: 'Day 0', stats: [412, 174, 26] },
+        { id: 'r2', kind: 'wait', title: 'Wait 7 days', when: '' },
+        { id: 'r3', kind: 'email', title: 'Same specs, new price sheet', when: 'Day 7', stats: [386, 121, 14] },
+        { id: 'r4', kind: 'wait', title: 'Wait 10 days', when: '' },
+        { id: 'r5', kind: 'email', title: 'Last call on the reorder', when: 'Day 17', stats: [0, 0, 0] }
+      ],
+      cold: [
+        { id: 'c1', kind: 'email', title: 'Printing in the Valley', when: 'Day 0', stats: [0, 0, 0] },
+        { id: 'c2', kind: 'wait', title: 'Wait 6 days', when: '' },
+        { id: 'c3', kind: 'email', title: 'One job, no commitment', when: 'Day 6', stats: [0, 0, 0] }
+      ]
+    };
+    this.EMAILS = {
+      a1: { subject: 'We got your request — Dumont Printing', body: "Hi {{first_name}},\n\nThanks for sending this over. I have your request for {{quantity}} on {{stock}} in front of me and I'm putting a quote together now.\n\nYou'll hear back from me today with a price and a date we can hit. If anything about the job has changed — quantity, stock, finishing — just reply to this email and I'll work from the new numbers.\n\n— The front desk at Dumont Printing\n(559) 555-0100" },
+      q2: { subject: 'Checking in on your quote — {{quantity}} on {{stock}}', body: "Hi {{first_name}},\n\nJust making sure the quote landed. Nothing needed from you if the timing has moved — I'd rather hold the press time than lose the job to a bad date.\n\nIf the number is the sticking point, tell me what you need to hit and I'll show you where we can take cost out: a lighter stock, a different finish, or a longer run that lowers your unit price.\n\n— Dumont Printing" },
+      q4: { subject: 'Anything you want changed on the quote?', body: "Hi {{first_name}},\n\nStill happy to adjust this one. The two things that move price most on your job are the stock and the finishing — swapping {{stock}} for the next weight down usually saves real money without changing how it feels in hand.\n\nHappy to send a revised quote today if you want to see the difference side by side.\n\n— Dumont Printing" },
+      q6: { subject: 'Closing this one out', body: "Hi {{first_name}},\n\nI'll take this off my board for now so it isn't sitting open on your end either. The quote stays good for 30 days — reply any time and I'll pick it right back up, no need to re-send the specs.\n\nWhen the job comes back around, we still have your files.\n\n— Dumont Printing" },
+      r1: { subject: 'Time to reorder, {{first_name}}?', body: "Hi {{first_name}},\n\nYour last run with us was {{quantity}} on {{stock}}. Most shops your size are back in about this often, so I wanted to check before your stock runs thin.\n\nWe still have your files and dies, so a reprint takes one email — no new setup, no new proof unless something changed.\n\nReply with a quantity and I'll have a price back the same day.\n\n— Dumont Printing" },
+      r3: { subject: 'Same specs, new price sheet', body: "Hi {{first_name}},\n\nOur paper pricing moved this quarter, mostly down on coated text weights. If you reorder the same job, here's what it looks like now against your last invoice.\n\nWant me to run the numbers on your exact specs? Reply and I'll send them today.\n\n— Dumont Printing" },
+      r5: { subject: 'Last call on the reorder', body: "Hi {{first_name}},\n\nLast note from me on this. If you'd rather I check back next quarter instead, say the word and I'll move you to a longer cycle.\n\n— Dumont Printing" },
+      c1: { subject: 'Printing in the Valley since 1974', body: "Hi {{first_name}},\n\nWe're a commercial shop on Fresno's north side — booklets, mailers, labels, menus, banners. Sheetfed and digital under one roof, so short runs don't get quoted like long ones.\n\nIf you print anything on a schedule, I'd like the chance to bid one job against whoever you use now.\n\n— Dumont Printing" },
+      c3: { subject: 'One job, no commitment', body: "Hi {{first_name}},\n\nSend me the specs on your next print job and I'll quote it. If we're not competitive, you've lost ten minutes and you know where you stand.\n\n— Dumont Printing" }
+    };
+    this.CHAT = [
+      { who: 'bot', text: "Hi — this is Dumont Printing. Tell me what you need printed and I'll get it in front of an estimator." },
+      { who: 'user', text: 'door hangers, do you punch the hole?' },
+      { who: 'bot', text: 'We do — 4.25 × 11 on 12pt C2S is our standard door hanger, die cut with the hook. How many do you need?' },
+      { who: 'user', text: '5,000' },
+      { who: 'bot', text: 'Got it. Printing both sides in full color, or one side?' },
+      { who: 'user', text: 'both sides, color' },
+      { who: 'bot', text: 'And when do you need them in hand?' },
+      { who: 'user', text: 'mid august' },
+      { who: 'bot', text: "Perfect. That's 5,000 door hangers, 12pt C2S, 4/4, die cut, mid-August. What's the best number for the estimator to reach you?" },
+      { who: 'user', text: '559-555-0176' },
+      { who: 'bot', text: "Thanks — you're in the queue. An estimator will text or call you today with a price. Nothing else needed from you right now." }
+    ];
+    this.CHIPS = ['Get a quote', 'Check on a job', 'Talk to a person'];
+    this.searchRef = React.createRef();
+    this.draftRef = React.createRef();
+    this.assignRef = React.createRef();
+    this.editRef = React.createRef();
+  }
+
+  componentDidMount() {
+    this._key = (e) => this.onKey(e);
+    window.addEventListener('keydown', this._key);
+    this._resize = () => this.setState({ w: window.innerWidth });
+    window.addEventListener('resize', this._resize);
+    this._resize();
+    if (this.speechOK()) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => this.forceUpdate();
+    }
+    const seen = {}, deduped = this.state.leads.filter(l => seen[l.id] ? false : (seen[l.id] = true));
+    if (!seen[46]) this.setState({ leads: this._seedLeads, selectedId: 46, liveQueue: 0, liveDraft: '' });
+    else if (deduped.length !== this.state.leads.length) this.setState({ leads: deduped });
+    if (!seen[45]) this._t = setTimeout(() => this.arrive(), 20000);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._key); window.removeEventListener('resize', this._resize);
+    clearTimeout(this._t); clearInterval(this._tick);
+    if (this.speechOK()) window.speechSynthesis.cancel();
+  }
+
+  arrive() {
+    if (this.leadsList().some(l => l.id === 45)) return;
+    const lead = { id: 45, ticket: 'DL-2045', company: 'Tower District Theatre Co.', contact: 'Dana Whitfield', phone: '(559) 555-0170', email: 'dana@towerdistricttheatre.org', channel: 'SM', rush: false, reprint: false, callback: false, status: 'New', assignee: 'Unassigned', qty: 1200, stock: '100# gloss cover', finishing: '4/4, score, fold', deadline: 'Wed Aug 5', days: 7, budget: '~$740', bucket: 'today', mins: 0, lowConf: [], jobDescription: 'Season programs for the fall run, 8.5 × 11 folded to 5.5 × 8.5, 8 pages self-cover.',
+      messages: [['Dana · just now', 'Hi! We need 1,200 season programs printed, 8 pages, 100# gloss cover, folded. Opening night is Aug 8 so we need them by the 5th.']],
+      activity: [['just now', 'Lead created — text message']] };
+    this.setState(s => ({ leads: [lead].concat(s.leads), unread: Object.assign({}, s.unread, { 45: true }), newPill: true, arrivedId: 45 }));
+    setTimeout(() => this.setState({ arrivedId: null }), 1000);
+  }
+
+  leadsList() {
+    const seen = {};
+    const out = this.state.leads.filter(l => seen[l.id] ? false : (seen[l.id] = true));
+    return seen[46] ? out : this._seedLeads;
+  }
+  sel() { return this.leadsList().find(l => l.id === this.state.selectedId) || this.leadsList()[0] || null; }
+
+  visible() {
+    const s = this.state, q = s.query.trim().toLowerCase();
+    const chans = Object.keys(s.channels).filter(k => s.channels[k]);
+    let out = this.leadsList().filter(l => {
+      if (s.view === 'new' && l.status !== 'New') return false;
+      if (s.view === 'mine' && l.assignee !== 'Susan R.') return false;
+      if (s.view === 'rush' && !l.rush) return false;
+      if (s.view === 'needs' && !(l.qty == null || l.stock == null || l.deadline == null)) return false;
+      if (s.view === 'quoted' && l.status !== 'Quoted') return false;
+      if (s.view === 'won' && l.status !== 'Won') return false;
+      if (s.view === 'lost' && l.status !== 'Lost') return false;
+      if (s.view === 'spam' && l.status !== 'Spam') return false;
+      if (chans.length && chans.indexOf(l.channel) < 0) return false;
+      if (q) {
+        const hay = [l.company, l.contact, l.phone, l.email, l.jobDescription].join(' ').toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+    const rank = l => l.live ? -1 : (l.rush ? 0 : (l.days != null && l.days <= 2 ? 1 : 2));
+    const age = l => l.mins != null ? l.mins : (l.hrs != null ? l.hrs * 60 : 100000);
+    out.sort((a, b) => rank(a) - rank(b) || (rank(a) < 2 ? (a.days || 99) - (b.days || 99) : age(a) - age(b)));
+    return out;
+  }
+
+  select(id) { this.stopAudio(); this.setState({ selectedId: id, composerOpen: false, templatesOpen: false, editing: null, playing: false, pane: 'ticket', railSheet: false, unread: Object.assign({}, this.state.unread, { [id]: false }) }); }
+  step(d) {
+    const v = this.visible(), i = v.findIndex(l => l.id === this.state.selectedId);
+    const n = v[Math.max(0, Math.min(v.length - 1, (i < 0 ? 0 : i) + d))];
+    if (n) this.select(n.id);
+  }
+  patch(fields) {
+    this.setState(s => ({ leads: s.leads.map(l => l.id === s.selectedId ? Object.assign({}, l, fields) : l) }));
+  }
+  logActivity(text) {
+    this.setState(s => ({ leads: s.leads.map(l => l.id === s.selectedId ? Object.assign({}, l, { activity: l.activity.concat([['just now', text]]) }) : l) }));
+  }
+  setStatus(v) { this.patch({ status: v }); this.logActivity('Status changed to ' + v); }
+
+  speechOK() { return typeof window !== 'undefined' && 'speechSynthesis' in window; }
+  voiceList() {
+    const vs = (this.speechOK() ? window.speechSynthesis.getVoices() : []) || [];
+    const en = vs.filter(v => /^en(-|_|$)/i.test(v.lang || ''));
+    const FEM = /(aria|jenny|michelle|ava|emma|samantha|victoria|karen|moira|tessa|fiona|serena|allison|susan|zira|hazel|joanna|salli|kendra|kimberly|ivy|female|natasha|clara|sonia|libby)/i;
+    const NAT = /(natural|neural|online|premium|enhanced|eloquence|siri)/i;
+    const score = v => {
+      const n = v.name || '';
+      let s = 0;
+      if (NAT.test(n)) s += 60;              // neural / online voices sound closest to Polly
+      if (FEM.test(n)) s += 40;
+      if (/^en-US/i.test(v.lang || '')) s += 12;
+      if (!v.localService) s += 8;
+      return s;
+    };
+    // macOS/Chrome expose dozens of novelty voices — keep them out of a client-facing control
+    const NOVELTY = /(aaron|albert|alice|alva|bad news|bahh|bells|boing|bubbles|carmit|cellos|damayanti|deranged|eddy|flo|fred|good news|grandma|grandpa|jester|junior|kathy|luciana|majed|organ|princess|ralph|reed|rocko|sandy|shelley|superstar|trinoids|whisper|wobble|zarvox|compact|espeak|robot|novelty|eloquence)/i;
+    return en.filter(v => !NOVELTY.test(v.name || '')).sort((a, b) => score(b) - score(a)).slice(0, 8);
+  }
+  pickVoice() {
+    const list = this.voiceList();
+    const chosen = this.state.voiceName && list.find(v => v.name === this.state.voiceName);
+    return chosen || list[0] || null;
+  }
+  stopAudio() {
+    clearInterval(this._tick); this._tick = null;
+    if (this.speechOK()) window.speechSynthesis.cancel();
+    this.setState({ playing: false, playPos: 0, spokenAt: 0 });
+  }
+  toggleAudio() {
+    const lead = this.sel(); if (!lead || !lead.transcript) return;
+    if (this.state.playing) { this.stopAudio(); return; }
+    if (!this.speechOK()) { this.flash("This browser can't play the voicemail — read the transcript below"); return; }
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const text = lead.transcript.replace(/\[[^\]]*\]/g, ' ').replace(/…/g, ', ');
+    const u = new SpeechSynthesisUtterance(text);
+    const v = this.pickVoice(); if (v) { u.voice = v; u.lang = v.lang; }
+    u.rate = 0.94; u.pitch = 1.06;
+    u.onboundary = (e) => { if (e.charIndex != null) this.setState({ spokenAt: e.charIndex }); };
+    u.onend = () => { if (this._finish) this._finish(); };
+    u.onerror = () => { if (this._finish) this._finish(); };
+    const words = text.trim().split(/\s+/).length;
+    const secs = Math.max(6, Math.round(words / 2.6));
+    const t0 = Date.now();
+    this.setState({ playing: true, playPos: 0, spokenAt: 0, audioSecs: secs });
+    clearInterval(this._tick);
+    const finish = () => { clearInterval(this._tick); this._tick = null; this.setState({ playing: false, playPos: 0, spokenAt: 0 }); };
+    this._finish = finish;
+    this._tick = setInterval(() => {
+      const elapsed = Date.now() - t0;
+      const p = Math.min(1, elapsed / (secs * 1000));
+      this.setState({ playPos: p });
+      // onend is unreliable in Chrome — reconcile against the engine, and hard-stop at the estimate
+      const idle = elapsed > 1200 && !window.speechSynthesis.speaking && !window.speechSynthesis.pending;
+      if (p >= 1 || idle) { window.speechSynthesis.cancel(); finish(); }
+    }, 100);
+    this._utter = u;
+    synth.speak(u);
+  }
+  sendLive() {
+    const text = this.state.liveDraft.trim(); if (!text) return;
+    const replies = ['about 200 per store, so 2,800 — call it 3,000', '12pt is fine if it stands up on its own', 'we need them by the 14th for the sale', 'yes please, text me the quote at this number'];
+    const id = this.state.selectedId;
+    const add = (label, body) => this.setState(s => ({ leads: s.leads.map(l => l.id === id ? Object.assign({}, l, { messages: (l.messages || []).concat([[label, body]]) }) : l) }));
+    add('Alma T. · just now', text);
+    this.setState({ liveDraft: '' });
+    const i = this.state.liveQueue;
+    if (i < replies.length) {
+      this.setState({ liveQueue: i + 1 });
+      clearTimeout(this._live);
+      this._live = setTimeout(() => {
+        add('Trina · just now', replies[i]);
+        if (i === 0) this.patch({ qty: 3000 });
+        if (i === replies.length - 1) { this.patch({ callback: true }); this.logActivity('Chat handed to Alma T. — quantity confirmed at 3,000'); }
+      }, 900);
+    }
+  }
+  flash(msg) { this.setState({ toast: msg }); clearTimeout(this._toast); this._toast = setTimeout(() => this.setState({ toast: null }), 2600); }
+
+  mode() {
+    const l = this.sel(); if (!l) return 'SMS';
+    if (this.state.replyMode) return this.state.replyMode;
+    if (l.channel === 'EM' || !l.phone) return 'Email';
+    return 'SMS';
+  }
+  openComposer() {
+    const l = this.sel(); if (!l) return;
+    this.setState({ composerOpen: true });
+    setTimeout(() => this.draftRef.current && this.draftRef.current.focus(), 60);
+  }
+  send() {
+    if (!this.state.draft.trim()) { this.flash('Write a reply first'); return; }
+    this.logActivity('Reply sent by ' + (this.mode() === 'SMS' ? 'text' : 'email'));
+    this.patch({ status: 'Replied' });
+    this.setState({ composerOpen: false, draft: '', templatesOpen: false });
+    this.flash('Reply sent');
+  }
+  applyTemplate(body) {
+    const l = this.sel();
+    const first = (l.contact || '').split(' ')[0];
+    const text = body.replace('{{contact_first_name}}', first)
+      .replace('{{quantity}}', l.qty == null ? 'the quantity' : l.qty.toLocaleString())
+      .replace('{{stock}}', l.stock || 'the stock');
+    this.setState({ draft: text, templatesOpen: false, composerOpen: true });
+    setTimeout(() => this.draftRef.current && this.draftRef.current.focus(), 60);
+  }
+
+  onKey(e) {
+    const tag = (e.target.tagName || '').toLowerCase();
+    const typing = tag === 'input' || tag === 'textarea';
+    if (e.key === 'Escape') {
+      if (this.state.shortcutsOpen) return this.setState({ shortcutsOpen: false });
+      if (this.state.editing) return this.setState({ editing: null });
+      if (this.state.composerOpen) return this.setState({ composerOpen: false, templatesOpen: false });
+      if (this.state.query) return this.setState({ query: '' });
+      if (typing) e.target.blur();
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); if (this.state.composerOpen) this.send(); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); this.setState(s => ({ composerOpen: true, templatesOpen: !s.templatesOpen })); return; }
+    if (typing) return;
+    const k = e.key.toLowerCase();
+    if (k === '?') { this.setState(st => ({ shortcutsOpen: !st.shortcutsOpen })); return; }
+    if (this.state.app !== 'inbox') return;
+    if (k === 'j' || e.key === 'ArrowDown') { e.preventDefault(); this.step(1); }
+    else if (k === 'k' || e.key === 'ArrowUp') { e.preventDefault(); this.step(-1); }
+    else if (k === 'r' || e.key === 'Enter') { e.preventDefault(); this.openComposer(); }
+    else if (k === 'a') { e.preventDefault(); this.assignRef.current && this.assignRef.current.focus(); }
+    else if (k === '/') { e.preventDefault(); this.searchRef.current && this.searchRef.current.focus(); }
+    else if (k === '?') { this.setState(s => ({ shortcutsOpen: !s.shortcutsOpen })); }
+    else if ('12345'.indexOf(e.key) >= 0) this.setStatus(['New', 'Working', 'Quoted', 'Won', 'Lost'][+e.key - 1]);
+  }
+
+  specRows(l) {
+    const fmt = v => v == null ? '—' : v;
+    const deadlineVal = l.deadline == null ? '—' : l.deadline + (l.days != null ? ' · ' + (l.days <= 2 ? '⚠ ' : '') + l.days + (l.days === 1 ? ' day' : ' days') : '');
+    return [
+      { key: 'QTY', value: l.qty == null ? '—' : l.qty.toLocaleString() },
+      { key: 'STOCK', value: fmt(l.stock) },
+      { key: 'FINISH', value: fmt(l.finishing) },
+      { key: 'DEADLINE', value: deadlineVal, warn: l.days != null && l.days <= 2 },
+      { key: 'BUDGET', value: fmt(l.budget) },
+      { key: 'RUSH', value: l.rush ? 'yes' : 'no', rush: l.rush },
+      { key: 'REPRINT', value: l.reprint ? 'yes — PO 8842' : 'no' },
+      { key: 'CALLBACK', value: l.callback ? 'requested' : 'no', warn: l.callback }
+    ];
+  }
+
+  renderVals() {
+    const s = this.state, vis = this.visible(), sel = this.sel(), all = this.leadsList();
+    const counts = {
+      all: all.length,
+      new: all.filter(l => l.status === 'New').length,
+      mine: all.filter(l => l.assignee === 'Susan R.').length,
+      rush: all.filter(l => l.rush).length,
+      needs: all.filter(l => l.qty == null || l.stock == null || l.deadline == null).length,
+      quoted: all.filter(l => l.status === 'Quoted').length,
+      won: all.filter(l => l.status === 'Won').length,
+      lost: all.filter(l => l.status === 'Lost').length,
+      spam: all.filter(l => l.status === 'Spam').length
+    };
+    const w = s.w;
+    const narrow = w < 1024, mid = w >= 1024 && w < 1280;
+    const railW = narrow ? 0 : (mid ? 56 : 200), listW = narrow ? 0 : (mid ? 340 : 380);
+    const collapsedRail = mid;
+    const panelW = narrow ? w : w - railW - listW;
+    const views = [['all', 'All', 'ALL'], ['new', 'New', 'NEW'], ['mine', 'Mine', 'MINE'], ['rush', 'Rush', 'RUSH'], ['needs', 'Needs info', 'INFO'], ['quoted', 'Quoted', 'QTD'], ['won', 'Won', 'WON'], ['lost', 'Lost', 'LOST'], ['spam', 'Spam', 'SPAM']]
+      .map(([k, label, short]) => {
+        const on = s.view === k;
+        return { label: collapsedRail ? short : label, title: label, count: counts[k], bar: on ? '#0B7FA8' : 'transparent', color: on ? '#14161A' : '#5C6169', weight: on ? 600 : 400, countColor: on ? '#14161A' : '#9AA0A8', onClick: () => this.setState({ view: k, pane: 'list', railSheet: false }) };
+      });
+    const CH = [['VM', 'Voice'], ['SM', 'Text'], ['WF', 'Web form'], ['EM', 'Email'], ['CB', 'Website chat']];
+    const channelToggles = CH.map(([code, label]) => {
+      const on = !!s.channels[code];
+      return { code, label, checked: on, tick: on ? '✓' : '', box: on ? '#0B7FA8' : '#FBFAF8', color: on ? '#14161A' : '#5C6169', onClick: () => this.setState(st => ({ channels: Object.assign({}, st.channels, { [code]: !on }) })) };
+    });
+    const CHW = { VM: 'Voicemail', SM: 'Text message', WF: 'Web form', EM: 'Email', CB: 'Website chat' };
+
+    const rowOf = (l) => {
+      const selected = l.id === s.selectedId, unread = !!s.unread[l.id];
+      const time = l.mins != null ? (l.mins === 0 ? 'now' : l.mins + 'm') : (l.hrs != null ? l.hrs + 'h' : l.day);
+      const warn = l.days != null && l.days <= 2;
+      let finish = l.finishing ? l.finishing : '';
+      if (l.reprint) finish = finish ? finish + ' · reprint' : 'reprint';
+      return {
+        selected, company: l.company, time,
+        bg: selected ? '#E6F2F7' : 'transparent',
+        anim: l.id === s.arrivedId ? 'arrive 900ms ease-out' : 'none',
+        bar: selected ? '#0B7FA8' : (l.rush ? '#E0115F' : (l.live ? '#1F7A4D' : 'transparent')),
+        dot: unread ? '#0B7FA8' : 'transparent',
+        rush: l.rush ? 'RUSH' : '',
+        live: l.live ? '● LIVE' : '',
+        callback: l.callback ? '↩ callback' : '',
+        nameWeight: unread ? 700 : 600,
+        channelCode: l.channel, channelWord: CHW[l.channel],
+        qty: l.qty == null ? 'qty —' : l.qty.toLocaleString(),
+        qtyColor: l.qty == null ? '#9AA0A8' : '#14161A',
+        stock: l.stock == null ? 'stock —' : l.stock,
+        stockColor: l.stock == null ? '#9AA0A8' : '#14161A',
+        finish: finish ? finish + (l.deadline ? ' · ' : '') : '',
+        deadline: l.deadline ? 'due ' + l.deadline : (finish ? '' : 'no deadline given'),
+        deadlineColor: warn ? '#B4690E' : '#5C6169',
+        onClick: () => this.select(l.id)
+      };
+    };
+    const buckets = [['live', 'IN CHAT NOW'], ['rush', 'RUSH'], ['today', 'TODAY'], ['earlier', 'EARLIER']];
+    const groups = buckets.map(([k, name]) => {
+      const rows = vis.filter(l => (l.live ? 'live' : (l.rush ? 'rush' : (l.bucket || 'today'))) === k);
+      return { label: k === 'earlier' ? 'EARLIER' : name + ' · ' + rows.length, rows: rows.map(rowOf) };
+    }).filter(g => g.rows.length);
+
+    let t = null;
+    if (sel) {
+      const specs = this.specRows(sel).map(r => {
+        const editing = s.editing === r.key;
+        const low = (sel.lowConf || []).indexOf(r.key) >= 0;
+        return {
+          label: r.key, value: r.value, editing, showValue: !editing, draft: s.editDraft,
+          color: r.rush ? '#E0115F' : (r.warn ? '#B4690E' : (r.value === '—' ? '#9AA0A8' : '#14161A')),
+          underline: low ? '1px dotted #B4690E' : '1px solid transparent',
+          title: low ? 'Extracted from ' + (sel.channel === 'VM' ? 'voicemail' : 'the message') + ' — confirm with customer.' : 'Click to edit',
+          inputRef: this.editRef,
+          edit: () => this.setState({ editing: r.key, editDraft: r.value === '—' ? '' : String(r.value) }),
+          onInput: e => this.setState({ editDraft: e.target.value }),
+          commit: () => {
+            const v = s.editDraft.trim();
+            const map = { QTY: 'qty', STOCK: 'stock', FINISH: 'finishing', BUDGET: 'budget', DEADLINE: 'deadline' };
+            if (map[r.key]) {
+              let val = v === '' ? null : v;
+              if (r.key === 'QTY') val = v === '' ? null : parseInt(v.replace(/[^0-9]/g, ''), 10) || null;
+              this.patch({ [map[r.key]]: val });
+              this.logActivity(r.key.charAt(0) + r.key.slice(1).toLowerCase() + ' corrected by Susan R.');
+            }
+            this.setState({ editing: null });
+          },
+          onKey: e => { if (e.key === 'Enter') e.target.blur(); }
+        };
+      });
+      const statusColor = { New: '#0B7FA8', Working: '#14161A', Replied: '#14161A', Quoted: '#1F7A4D', Won: '#1F7A4D', Lost: '#9AA0A8', Spam: '#9AA0A8' }[sel.status];
+      const whenAbs = sel.day ? sel.day + ', 2026' : (sel.mins != null ? 'Wed Jul 29, 2026, 9:00 AM' : 'Wed Jul 29, 2026, ' + (8 - (sel.hrs || 0)) + ':05 AM');
+      t = {
+        ticket: sel.ticket, company: sel.company, contact: sel.contact, status: sel.status, statusColor, assignee: sel.assignee,
+        rushMark: sel.rush ? '● RUSH' : '',
+        phone: sel.phone || 'no phone', email: sel.email || 'no email',
+        telHref: sel.phone ? 'tel:' + sel.phone.replace(/[^0-9]/g, '') : '#',
+        mailHref: sel.email ? 'mailto:' + sel.email : '#',
+        copyHint: 'click to copy',
+        copyPhone: e => { e.preventDefault(); if (sel.phone) { navigator.clipboard && navigator.clipboard.writeText(sel.phone); this.flash('Phone number copied'); } },
+        copyEmail: e => { e.preventDefault(); if (sel.email) { navigator.clipboard && navigator.clipboard.writeText(sel.email); this.flash('Email address copied'); } },
+        provenance: CHW[sel.channel].toUpperCase() + ' · received ' + whenAbs + ' · ' + (sel.phone || sel.email),
+        extractionFailed: !!sel.extractionFailed,
+        spec: specs,
+        jobDescription: sel.jobDescription,
+        isVoice: sel.channel === 'VM', isThread: sel.channel === 'SM' || sel.channel === 'CB', isEmail: sel.channel === 'EM', isForm: sel.channel === 'WF',
+        transcript: sel.transcript,
+        audioLen: (() => {
+          const total = s.playing || s.playPos ? (s.audioSecs || 0) : null;
+          const fmt = n => Math.floor(n / 60) + ':' + String(Math.floor(n % 60)).padStart(2, '0');
+          if (!total) return sel.audioLen;
+          return fmt((s.playPos || 0) * total) + ' / ' + fmt(total);
+        })(),
+        playing: s.playing, playGlyph: s.playing ? '■' : '▶',
+        playTitle: s.playing ? 'Stop' : 'Play this voicemail out loud',
+        playPct: Math.round((s.playing || s.playPos ? (s.playPos || 0) : 0) * 100) + '%',
+        playColor: s.playing ? '#1F7A4D' : '#0B7FA8',
+        liveHint: s.playing ? 'PLAYING — SPOKEN ALOUD' : 'PRESS PLAY TO HEAR IT',
+        voiceName: (this.pickVoice() || {}).name || '',
+        voices: this.voiceList().map(v => ({ name: v.name, label: v.name.replace(/\s*\((.*)\)\s*$/, ' · $1') })),
+        onVoice: e => { this.setState({ voiceName: e.target.value }); if (this.state.playing) { this.stopAudio(); setTimeout(() => this.toggleAudio(), 120); } },
+        togglePlay: () => this.toggleAudio(),
+        tSpoken: sel.transcript ? sel.transcript.slice(0, s.spokenAt || 0) : '',
+        tRest: sel.transcript ? sel.transcript.slice(s.spokenAt || 0) : '',
+        messages: (sel.messages || []).map(([meta, text]) => {
+          const mine = meta.indexOf('Dumont') === 0 || meta.indexOf('Alma') === 0;
+          return { meta, text, align: mine ? 'flex-end' : 'flex-start', bg: mine ? '#E6F2F7' : '#F2F1EE' };
+        }),
+        emailHeader: sel.emailHeader, emailBody: sel.emailBody,
+        formFields: (sel.form || []).map(([label, value]) => ({ label: label.toUpperCase(), value })),
+        isLive: !!sel.live,
+        liveDraft: s.liveDraft,
+        onLiveDraft: e => this.setState({ liveDraft: e.target.value }),
+        sendLive: () => this.sendLive(),
+        onLiveKey: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendLive(); } },
+        files: (sel.files || []).map(([name, meta]) => ({ name, meta })),
+        hasFiles: !!(sel.files && sel.files.length),
+        activity: (sel.activity || []).slice().reverse().map(([when, what]) => ({ when, what }))
+      };
+    }
+
+    const mode = this.mode();
+    const chars = s.draft.length, segs = Math.ceil(chars / 153) || 1;
+    const showTicketPane = !narrow || s.pane === 'ticket';
+    const showListPane = !narrow || s.pane === 'list';
+    return {
+      isInbox: s.app === 'inbox', isCampaigns: s.app === 'campaigns', isChat: s.app === 'chat',
+      showCounts: w >= 1280 ? 'block' : 'none',
+      campCols: w >= 1280 ? '320px minmax(0,1fr) 420px' : (w >= 1024 ? '280px minmax(0,1fr)' : '1fr'),
+      campListDisplay: (!narrow || s.campPane === 'list') ? 'block' : 'none',
+      campBuilderDisplay: (!narrow || s.campPane === 'builder') ? 'block' : 'none',
+      campBack: narrow && s.campPane === 'builder',
+      backToSeqs: () => this.setState({ campPane: 'list', stepPicked: false }),
+      emailOverlay: w < 1280,
+      emailScrim: w < 1280 && s.stepPicked && !!this.EMAILS[s.stepId],
+      emailPos: w >= 1280 ? 'static' : 'fixed',
+      emailWidth: w >= 1280 ? 'auto' : (narrow ? 'min(380px,100%)' : '380px'),
+      emailShadow: w >= 1280 ? 'none' : '-12px 0 32px rgba(20,22,26,.12)',
+      emailBorder: w >= 1280 ? '0' : '1px solid #E3E1DC',
+      closeEmail: () => this.setState({ stepPicked: false }),
+      chatHeroCols: w >= 1024 ? '1.1fr .9fr' : '1fr',
+      chatPhotoDisplay: w >= 1024 ? 'grid' : 'none',
+      signInScreen: !s.signedIn,
+      signInCols: w >= 1024 ? '1fr .85fr' : '1fr',
+      signInAsideDisplay: w >= 1024 ? 'flex' : 'none',
+      signInEmail: s.signInEmail, signInPass: s.signInPass,
+      onSignInEmail: e => this.setState({ signInEmail: e.target.value }),
+      onSignInPass: e => this.setState({ signInPass: e.target.value }),
+      onSignInKey: e => { if (e.key === 'Enter') this.setState({ signedIn: true }); },
+      signIn: () => this.setState({ signedIn: true }),
+      signOut: () => this.setState({ signedIn: false }),
+      signInWaiting: counts.new,
+      signInRush: counts.rush + ' jobs flagged, soonest due tomorrow',
+      signInNeeds: counts.needs + ' leads missing a quantity, stock, or date',
+      headerA: (this.props.headerStyle ?? 'one-row') !== 'two-tier',
+      headerB: (this.props.headerStyle ?? 'one-row') === 'two-tier',
+      shellRows: (this.props.headerStyle ?? 'one-row') === 'two-tier' ? '84px 1fr' : '56px 1fr',
+      tabsB: [['inbox', 'Inbox'], ['campaigns', 'Campaigns'], ['chat', 'Chat'], ['form', 'Form']].map(([k, label], i) => {
+        const on = s.app === k;
+        return { label, onClick: () => this.setState({ app: k, stepPicked: false }), bg: on ? '#14161A' : '#FBFAF8', color: on ? '#FBFAF8' : '#5C6169', divider: i === 0 ? '0' : '1px solid #E3E1DC' };
+      }),
+      isForm: s.app === 'form',
+      formFiles: s.files.map(f => ({ name: f[0], meta: f[1] })),
+      hasFiles: s.files.length > 0, noFiles: s.files.length === 0,
+      fileCount: s.files.length === 1 ? '1 file attached' : s.files.length + ' files attached',
+      addFiles: () => this.setState({ files: [['FUSD-handbook-2026.pdf', '24 pages · 42.8 MB · press-ready, bleeds included'], ['handbook-cover-final.ai', '8.1 MB · CMYK, fonts outlined'], ['links-and-fonts.zip', '116 MB · packaged from InDesign']] }),
+      clearFiles: () => this.setState({ files: [] }),
+      submitForm: () => { this.setState({ formDone: true }); this.flash('Request sent'); },
+      resetForm: () => this.setState({ formDone: false, files: [] }),
+      formDone: s.formDone, formOpen: !s.formDone,
+      formCols: w >= 1024 ? '1.15fr .85fr' : '1fr',
+      tabs: [['inbox', 'Inbox'], ['campaigns', 'Campaigns'], ['chat', w < 1400 ? 'Chat' : 'Website chat'], ['form', w < 1400 ? 'Form' : 'Order form']].map(([k, label]) => {
+        const on = s.app === k;
+        return { label, onClick: () => this.setState({ app: k, stepPicked: false }), color: on ? '#14161A' : '#5C6169', weight: on ? 600 : 400, border: on ? '2px solid #0B7FA8' : '2px solid transparent' };
+      }),
+      seqRows: this.SEQS.map(q => {
+        const on = q.id === s.seqId, live = !!s.live[q.id];
+        return {
+          name: q.name, trigger: q.trigger,
+          bg: on ? '#E6F2F7' : 'transparent', bar: on ? '#0B7FA8' : 'transparent',
+          state: live ? 'LIVE' : 'PAUSED', stateColor: live ? '#1F7A4D' : '#9AA0A8',
+          stats: q.stats[0].toLocaleString() + ' sent · ' + q.stats[1].toLocaleString() + ' opened · ' + q.stats[2].toLocaleString() + ' replied',
+          onClick: () => this.setState({ seqId: q.id, campPane: 'builder', stepId: (this.STEPS[q.id].find(x => x.kind === 'email') || {}).id })
+        };
+      }),
+      seq: (() => {
+        const q = this.SEQS.find(x => x.id === s.seqId) || this.SEQS[0], live = !!s.live[q.id];
+        return {
+          name: q.name, trigger: q.trigger, audience: q.audience,
+          stateLabel: live ? 'Live' : 'Paused', stateColor: live ? '#1F7A4D' : '#9AA0A8',
+          toggleLabel: live ? 'Pause sequence' : 'Set live',
+          sent: q.stats[0].toLocaleString(), opened: q.stats[1].toLocaleString(), replied: q.stats[2].toLocaleString(),
+          openRate: q.stats[0] ? Math.round(q.stats[1] / q.stats[0] * 100) + '%' : '—',
+          toggle: () => this.setState(st => ({ live: Object.assign({}, st.live, { [q.id]: !st.live[q.id] }) }))
+        };
+      })(),
+      steps: (this.STEPS[s.seqId] || []).map(st2 => {
+        const on = st2.id === s.stepId, isEmail = st2.kind === 'email';
+        return {
+          isEmail, isWait: !isEmail, title: st2.title, when: st2.when,
+          kindLabel: isEmail ? 'EMAIL' : 'WAIT',
+          bg: on ? '#E6F2F7' : '#FBFAF8', border: on ? '1px solid #0B7FA8' : '1px solid #E3E1DC',
+          stats: isEmail ? st2.stats[0].toLocaleString() + ' sent · ' + st2.stats[1].toLocaleString() + ' opened · ' + st2.stats[2].toLocaleString() + ' replied' : '',
+          branches: (st2.branches || []).map(([cond, then]) => ({ cond, then })),
+          onClick: () => { if (isEmail) this.setState({ stepId: st2.id, stepPicked: true }); }
+        };
+      }),
+      email: (() => {
+        const e = this.EMAILS[s.stepId];
+        return e ? { subject: e.subject, body: e.body, has: true } : { has: false, subject: '', body: '' };
+      })(),
+      hasEmail: !!this.EMAILS[s.stepId] && (w >= 1280 || s.stepPicked),
+      noEmailSel: !(!!this.EMAILS[s.stepId] && (w >= 1280 || s.stepPicked)) && w >= 1280,
+      emailPaneDisplay: (!!this.EMAILS[s.stepId] && (w >= 1280 || s.stepPicked)) || w >= 1280 ? 'block' : 'none',
+      csvDone: s.csvDone, csvIdle: !s.csvDone,
+      dropCsv: () => { this.setState({ csvDone: true }); this.flash('412 contacts added'); },
+      resetCsv: () => this.setState({ csvDone: false }),
+      chatOpen: narrow ? s.chatOpenNarrow : s.chatOpen,
+      chatClosed: narrow ? !s.chatOpenNarrow : !s.chatOpen,
+      toggleChat: () => this.setState(st => (narrow ? { chatOpenNarrow: !st.chatOpenNarrow } : { chatOpen: !st.chatOpen })),
+      chatTurns: this.CHAT.slice(0, s.chatIdx).map(t => ({
+        text: t.text, align: t.who === 'user' ? 'flex-end' : 'flex-start',
+        bg: t.who === 'user' ? '#E6F2F7' : '#F2F1EE', who: t.who === 'user' ? 'You' : 'Dumont'
+      })),
+      chatChips: s.chatIdx >= this.CHAT.length ? [] : [{ label: this.CHAT[s.chatIdx] ? (this.CHAT[s.chatIdx].who === 'user' ? this.CHAT[s.chatIdx].text : 'Continue') : '', onClick: () => this.setState(st => ({ chatIdx: Math.min(this.CHAT.length, st.chatIdx + 2) })) }],
+      chatDone: s.chatIdx >= this.CHAT.length,
+      chatRestart: () => this.setState({ chatIdx: 2 }),
+      narrow, wordmark: 'Front Desk',
+      showPoweredBy: !narrow,
+      topCols: narrow ? 'auto 1fr auto' : 'auto 1fr auto',
+      gridCols: narrow ? '1fr' : railW + 'px ' + listW + 'px minmax(0,1fr)',
+      railDisplay: narrow ? (s.railSheet ? 'block' : 'none') : 'block',
+      railPos: narrow ? 'fixed' : 'static',
+      railWidth: narrow ? '240px' : 'auto',
+      railShadow: narrow ? '8px 0 24px rgba(20,22,26,.08)' : 'none',
+      railHPad: collapsedRail ? '8px' : '16px',
+      railDir: collapsedRail ? 'column' : 'row',
+      railAlign: collapsedRail ? 'flex-start' : 'center',
+      railJustify: collapsedRail ? 'flex-start' : 'space-between',
+      railGap: collapsedRail ? '1px' : '8px',
+      railViewPad: collapsedRail ? '6px 4px 6px 5px' : '7px 16px 7px 13px',
+      railFont: collapsedRail ? '10px' : '13.5px',
+      railLabelDisplay: collapsedRail ? 'none' : 'inline',
+      toggleRailSheet: () => this.setState(st => ({ railSheet: !st.railSheet })),
+      backToList: () => this.setState({ pane: 'list', composerOpen: false, railSheet: false }),
+      listDisplay: showListPane ? 'block' : 'none',
+      ticketDisplay: showTicketPane ? 'grid' : 'none',
+      specCols: panelW >= 900 ? '1fr 1fr' : '1fr',
+      headerCounts: counts.new + ' new · ' + counts.rush + ' rush',
+      query: s.query, searchRef: this.searchRef, assignRef: this.assignRef, draftRef: this.draftRef,
+      onQuery: e => this.setState({ query: e.target.value }),
+      clearFilter: () => this.setState({ view: 'all', channels: {}, query: '' }),
+      views, channelToggles, groups, listEmpty: !groups.length,
+      newPill: s.newPill,
+      dismissPill: () => { this.setState({ newPill: false }); const el = document.querySelector('[data-list-scroll]'); if (el) el.scrollTop = 0; },
+      hasTicket: !!sel, noTicket: !sel, t,
+      onStatus: e => this.setStatus(e.target.value),
+      onAssign: e => { this.patch({ assignee: e.target.value }); this.logActivity('Assigned to ' + e.target.value); },
+      activityOpen: s.activityOpen, activityGlyph: s.activityOpen ? '−' : '+',
+      toggleActivity: () => this.setState(st => ({ activityOpen: !st.activityOpen })),
+      composerOpen: s.composerOpen, composerCollapsed: !s.composerOpen,
+      composerShadow: s.composerOpen ? '0 -8px 24px rgba(20,22,26,.06)' : 'none',
+      composerLabel: mode === 'SMS' ? 'REPLY BY TEXT' : 'REPLY BY EMAIL',
+      replyPlaceholder: sel ? 'Reply to ' + (sel.contact || '').split(' ')[0] + '…' : 'Reply…',
+      openComposer: () => this.openComposer(), closeComposer: () => this.setState({ composerOpen: false, templatesOpen: false }),
+      isEmailMode: mode === 'Email', subject: s.subject, onSubject: e => this.setState({ subject: e.target.value }),
+      draft: s.draft, onDraft: e => this.setState({ draft: e.target.value }),
+      onDraftKey: e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); this.send(); } },
+      noPhone: sel ? !sel.phone : true, noEmail: sel ? !sel.email : true,
+      smsBg: mode === 'SMS' ? '#0B7FA8' : 'transparent', smsColor: mode === 'SMS' ? '#FBFAF8' : (sel && !sel.phone ? '#9AA0A8' : '#5C6169'),
+      emailBg: mode === 'Email' ? '#0B7FA8' : 'transparent', emailColor: mode === 'Email' ? '#FBFAF8' : (sel && !sel.email ? '#9AA0A8' : '#5C6169'),
+      setSms: () => this.setState({ replyMode: 'SMS' }), setEmail: () => this.setState({ replyMode: 'Email' }),
+      counterText: mode === 'SMS' ? (chars + ' characters' + (chars > 160 ? ' · ' + segs + ' segments' : '')) : (chars + ' characters'),
+      counterColor: mode === 'SMS' && chars > 160 ? '#B4690E' : '#5C6169',
+      templatesOpen: s.templatesOpen, toggleTemplates: () => this.setState(st => ({ templatesOpen: !st.templatesOpen })),
+      templates: [
+        ['Quote coming today', 'Hi {{contact_first_name}} — got your request. I\'m putting a quote together on the {{quantity}} on {{stock}} and will have it to you before end of day today.'],
+        ['Need more detail', 'Hi {{contact_first_name}} — happy to quote this. Before I do, I need a couple of details: flat and finished size, and how many ink colors on each side.'],
+        ['Confirm quantity and stock', 'Hi {{contact_first_name}} — confirming before I price it: {{quantity}} on {{stock}}. Let me know if either of those has changed and I\'ll adjust.'],
+        ["Can't hit that deadline", 'Hi {{contact_first_name}} — that date is tight for us on press. The earliest I can have this in your hands is the following Tuesday. Does that still work?']
+      ].map(([label, body]) => ({ label, onClick: () => this.applyTemplate(body) })),
+      sendFailed: false,
+      toast: s.toast,
+      shortcutsOpen: s.shortcutsOpen, toggleShortcuts: () => this.setState(st => ({ shortcutsOpen: !st.shortcutsOpen })),
+      shortcuts: [
+        { key: 'j / k · ↓ / ↑', action: 'Next / previous lead' }, { key: 'Enter', action: 'Focus reply composer' },
+        { key: 'r', action: 'Reply' }, { key: '1 – 5', action: 'Set status New / Working / Quoted / Won / Lost' },
+        { key: 'a', action: 'Assign' }, { key: '/', action: 'Search' }, { key: '⌘K', action: 'Reply templates' },
+        { key: 'Esc', action: 'Collapse composer, clear search' }, { key: '⌘Enter', action: 'Send reply' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

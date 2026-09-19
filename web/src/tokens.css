@@ -1,0 +1,61 @@
+/* Midlayr Front Desk · design tokens
+   Platform defaults live in :root. Each tenant overrides via [data-tenant] or inline style from GET /api/org → brand.
+   Values are lifted from the Dumont Front Desk deck and prototypes; nothing here is Dumont-only except the accent. */
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,500;125,600;125,700&family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  /* type */
+  --font-display: 'Archivo', system-ui, sans-serif;      /* headings · always with font-variation-settings:'wdth' 125 */
+  --font-body: 'Inter Tight', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;  /* labels, ids, timestamps, chips */
+  --display-wdth: 125;
+
+  /* surfaces */
+  --paper: #FBFAF8;        /* app background, cards */
+  --paper-2: #F2F1EE;      /* sunk panels, queue rail, unread rows */
+  --paper-3: #E9E7E2;      /* placeholder blocks */
+  --line: #E3E1DC;         /* every 1px border */
+  --ink: #14161A;          /* text, dark bars, deck background */
+  --ink-2: #5C6169;        /* secondary text */
+  --ink-3: #9AA0A8;        /* tertiary, mono labels, dashed chips */
+
+  /* accent · overridden per tenant from orgs.brand.color */
+  --accent: #0B7FA8;
+  --accent-deep: #075E7C;  /* borders on accent buttons, hover */
+  --accent-tint: #E6F2F7;  /* quick-reply chips */
+  --accent-tint-fg: #075E7C;
+
+  /* semantic */
+  --ok: #1F7A4D;           /* live, replied, ticket created */
+  --ok-bright: #4FC28A;    /* live dot on dark bars */
+  --warn: #B4690E;         /* rush, needs info, handoff rule */
+  --danger: #B4261B;
+
+  /* shape · square-ish, print-shop feel */
+  --radius: 2px;
+  --shadow-float: 0 8px 24px rgba(20,22,26,.10);
+  --shadow-widget: 0 12px 32px rgba(20,22,26,.16);
+
+  /* scale */
+  --text-xs: 10.5px; --text-sm: 12.5px; --text-md: 13.5px; --text-base: 14px; --text-lg: 16px;
+  --h2: 24px; --h1: 30px;
+  --track-mono: .08em;     /* letter-spacing on mono labels; .1em for section eyebrows */
+  --control-h: 34px; --control-h-sm: 28px;
+}
+
+/* Tenant override example — the app sets these from GET /api/org at boot:
+   document.documentElement.style.setProperty('--accent', org.brand.color) etc. */
+[data-tenant="dumont"] { --accent: #0B7FA8; --accent-deep: #075E7C; --accent-tint: #E6F2F7; }
+
+/* ── recipes (keep these exact) ── */
+.eyebrow { font: 500 11px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.label   { font: 400 var(--text-xs)/1 var(--font-mono); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--ink-3); }
+.display { font-family: var(--font-display); font-variation-settings: 'wdth' var(--display-wdth); font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.btn-primary { background: var(--accent); color: var(--paper); border: 1px solid var(--accent-deep); border-radius: var(--radius); height: var(--control-h); padding: 0 16px; font: 600 13px var(--font-body); }
+.btn-ghost   { background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); height: var(--control-h); padding: 0 12px; font: 400 13px var(--font-body); }
+.chip        { border: 1px solid var(--ink); border-radius: var(--radius); padding: 1px 6px; font: 11px var(--font-mono); }
+.chip.missing{ border-style: dashed; border-color: var(--ink-3); color: var(--ink-3); }
+.chip.reply  { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-tint-fg); padding: 6px 11px; font: 13px var(--font-body); }
+.bar-dark    { background: var(--ink); color: var(--paper); }   /* widget header, deck bg */
+.spec-cell   { border: 1px solid var(--line); padding: 7px 9px; }  .spec-cell.filled { border-color: var(--ink); }  .spec-cell.empty { border-style: dashed; }

@@ -13,6 +13,7 @@ export interface Env {
   RESEND_API_KEY: string;
   SESSION_SECRET: string;
   PLATFORM_DOMAIN: string;
+  AI_MODEL?: string;
   WIDGET_ORIGIN: string;
 }
 

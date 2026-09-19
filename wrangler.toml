@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 # Relational data — Postgres (Neon/Supabase) pooled through Hyperdrive
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "<wrangler hyperdrive create frontdesk --connection-string=$DATABASE_URL>"
+id = "0f976080680e4b10b3ebddd9abbfc9ff"
 
 # Artwork, voicemail audio, CSV imports
 [[r2_buckets]]
@@ -50,4 +50,6 @@ crons = ["*/5 * * * *"]
 [vars]
 PLATFORM_DOMAIN = "midlayr.app"          # <slug>.midlayr.app default per tenant; custom hostnames via Cloudflare for SaaS
 WIDGET_ORIGIN = "https://cdn.midlayr.com"
+# Workers AI retires models; swap this rather than editing src/jobs/extract-specs.ts
+AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 # secrets (wrangler secret put): DATABASE_URL (local dev only; prod uses Hyperdrive), TWILIO_AUTH_TOKEN, TWILIO_SID, RESEND_API_KEY, ENRICH_API_KEY, SESSION_SECRET

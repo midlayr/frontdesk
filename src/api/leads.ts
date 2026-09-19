@@ -53,6 +53,26 @@ leads.get('/:id', async (c) => {
   return found ? c.json(found) : c.json({ error: 'not found' }, 404);
 });
 
+/**
+ * Re-run extraction over a ticket's inbound messages.
+ *
+ * Needed whenever the prompt or model changes, or a job died into the DLQ — otherwise the
+ * only way to re-extract is to ask the customer to text again.
+ */
+leads.post('/:id/reextract', async (c) => {
+  const org = c.get('org');
+  const id = c.req.param('id');
+
+  const exists = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [row] = await tx<{ id: string }[]>`SELECT id FROM leads WHERE id = ${id}`;
+    return !!row;
+  });
+  if (!exists) return c.json({ error: 'not found' }, 404);
+
+  await c.env.JOBS.send({ kind: 'extract_specs', orgId: org.id, leadId: id });
+  return c.json({ ok: true, queued: 'extract_specs' });
+});
+
 const Reply = z.object({ body: z.string().min(1).max(1600) });
 
 /**

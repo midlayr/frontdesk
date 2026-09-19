@@ -1,5 +1,5 @@
 // Midlayr Front Desk · Worker entry
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { Env, Job, Org } from './env';
 import { connect, withOrg, type Sql } from './db';
 import { resolveOrg } from './org';
@@ -18,6 +18,13 @@ function isDevHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost');
 }
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 // One Postgres client per request, closed after the response is sent.
 app.use('*', async (c, next) => {
   const sql = connect(c.env);
@@ -34,34 +41,55 @@ app.post('/hooks/twilio/sms', (c) => twilioSms(c.req.raw, c.env, c.get('sql')));
 
 // Everything below is tenant-scoped by hostname.
 app.use('/api/*', async (c, next) => {
-  const org = await resolveOrg(c.env, c.get('sql'), new URL(c.req.url));
-  if (!org) return c.json({ error: 'unknown tenant' }, 404);
+  const url = new URL(c.req.url);
+  const org = await resolveOrg(c.env, c.get('sql'), url);
+  // Naming the hostname turns "unknown tenant" from a guess into the org_domains row you need.
+  if (!org) return c.json({ error: 'unknown tenant', hostname: url.hostname }, 404);
   c.set('org', org);
   await next();
 });
 
 /**
- * Auth.
+ * Auth. Two ways in, and interactive user sessions are still neither of them.
  *
- * Production sessions are still to do (signed cookie against SESSION_SECRET, users table).
- * Until then `x-dev-user: <users.id>` stands in — gated on a localhost hostname so it can
- * never authenticate a request to a deployed worker.
+ * 1. localhost: `x-dev-user: <users.id>` alone, for `wrangler dev`.
+ * 2. anywhere: `x-admin-token` matching SESSION_SECRET, plus `x-dev-user` to say who to act
+ *    as. This is an operator credential for testing and automation, not a user session —
+ *    whoever holds the secret can act as any user in any tenant, so it belongs in a
+ *    password manager and nowhere near a browser.
+ *
+ * Real sessions (signed cookie, login flow) remain to build; until they exist a browser
+ * cannot authenticate at all, which is deliberate.
  */
-app.use('/api/*', async (c, next) => {
-  if (isDevHost(new URL(c.req.url).hostname)) {
-    const devUser = c.req.header('x-dev-user');
-    if (!devUser) return c.json({ error: 'x-dev-user required in dev' }, 401);
+async function authenticate(c: Context<{ Bindings: Env; Variables: Vars }>): Promise<Response | null> {
+  const devUser = c.req.header('x-dev-user');
+  const adminToken = c.req.header('x-admin-token');
+  const onDevHost = isDevHost(new URL(c.req.url).hostname);
 
-    const org = c.get('org');
-    const [user] = await withOrg(c.get('sql'), org.id, (tx) =>
-      tx<{ id: string }[]>`SELECT id FROM users WHERE id = ${devUser}`);
-    if (!user) return c.json({ error: 'unknown user for tenant' }, 401);
-
-    c.set('userId', user.id);
-    return next();
+  if (!onDevHost) {
+    if (!adminToken) return c.json({ error: 'session auth not implemented; use x-admin-token' }, 501);
+    if (!c.env.SESSION_SECRET || !timingSafeEqual(adminToken, c.env.SESSION_SECRET)) {
+      return c.json({ error: 'bad admin token' }, 401);
+    }
   }
 
-  return c.json({ error: 'session auth not implemented' }, 501);
+  if (!devUser) return c.json({ error: 'x-dev-user required' }, 401);
+
+  // Looked up inside the tenant's own context, so a user id from another org resolves to
+  // nothing however the caller authenticated.
+  const org = c.get('org');
+  const [user] = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ id: string }[]>`SELECT id FROM users WHERE id = ${devUser}`);
+  if (!user) return c.json({ error: 'unknown user for tenant' }, 401);
+
+  c.set('userId', user.id);
+  return null;
+}
+
+app.use('/api/*', async (c, next) => {
+  const failed = await authenticate(c);
+  if (failed) return failed;
+  await next();
 });
 
 app.get('/api/org', (c) => {

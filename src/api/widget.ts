@@ -71,6 +71,7 @@ widget.get('/config', async (c) => {
       accent_tint: brand.accent_tint ?? null,
       show_powered_by: brand.show_powered_by ?? true,
       logo_url: brand.logo_r2_key ? `/widget/logo?org=${encodeURIComponent(org.slug)}` : null,
+      mark_url: brand.mark_r2_key ? `/widget/logo?org=${encodeURIComponent(org.slug)}&kind=mark` : null,
     },
     widget: org.widget,
   });
@@ -91,7 +92,9 @@ widget.get('/logo', async (c) => {
   const org = await orgBySlug(c.env, slug);
   if (!org) return c.text('unknown tenant', 404);
 
-  const key = (org.brand as { logo_r2_key?: unknown }).logo_r2_key;
+  // ?kind=mark gives the square mark (widget avatar, favicon); default is the wordmark.
+  const brand = org.brand as { logo_r2_key?: unknown; mark_r2_key?: unknown };
+  const key = c.req.query('kind') === 'mark' ? brand.mark_r2_key : brand.logo_r2_key;
   if (typeof key !== 'string' || !key.startsWith(`org/${org.id}/`)) return c.text('no logo', 404);
 
   const obj = await c.env.FILES.get(key);

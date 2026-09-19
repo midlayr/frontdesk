@@ -41,8 +41,12 @@
         .btn{background:${color};color:#fff;border:0;border-radius:2px;padding:12px 18px;font:600 14px system-ui;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.14)}
         .w{position:fixed;right:28px;bottom:28px;width:min(380px,calc(100vw - 56px));height:min(560px,calc(100vh - 56px));display:none;flex-direction:column;background:${paper};color:${ink};border:1px solid #E3E1DC;box-shadow:0 12px 32px rgba(0,0,0,.16);font:14px/1.5 'Inter Tight',system-ui,sans-serif;z-index:2147483001}
         .w.open{display:flex}
-        .h{display:flex;align-items:center;gap:10px;padding:12px 14px;background:${ink};color:${paper};font:700 14px 'Archivo',system-ui;font-variation-settings:'wdth' 125;letter-spacing:.06em;text-transform:uppercase}
-        .h .live{font:11px ui-monospace,monospace;text-transform:none;letter-spacing:.04em;color:#9AA0A8}.h .live.on{color:#4FC28A}
+        .h{display:flex;align-items:center;gap:8px;padding:11px 13px;background:${ink};color:${paper};font:700 11.5px 'Archivo',system-ui;font-variation-settings:'wdth' 125;letter-spacing:.05em;text-transform:uppercase}
+        /* the mark plus a long wordmark overflows 380px, so the name gets the slack and
+           ellipses rather than wrapping the bar to two lines */
+        .h .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+        .h img{height:18px;width:18px;object-fit:contain;flex:none;display:block}
+        .h .live{font:10px 'IBM Plex Mono',ui-monospace,monospace;text-transform:none;letter-spacing:.04em;color:#9AA0A8;white-space:nowrap;flex:none}.h .live.on{color:#4FC28A}
         .h button{margin-left:auto;background:none;border:0;color:#9AA0A8;font-size:14px;cursor:pointer}
         .m{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
         .t{max-width:86%;padding:9px 11px;border:1px solid #E3E1DC;background:#F2F1EE;font-size:13.5px}
@@ -59,7 +63,7 @@
         .pb{font:10px system-ui;color:#9AA0A8;text-align:right;padding:4px 14px 8px}
       </style>
       <div class="l"><div class="nudge" hidden>${esc(w.nudge || 'Need a price? Tell me what you\'re printing.')}</div><button class="btn">${esc(w.launcher || 'Get a quote')}</button></div>
-      <div class="w"><div class="h"><span>${esc(b.app_name_public || cfg.orgName || '')}</span><span class="live">· quotes</span><button aria-label="Close">✕</button></div>
+      <div class="w"><div class="h">${b.mark_url ? `<img src="${esc(API + b.mark_url)}" alt="">` : ''}<span class="nm">${esc(b.app_name_public || cfg.orgName || '')}</span><span class="live">· quotes</span><button aria-label="Close">✕</button></div>
         <div class="m"></div><div class="f"><div class="c"></div><form><input placeholder="Type your answer" autocomplete="off"><button type="submit">↵</button></form></div>
         ${b.show_powered_by === false ? '' : '<div class="pb">Powered by Midlayr</div>'}</div>`;
     const $ = s => sh.querySelector(s); const L = $('.l'), W = $('.w'), M = $('.m'), C = $('.c'), F = $('form'), I = $('input'), live = $('.live');

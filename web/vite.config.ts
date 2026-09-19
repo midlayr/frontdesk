@@ -12,6 +12,8 @@ export default defineConfig({
     proxy: {
       '/api': { target: WORKER, changeOrigin: true, ws: true, secure: true },
       '/widget': { target: WORKER, changeOrigin: true, ws: true, secure: true },
+      // the drop-in script, so the test page loads it same-origin in dev
+      '/w.js': { target: WORKER, changeOrigin: true, secure: true },
     },
   },
 });

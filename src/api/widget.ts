@@ -66,6 +66,9 @@ widget.get('/config', async (c) => {
       ink: brand.ink ?? '#14161A',
       paper: brand.paper ?? '#FBFAF8',
       app_name_public: brand.app_name_public ?? org.name,
+      // The bot's display name, kept separate from the legal/org name.
+      bot_name: brand.bot_name ?? String(org.name).split(/\s+/)[0],
+      accent_tint: brand.accent_tint ?? null,
       show_powered_by: brand.show_powered_by ?? true,
       logo_url: brand.logo_r2_key ? `/widget/logo?org=${encodeURIComponent(org.slug)}` : null,
     },

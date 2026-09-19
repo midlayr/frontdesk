@@ -3,6 +3,7 @@ import { ulid } from 'ulid';
 import { z } from 'zod';
 import type { Env, Org, Step } from '../env';
 import { withOrg, type Sql } from '../db';
+import { simulate } from '../flow-engine';
 
 type Vars = { org: Org; sql: Sql; userId: string };
 
@@ -28,6 +29,33 @@ const StepSchema = z.discriminatedUnion('kind', [
 const FlowBody = z.object({
   name: z.string().min(1).optional(),
   steps: z.array(StepSchema).min(1),
+});
+
+/**
+ * Run an unsaved draft. The builder posts the steps it currently has on screen plus what the
+ * tester has typed, and gets the resulting conversation back. Stateless on purpose — there is
+ * no session to leak between tenants, and the preview cannot desync from what you are editing.
+ *
+ * It calls the same flow-engine as the live ChatSession DO, so the preview is not an
+ * approximation of the bot's behaviour: it is the bot's behaviour.
+ */
+flows.post('/:slug/simulate', async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = z.object({
+    steps: z.array(StepSchema).min(1),
+    said: z.array(z.string()).max(50).default([]),
+  }).safeParse(body);
+  if (!parsed.success) return c.json({ error: 'bad draft', detail: parsed.error.issues }, 400);
+
+  const r = simulate(parsed.data.steps, parsed.data.said);
+  return c.json({
+    turns: r.next.turns,
+    chips: r.chips,
+    captured: r.next.captured,
+    state: r.next.state,
+    handedOff: r.handedOff,
+    completed: r.completed,
+  });
 });
 
 flows.get('/:slug', async (c) => {

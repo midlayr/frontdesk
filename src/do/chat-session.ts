@@ -2,6 +2,7 @@
 // Runs the published flow (ask steps) server-side; persists turns to Postgres on ticket creation / handoff / end.
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../index';
+import { advance as engineAdvance, asksOf, chipsFor, type FlowState } from '../flow-engine';
 
 type Turn = { who: 'visitor' | 'bot' | 'rep'; text: string; at: number };
 type Step = { kind: 'ask'; prompt: string; field: string; chips?: string; skippable?: boolean } | { kind: 'rule'; words: string; handoff: string; route: string } | { kind: 'ticket'; text: string };
@@ -69,28 +70,40 @@ export class ChatSession extends DurableObject<Env> {
   async webSocketClose(ws: WebSocket) { this.sockets.delete(ws); await this.persist(); }
 
   // ── flow engine ────────────────────────────────────────
-  private asks() { return this.s.steps.filter((x): x is Extract<Step, { kind: 'ask' }> => x.kind === 'ask'); }
-  private chips() { const a = this.asks()[this.s.stepIdx]; if (!a || this.s.state !== 'bot') return []; const c = a.chips ? a.chips.split(',').map(x => x.trim()).filter(Boolean) : []; return a.skippable ? [...c, 'Skip'] : c; }
+  // Rules live in src/flow-engine.ts so the builder's preview runs exactly this logic.
+  private asks() { return asksOf(this.s.steps); }
+  private chips() { return chipsFor(this.s.steps, this.s as unknown as FlowState); }
   private async botAsk() { const a = this.asks()[this.s.stepIdx]; if (a) this.push({ who: 'bot', text: a.prompt, at: Date.now() }); }
 
+  /**
+   * One visitor message. The decisions — capture, handoff rule, advance, ticket — all come
+   * from flow-engine, which is also what /api/flows/:slug/simulate runs, so the builder's
+   * preview cannot drift from what actually happens here. This method only does the things
+   * the engine cannot: broadcast, create the lead, and notify the inbox.
+   */
   private async visitorSays(text: string) {
-    this.push({ who: 'visitor', text, at: Date.now() });
-    // Once a rep is on the line every turn is flushed to Postgres as it happens. Waiting for
-    // webSocketClose meant an eviction mid-conversation silently dropped the live exchange.
     if (this.s.state !== 'bot') {
+      this.push({ who: 'visitor', text, at: Date.now() });
       await this.save();
       return this.persist();
     }
-    const rule = this.s.steps.find((x): x is Extract<Step, { kind: 'rule' }> => x.kind === 'rule');
-    const cur = this.asks()[this.s.stepIdx];
-    if (cur && text !== 'Skip') this.s.captured[cur.field] = text;
-    const hit = rule && rule.words.split(',').map(w => w.trim().toLowerCase()).filter(Boolean).some(w => text.toLowerCase().includes(w));
-    if (hit) { this.push({ who: 'bot', text: rule!.handoff, at: Date.now() }); await this.ensureLead(); this.s.state = 'live'; await this.notifyInbox('handoff_requested'); return this.save(); }
-    this.s.stepIdx++;
-    if (this.asks()[this.s.stepIdx]) await this.botAsk();
-    else { const t = this.s.steps.find((x): x is Extract<Step, { kind: 'ticket' }> => x.kind === 'ticket'); await this.ensureLead(); this.push({ who: 'bot', text: t?.text ?? 'Thanks — your request is in.', at: Date.now() }); this.s.state = 'done'; }
+
+    const before = this.s.turns.length;
+    const r = engineAdvance(this.s.steps, this.s as unknown as FlowState, text);
+    this.s.turns = r.next.turns as Turn[];
+    this.s.captured = r.next.captured;
+    this.s.stepIdx = r.next.stepIdx;
+    this.s.state = r.next.state;
+
+    for (const t of this.s.turns.slice(before)) {
+      this.broadcast({ type: 'turn', turn: t, captured: this.s.captured, chips: this.chips(), state: this.s.state });
+    }
+
+    if (r.handedOff || r.completed) await this.ensureLead();
+    if (r.handedOff) await this.notifyInbox('handoff_requested');
     await this.save();
   }
+
   private async takeover(repId: string, repName: string) {
     await this.ensureLead(); this.s.state = 'live'; this.s.repId = repId;
     this.broadcast({ type: 'joined', repName });

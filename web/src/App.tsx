@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, applyBrand, getToken, orgSlug, setToken, userId, type Lead, type Message, type Org } from './api';
+import { FlowBuilder } from './FlowBuilder';
 
 const VIEWS = ['All', 'New', 'Mine', 'Rush', 'Needs info', 'Quoted', 'Won', 'Lost', 'Spam'] as const;
 type View = (typeof VIEWS)[number];
@@ -31,7 +32,23 @@ function matches(l: Lead, v: View) {
   return l.status === STATUS_OF[v];
 }
 
+/** Just enough routing for two screens; a router library would outweigh the problem. */
+function usePath() {
+  const [path, setPath] = useState(location.pathname);
+  useEffect(() => {
+    const on = () => setPath(location.pathname);
+    addEventListener('popstate', on);
+    return () => removeEventListener('popstate', on);
+  }, []);
+  const go = useCallback((to: string) => {
+    history.pushState({}, '', to + location.search);
+    setPath(to);
+  }, []);
+  return [path, go] as const;
+}
+
 export function App() {
+  const [path, go] = usePath();
   const [org, setOrg] = useState<Org | null>(null);
   const [needToken, setNeedToken] = useState(false);
   const [error, setError] = useState('');
@@ -178,6 +195,7 @@ export function App() {
 
   if (needToken) return <TokenGate onDone={() => { setNeedToken(false); location.reload(); }} />;
 
+  const flowSlug = path.startsWith('/chat/flows/') ? path.slice('/chat/flows/'.length) : '';
   const brand = (org?.brand ?? {}) as Record<string, string>;
   const logo = brand.logo_url ? `${brand.logo_url}` : '/brand/dumont/logo-horizontal.png';
 
@@ -189,9 +207,9 @@ export function App() {
         <span className="wordmark">{brand.app_name?.replace(/^.*?\s/, '') || 'Front Desk'}</span>
         <span className="powered">powered by Midlayr</span>
         <nav className="nav">
-          <button aria-current="true">Inbox</button>
+          <button aria-current={!flowSlug} onClick={() => go('/')}>Inbox</button>
           <button title="Not built yet">Campaigns</button>
-          <button title="Not built yet">Website chat</button>
+          <button aria-current={!!flowSlug} onClick={() => go('/chat/flows/quote-intake')}>Chat</button>
           <button title="Not built yet">Order form</button>
         </nav>
         <div className="search">
@@ -200,6 +218,9 @@ export function App() {
         <span className="counts">{counts.new} new · {counts.rush} rush</span>
       </header>
 
+      {flowSlug ? (
+        <FlowBuilder slug={flowSlug} accent={brand.color || '#0B7FA8'} />
+      ) : (
       <div className="panes">
         <aside className="rail">
           <span className="eyebrow">Views</span>
@@ -255,6 +276,7 @@ export function App() {
           <div className="ticket"><div className="empty">{error || 'Select a ticket'}</div></div>
         )}
       </div>
+      )}
       <div ref={threadEnd} />
     </div>
   );

@@ -1,63 +1,109 @@
-// Dumont Front Desk · Worker entry · route skeleton only
+// Midlayr Front Desk · Worker entry
+import { Hono } from 'hono';
+import type { Env, Job, Org } from './env';
+import { connect, withOrg, type Sql } from './db';
+import { resolveOrg } from './org';
+import { twilioSms } from './hooks/twilio-sms';
+import { extractSpecs } from './jobs/extract-specs';
+import { leads } from './api/leads';
+
 export { ChatSession } from './do/chat-session';
 export { InboxRoom } from './do/inbox-room';
+export type { Env, Job };
 
-export interface Env {
-  HYPERDRIVE: Hyperdrive; FILES: R2Bucket; CONFIG: KVNamespace; JOBS: Queue<Job>; AI: Ai;
-  CHAT_SESSION: DurableObjectNamespace; INBOX_ROOM: DurableObjectNamespace;
-  TWILIO_AUTH_TOKEN: string; RESEND_API_KEY: string; SESSION_SECRET: string;
+type Vars = { org: Org; sql: Sql; userId: string };
+const app = new Hono<{ Bindings: Env; Variables: Vars }>();
+
+function isDevHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.localhost');
 }
-export type Job =
-  | { kind: 'transcribe'; messageId: string }          // R2 audio → Whisper → messages.body
-  | { kind: 'extract_specs'; leadId: string }         // body → product/qty/size/stock… + confidence
-  | { kind: 'score_intent'; leadId: string }
-  | { kind: 'enrich'; contactId: string }
-  | { kind: 'import_rows'; importId: string; offset: number }
-  | { kind: 'drip_send'; enrollmentId: string };
 
-// Tenant resolution runs before every route: hostname → org_domains → org (cached in KV 60s).
-// Fallback: <slug>.midlayr.app. The resolved org's brand/comms/widget JSON is attached to the request
-// and drives the theme, the From address, the SMS number, and the widget config.
-// Platform users (Midlayr staff) authenticate against platform_users and pick a tenant explicitly.
-const routes: [string, RegExp, string][] = [
-  // inbound channels (webhooks)
-  ['POST', /^\/hooks\/twilio\/voice$/,   'voicemail → lead + message(audio) → JOBS.transcribe'],
-  ['POST', /^\/hooks\/twilio\/sms$/,     'sms in → find/create lead by phone → JOBS.extract_specs'],
-  ['POST', /^\/hooks\/email$/,           'forwarded quotes@ inbox → lead + attachments → JOBS.extract_specs'],
-  ['POST', /^\/api\/form$/,              'dumontprinting.com order form → lead (already structured)'],
-  // Midlayr Chat widget (public, CORS to allowed domains from CONFIG)
-  ['GET',  /^\/widget\/config$/,         'published flow + tenant brand/widget settings from KV (per hostname)'],
-  // platform admin (Midlayr only)
-  ['CRUD', /^\/platform\/orgs/,          'create tenant, set brand/comms/features, attach custom hostnames via Cloudflare for SaaS'],
-  ['GET',  /^\/widget\/session$/,        'upgrade → ChatSession DO websocket'],
-  // app API (session cookie auth)
-  ['GET',  /^\/api\/leads$/,             'queue: ?status&assignee&q · sorted live→rush→deadline'],
-  ['GET',  /^\/api\/leads\/:id$/,        'ticket + messages + attachments + activity'],
-  ['PATCH',/^\/api\/leads\/:id$/,        'inline spec edit → recompute missing_fields/status, log activity'],
-  ['POST', /^\/api\/leads\/:id\/reply$/, 'send on lead.channel (Twilio/Resend) → status replied, first_reply_at'],
-  ['POST', /^\/api\/leads\/:id\/takeover$/, 'rep joins ChatSession DO, state=live'],
-  ['GET',  /^\/api\/inbox\/stream$/,     'upgrade → InboxRoom DO (new-lead / status pushes)'],
-  ['GET|PUT', /^\/api\/flows\/:slug$/,   'flow builder read/save → bump version, write KV on publish'],
-  ['CRUD', /^\/api\/sequences/,          'drip sequences + steps'],
-  ['POST', /^\/api\/imports$/,           'CSV → R2 → JOBS.import_rows → JOBS.enrich per contact'],
-  ['GET',  /^\/api\/files\/:id$/,        'signed R2 read'],
-];
+// One Postgres client per request, closed after the response is sent.
+app.use('*', async (c, next) => {
+  const sql = connect(c.env);
+  c.set('sql', sql);
+  try {
+    await next();
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
+  }
+});
+
+// Webhooks resolve their own tenant (from the number dialled, not the hostname).
+app.post('/hooks/twilio/sms', (c) => twilioSms(c.req.raw, c.env, c.executionCtx));
+
+// Everything below is tenant-scoped by hostname.
+app.use('/api/*', async (c, next) => {
+  const org = await resolveOrg(c.env, c.get('sql'), new URL(c.req.url));
+  if (!org) return c.json({ error: 'unknown tenant' }, 404);
+  c.set('org', org);
+  await next();
+});
+
+/**
+ * Auth.
+ *
+ * Production sessions are still to do (signed cookie against SESSION_SECRET, users table).
+ * Until then `x-dev-user: <users.id>` stands in — gated on a localhost hostname so it can
+ * never authenticate a request to a deployed worker.
+ */
+app.use('/api/*', async (c, next) => {
+  if (isDevHost(new URL(c.req.url).hostname)) {
+    const devUser = c.req.header('x-dev-user');
+    if (!devUser) return c.json({ error: 'x-dev-user required in dev' }, 401);
+
+    const org = c.get('org');
+    const [user] = await withOrg(c.get('sql'), org.id, (tx) =>
+      tx<{ id: string }[]>`SELECT id FROM users WHERE id = ${devUser}`);
+    if (!user) return c.json({ error: 'unknown user for tenant' }, 401);
+
+    c.set('userId', user.id);
+    return next();
+  }
+
+  return c.json({ error: 'session auth not implemented' }, 501);
+});
+
+app.get('/api/org', (c) => {
+  const org = c.get('org');
+  return c.json({ id: org.id, slug: org.slug, name: org.name, brand: org.brand, features: org.features });
+});
+
+app.route('/api/leads', leads);
+
+app.get('/health', (c) => c.json({ ok: true }));
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
-    // db(): `import postgres from 'postgres'; const sql = postgres(env.HYPERDRIVE.connectionString, { max: 5 })`
-    // per request: await sql`SET LOCAL app.org_id = ${orgId}` inside a transaction → RLS scopes every query
-    // TODO: router (hono recommended) + auth middleware
-    return new Response(JSON.stringify(routes.map(r => r[0] + ' ' + r[1].source + ' — ' + r[2]), null, 2), { headers: { 'content-type': 'application/json' } });
-  },
-  async queue(batch: MessageBatch<Job>, env: Env) {
-    for (const m of batch.messages) {
-      // switch (m.body.kind) { case 'transcribe': … env.AI.run('@cf/openai/whisper', …) }
-      m.ack();
+  fetch: app.fetch,
+
+  async queue(batch: MessageBatch<Job>, env: Env): Promise<void> {
+    const sql = connect(env);
+    try {
+      for (const m of batch.messages) {
+        const job = m.body;
+        try {
+          switch (job.kind) {
+            case 'extract_specs':
+              await extractSpecs(env, sql, job.orgId, job.leadId);
+              break;
+            default:
+              // transcribe / score_intent / enrich / import_rows / drip_send land here as
+              // those channels ship. Ack rather than retry-loop an unhandled kind.
+              console.warn(`queue: no handler for ${job.kind}`);
+          }
+          m.ack();
+        } catch (err) {
+          console.error(`queue: ${job.kind} failed`, err);
+          m.retry(); // three attempts, then frontdesk-dlq
+        }
+      }
+    } finally {
+      await sql.end();
     }
   },
-  async scheduled(_: ScheduledEvent, env: Env) {
+
+  async scheduled(_controller: ScheduledController, _env: Env): Promise<void> {
     // enrollments WHERE state='active' AND next_send_at <= now → JOBS.drip_send
     // leads WHERE status IN ('new','needs_info') AND created_at < now-2h → SLA nudge to InboxRoom
   },
-};
+} satisfies ExportedHandler<Env, Job>;

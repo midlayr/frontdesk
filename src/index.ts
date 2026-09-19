@@ -30,7 +30,7 @@ app.use('*', async (c, next) => {
 });
 
 // Webhooks resolve their own tenant (from the number dialled, not the hostname).
-app.post('/hooks/twilio/sms', (c) => twilioSms(c.req.raw, c.env, c.executionCtx));
+app.post('/hooks/twilio/sms', (c) => twilioSms(c.req.raw, c.env, c.get('sql')));
 
 // Everything below is tenant-scoped by hostname.
 app.use('/api/*', async (c, next) => {

@@ -19,7 +19,10 @@ leads.get('/', async (c) => {
   const rows = await withOrg(c.get('sql'), org.id, (tx) => tx`
     SELECT l.id, l.ticket_no, l.channel, l.status, l.rush, l.deadline_at, l.assignee_id,
            l.product, l.qty, l.size, l.stock, l.color, l.finish,
-           l.confidence, l.missing_fields, l.intent_score, l.first_reply_at, l.created_at,
+           l.confidence, l.intent_score, l.first_reply_at, l.created_at,
+           -- to_jsonb: Hyperdrive needs fetch_types:false, which leaves postgres.js unable to
+           -- parse text[] — without this the client receives the string '{}' instead of [].
+           to_jsonb(l.missing_fields) AS missing_fields,
            c.name AS contact_name, c.phone AS contact_phone, c.email AS contact_email
       FROM leads l LEFT JOIN contacts c ON c.id = l.contact_id
      WHERE (${status ?? null}::text IS NULL OR l.status = ${status ?? null}::lead_status)
@@ -36,7 +39,9 @@ leads.get('/:id', async (c) => {
   const id = c.req.param('id');
 
   const found = await withOrg(c.get('sql'), org.id, async (tx) => {
-    const [lead] = await tx`SELECT * FROM leads WHERE id = ${id}`;
+    // trailing to_jsonb wins over the text[] from SELECT * (see note above)
+    const [lead] = await tx`
+      SELECT l.*, to_jsonb(l.missing_fields) AS missing_fields FROM leads l WHERE l.id = ${id}`;
     if (!lead) return null;
     const messages = await tx`SELECT id, channel, direction, author, body, provider_id, sent_at
                                 FROM messages WHERE lead_id = ${id} ORDER BY sent_at`;

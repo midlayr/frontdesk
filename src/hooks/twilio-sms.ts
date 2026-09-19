@@ -1,6 +1,6 @@
 import { ulid } from 'ulid';
 import type { Env, Org } from '../env';
-import { connect, withOrg, type Tx } from '../db';
+import { withOrg, type Sql, type Tx } from '../db';
 import { resolveOrgByPhone, ticketPrefix } from '../org';
 import { verifySignature, emptyTwiml } from '../lib/twilio';
 
@@ -31,11 +31,7 @@ async function findOrCreateContact(tx: Tx, orgId: string, phone: string): Promis
  * Inbound text → contact → lead (or the contact's open lead) → message → extract_specs job.
  * Replies with empty TwiML so Twilio doesn't auto-send anything; the rep replies from the queue.
  */
-export async function twilioSms(
-  req: Request,
-  env: Env,
-  ctx: { waitUntil(p: Promise<unknown>): void },
-): Promise<Response> {
+export async function twilioSms(req: Request, env: Env, sql: Sql): Promise<Response> {
   const form = await req.formData();
   const params: Record<string, string> = {};
   for (const [k, v] of form) params[k] = String(v);
@@ -45,9 +41,6 @@ export async function twilioSms(
   const body = params.Body ?? '';
   const providerId = params.MessageSid;
   if (!from || !to) return new Response('missing From/To', { status: 400 });
-
-  const sql = connect(env);
-  ctx.waitUntil(sql.end());
 
   const org = await resolveOrgByPhone(env, sql, to);
   // Unknown number: 404 rather than 403, and never before signature check leaks nothing —

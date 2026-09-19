@@ -96,9 +96,11 @@ export async function extractSpecs(env: Env, sql: Sql, orgId: string, leadId: st
         rush           = COALESCE(${spec.rush}, rush),
         spec           = spec || ${tx.json(spec.notes ? { notes: spec.notes } : {})},
         confidence     = confidence || ${tx.json(spec.confidence)},
-        missing_fields = ${missing},
+        -- passed as jsonb and rebuilt server-side: with fetch_types:false postgres.js
+        -- cannot infer the text[] type for a JS array parameter.
+        missing_fields = ARRAY(SELECT jsonb_array_elements_text(${tx.json(missing)}::jsonb)),
         -- don't walk a lead backwards once a rep has replied or quoted it
-        status         = CASE WHEN status = 'new' AND cardinality(${missing}::text[]) > 0
+        status         = CASE WHEN status = 'new' AND ${missing.length} > 0
                               THEN 'needs_info'::lead_status ELSE status END
       WHERE id = ${leadId} AND org_id = ${orgId}`;
 

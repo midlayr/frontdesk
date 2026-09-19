@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { KIND, FIELDS, ROUTES, ago, flowsApi, type Flow, type SimResult, type Step } from './flows-api';
+import { CONTACT_DEFAULTS, FIELDS, FIELD_GROUPS, KIND, ROUTES, ago, flowsApi, type Flow, type SimResult, type Step } from './flows-api';
 
 const SAVE_DEBOUNCE = 500;
 
@@ -86,6 +86,20 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
     });
   }
 
+  /** Append the standard contact questions, skipping any the flow already asks for. */
+  function addContactSet() {
+    setSteps((prev) => {
+      const have = new Set(prev.filter(isAsk).map((s) => s.field));
+      const missing = CONTACT_DEFAULTS.filter((d) => !have.has(d.field));
+      if (!missing.length) return prev;
+      const at = prev.findIndex((s) => s.kind !== 'ask');
+      const next = [...prev];
+      next.splice(at < 0 ? next.length : at, 0,
+        ...missing.map((d): Step => ({ kind: 'ask', prompt: d.prompt, field: d.field, chips: '', skippable: !!d.skippable })));
+      return next;
+    });
+  }
+
   function move(dir: -1 | 1) {
     setSteps((prev) => {
       const to = sel + dir;
@@ -167,6 +181,9 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
           })}
 
           <button className="fb-add" onClick={addQuestion}>+ Add a question</button>
+          <button className="fb-add" onClick={addContactSet} title="Name, company, email and phone">
+            + Add contact questions
+          </button>
         </div>
 
         {/* ── 2 · editor ── */}
@@ -187,7 +204,11 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
                   </Field>
                   <Field label="Saves to ticket field">
                     <select value={current.field} onChange={(e) => update({ field: e.target.value })}>
-                      {Object.entries(FIELDS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      {FIELD_GROUPS.map((g) => (
+                        <optgroup key={g.label} label={g.label}>
+                          {g.fields.map((f) => <option key={f} value={f}>{FIELDS[f]}</option>)}
+                        </optgroup>
+                      ))}
                     </select>
                   </Field>
                   <Field label="Quick replies" hint="comma separated · shown as chips">

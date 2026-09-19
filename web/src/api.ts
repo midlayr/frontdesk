@@ -7,6 +7,7 @@ export interface Lead {
   stock: string | null; color: string | null; finish: string | null;
   confidence: Record<string, number>; missing_fields: string[];
   intent_score: number | null; first_reply_at: string | null; created_at: string;
+  updated_at: string; last_in_at: string | null;
   contact_name: string | null; contact_phone: string | null; contact_email: string | null;
   chat_sid: string | null;
 }

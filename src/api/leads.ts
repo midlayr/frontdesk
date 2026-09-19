@@ -19,7 +19,10 @@ leads.get('/', async (c) => {
   const rows = await withOrg(c.get('sql'), org.id, (tx) => tx`
     SELECT l.id, l.ticket_no, l.channel, l.status, l.rush, l.deadline_at, l.assignee_id,
            l.product, l.qty, l.size, l.stock, l.color, l.finish,
-           l.confidence, l.intent_score, l.first_reply_at, l.created_at,
+           l.confidence, l.intent_score, l.first_reply_at, l.created_at, l.updated_at,
+           -- newest inbound timestamp: lets the queue pulse a row that just got a reply,
+           -- which updated_at alone would miss when only messages changed
+           (SELECT max(sent_at) FROM messages m WHERE m.lead_id = l.id AND m.direction = 'in') AS last_in_at,
            -- to_jsonb: Hyperdrive needs fetch_types:false, which leaves postgres.js unable to
            -- parse text[] — without this the client receives the string '{}' instead of [].
            to_jsonb(l.missing_fields) AS missing_fields,

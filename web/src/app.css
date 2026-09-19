@@ -42,7 +42,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
           font: 500 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2);
           position: sticky; top: 0; z-index: 1; }
 .row { display: block; width: 100%; text-align: left; background: var(--paper); border: 0;
-       border-bottom: 1px solid var(--line); border-left: 3px solid transparent; padding: 11px 15px; }
+       border-bottom: 1px solid var(--line); border-left: 3px solid transparent; padding: 11px 15px;
+       transition: background .35s ease; }
 .row:hover { background: var(--paper-2); }
 .row[aria-selected='true'] { border-left-color: var(--ink); background: var(--paper-2); }
 .row.live[aria-selected='true'] { border-left-color: var(--ok); }
@@ -179,3 +180,34 @@ button:disabled { opacity: .45; cursor: not-allowed; }
           border-bottom: 1px solid var(--line); font-size: var(--text-md); }
 .fb-cap:last-child { border-bottom: 0; }
 .fb-cap span { font: 400 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+
+/* ── live and just-changed rows ──
+   The highlight is --accent-tint, derived from the tenant's own colour, so it follows the
+   brand instead of being a hardcoded teal that would look wrong for the next tenant. */
+.row.live { background: var(--accent-tint); }
+.row.live:hover { background: var(--accent-tint); filter: brightness(.985); }
+.row.fresh { background: var(--accent-tint); }
+/* one sweep as a row lands, then it settles into the plain highlight */
+@keyframes fd-land { from { background: color-mix(in srgb, var(--accent-tint) 55%, var(--paper)); } }
+.row.fresh { animation: fd-land .5s ease-out; }
+@media (prefers-reduced-motion: reduce) { .row.fresh { animation: none; } }
+
+/* the dot breathes while a chat is live or a message just landed */
+@keyframes fd-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ok) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 0%, transparent); }
+}
+.dot.ok.pulse { animation: fd-pulse 1.8s ease-out infinite; }
+
+/* A pulsing element is genuinely unpleasant for some people, and this one never stops
+   while a chat is live — so honour the OS setting rather than animating regardless. */
+@media (prefers-reduced-motion: reduce) {
+  .dot.ok.pulse { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+}
+
+/* "N new leads" — sits above the queue until the rep acknowledges it */
+.newpill { position: sticky; top: 0; z-index: 2; display: block; margin: 8px auto; padding: 7px 14px;
+           background: var(--paper); color: var(--accent); border: 1px solid var(--accent);
+           border-radius: var(--radius); font: 500 12.5px var(--font-body); box-shadow: var(--shadow-float); }
+.newpill:hover { background: var(--accent-tint); }

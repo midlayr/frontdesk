@@ -41,15 +41,33 @@ function authorOf(t: Turn, repId: string | null): string {
   return repId ?? 'rep';
 }
 
-/** Pull whatever contact detail the flow captured; the field name is tenant-configurable. */
-function contactFrom(captured: Record<string, string>): { email?: string; phone?: string; name?: string } {
-  const out: { email?: string; phone?: string; name?: string } = {};
-  for (const v of Object.values(captured)) {
-    if (typeof v !== 'string') continue;
-    if (!out.email && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.trim())) out.email = v.trim();
-    else if (!out.phone && /^\+?[\d\s().-]{7,}$/.test(v.trim())) out.phone = v.trim().replace(/[^\d+]/g, '');
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const PHONE = /^\+?[\d\s().-]{7,}$/;
+
+interface Contact { email?: string; phone?: string; name?: string; company?: string }
+
+/**
+ * Turn captured answers into a contact.
+ *
+ * A flow can ask for name/company/email/phone by name, and those are taken at face value.
+ * The older generic `contact` field is a free-text "best email or mobile", so it still gets
+ * sniffed — but only to fill a slot an explicit question did not already answer.
+ */
+function contactFrom(captured: Record<string, string>): Contact {
+  const val = (k: string) => (typeof captured[k] === 'string' ? captured[k].trim() : '');
+  const out: Contact = {};
+
+  if (val('email')) out.email = val('email');
+  if (val('phone')) out.phone = val('phone').replace(/[^\d+]/g, '');
+  if (val('name')) out.name = val('name');
+  if (val('company')) out.company = val('company');
+
+  const generic = val('contact');
+  if (generic) {
+    if (!out.email && EMAIL.test(generic)) out.email = generic;
+    else if (!out.phone && PHONE.test(generic)) out.phone = generic.replace(/[^\d+]/g, '');
+    else if (!out.name && !EMAIL.test(generic) && !PHONE.test(generic)) out.name = generic;
   }
-  if (captured.name) out.name = captured.name;
   return out;
 }
 
@@ -83,6 +101,20 @@ internal.post('/leads/from-chat', async (c) => {
     if (existing?.lead_id) return existing.lead_id;
 
     const contact = contactFrom(body.captured);
+
+    // A named company becomes a real companies row, so the second enquiry from the same
+    // shop lands against the same account rather than a duplicate.
+    let companyId: string | null = null;
+    if (contact.company) {
+      const [found] = await tx<{ id: string }[]>`
+        SELECT id FROM companies
+         WHERE org_id = ${body.orgId} AND lower(name) = lower(${contact.company}) LIMIT 1`;
+      companyId = found?.id ?? ulid();
+      if (!found) {
+        await tx`INSERT INTO companies (id, org_id, name) VALUES (${companyId}, ${body.orgId}, ${contact.company})`;
+      }
+    }
+
     let contactId: string | null = null;
     if (contact.email || contact.phone) {
       const [found] = await tx<{ id: string }[]>`
@@ -92,17 +124,26 @@ internal.post('/leads/from-chat', async (c) => {
              OR (${contact.phone ?? null}::text IS NOT NULL AND phone = ${contact.phone ?? null}))
          LIMIT 1`;
       contactId = found?.id ?? ulid();
-      if (!found) {
-        await tx`INSERT INTO contacts (id, org_id, name, email, phone, source)
-                 VALUES (${contactId}, ${body.orgId}, ${contact.name ?? null},
+      if (found) {
+        // Returning visitor: fill blanks from this conversation without clobbering
+        // anything a rep may have corrected by hand.
+        await tx`UPDATE contacts SET
+                   name = COALESCE(name, ${contact.name ?? null}),
+                   email = COALESCE(email, ${contact.email ?? null}),
+                   phone = COALESCE(phone, ${contact.phone ?? null}),
+                   company_id = COALESCE(company_id, ${companyId})
+                 WHERE id = ${contactId}`;
+      } else {
+        await tx`INSERT INTO contacts (id, org_id, company_id, name, email, phone, source)
+                 VALUES (${contactId}, ${body.orgId}, ${companyId}, ${contact.name ?? null},
                          ${contact.email ?? null}, ${contact.phone ?? null}, 'chat')`;
       }
     }
 
     const id = ulid();
     const ticketNo = await nextTicket(tx, body.orgId, prefix);
-    await tx`INSERT INTO leads (id, org_id, ticket_no, contact_id, channel, status, spec)
-             VALUES (${id}, ${body.orgId}, ${ticketNo}, ${contactId}, 'chat', 'live',
+    await tx`INSERT INTO leads (id, org_id, ticket_no, contact_id, company_id, channel, status, spec)
+             VALUES (${id}, ${body.orgId}, ${ticketNo}, ${contactId}, ${companyId}, 'chat', 'live',
                      ${tx.json({ captured: body.captured })})`;
 
     await tx`INSERT INTO chat_sessions (id, org_id, flow_id, flow_version, lead_id, visitor_id, state, visitor, captured, do_id)

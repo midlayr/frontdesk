@@ -31,6 +31,10 @@
   --ok-bright: #4FC28A;    /* live dot on dark bars */
   --warn: #B4690E;         /* rush, needs info, handoff rule */
   --danger: #B4261B;
+  /* Rush reads crimson in the reference screenshots, distinct from --danger, which stays
+     reserved for destructive actions. BRAND.md's prose says amber; the designs disagree and
+     the designs win, since this is the colour reps will learn to scan for. */
+  --rush: #C8452F;
 
   /* shape · square-ish, print-shop feel */
   --radius: 2px;

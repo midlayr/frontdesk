@@ -88,7 +88,8 @@ export class ChatSession extends DurableObject<Env> {
     if (this.s.state !== 'bot') {
       this.push({ who: 'visitor', text, at: Date.now() });
       await this.save();
-      return this.persist();
+      await this.persist();
+      return this.notifyInbox('visitor_message');
     }
 
     const before = this.s.turns.length;
@@ -103,8 +104,13 @@ export class ChatSession extends DurableObject<Env> {
     }
 
     if (r.handedOff || r.completed) await this.ensureLead();
-    if (r.handedOff) await this.notifyInbox('handoff_requested');
     await this.save();
+
+    // Tell the inbox about every turn, not only handoff and takeover. Without this a rep
+    // watching the queue sees nothing when a visitor keeps typing, and the row never moves.
+    if (this.s.leadId) {
+      await this.notifyInbox(r.handedOff ? 'handoff_requested' : r.completed ? 'ticket_created' : 'visitor_message');
+    }
   }
 
   private async takeover(repId: string, repName: string) {

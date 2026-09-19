@@ -27,9 +27,30 @@ export const KIND: Record<Step['kind'], { label: string; color: string }> = {
 };
 
 export const FIELDS: Record<string, string> = {
+  // job
   product: 'Product', qty: 'Quantity', size: 'Size', stock: 'Stock',
-  deadline: 'Deadline', contact: 'Contact', notes: 'Notes',
+  color: 'Colour', finish: 'Finish', deadline: 'Deadline',
+  // who is asking — named fields land straight on the contact and company records;
+  // `contact` is the older free-text catch-all the server still has to sniff
+  name: 'Name', company: 'Company', email: 'Email', phone: 'Phone',
+  contact: 'Contact (email or phone)',
+  notes: 'Notes',
 };
+
+/** Grouped for the picker, so the contact fields read as a set. */
+export const FIELD_GROUPS: { label: string; fields: string[] }[] = [
+  { label: 'Job', fields: ['product', 'qty', 'size', 'stock', 'color', 'finish', 'deadline'] },
+  { label: 'Contact', fields: ['name', 'company', 'email', 'phone', 'contact'] },
+  { label: 'Other', fields: ['notes'] },
+];
+
+/** Dropped in by "+ Add contact questions" — the set most shops want every time. */
+export const CONTACT_DEFAULTS: { prompt: string; field: string; skippable?: boolean }[] = [
+  { prompt: 'Who am I speaking with?', field: 'name' },
+  { prompt: 'What company is this for?', field: 'company', skippable: true },
+  { prompt: "What's the best email for the quote?", field: 'email' },
+  { prompt: 'And a phone number, in case we need to check a detail?', field: 'phone', skippable: true },
+];
 
 export const ROUTES: Record<string, string> = {
   live: 'Bring in a rep now',

@@ -11,6 +11,38 @@ const STATUS_OF: Partial<Record<View, string>> = {
 
 const CHANNEL_TAG: Record<string, string> = { sms: 'SM', voice: 'VM', email: 'EM', form: 'WF', chat: 'CB' };
 
+const FRESH_MS = 45_000;
+
+/**
+ * Derived from the row's own timestamps rather than by diffing successive polls.
+ * Diffing needs a ref that survives every remount, hot reload and socket reconnect — and
+ * when it does not, the highlight silently stops working, which is the worst failure mode
+ * for something whose whole job is to catch your eye.
+ */
+const isFresh = (l: Lead) => {
+  const t = l.last_in_at ?? l.created_at;
+  return !!t && Date.now() - new Date(t).getTime() < FRESH_MS;
+};
+
+/**
+ * The left bar. BRAND.md: live/replied green, rush/needs-info amber, and red reserved for
+ * destructive actions — the one exception being a deadline that has actually passed, which
+ * is the only state on this screen that is genuinely an emergency.
+ */
+function urgency(l: Lead): { color: string; label: string } {
+  const due = l.deadline_at ? new Date(l.deadline_at).getTime() : null;
+  const hoursLeft = due === null ? null : (due - Date.now()) / 3_600_000;
+
+  if (l.rush || (hoursLeft !== null && hoursLeft < 0)) {
+    return { color: 'var(--rush)', label: hoursLeft !== null && hoursLeft < 0 ? 'overdue' : 'rush' };
+  }
+  if (l.status === 'live') return { color: 'var(--accent)', label: 'live' };
+  if (hoursLeft !== null && hoursLeft < 24) return { color: 'var(--warn)', label: 'due today' };
+  if (l.status === 'needs_info') return { color: 'var(--warn)', label: 'needs info' };
+  if (l.status === 'replied' || l.status === 'quoted') return { color: 'var(--ok)', label: l.status };
+  return { color: 'transparent', label: l.status };
+}
+
 function age(iso: string) {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
   if (m < 60) return `${m}m`;
@@ -52,7 +84,15 @@ export function App() {
   const [org, setOrg] = useState<Org | null>(null);
   const [needToken, setNeedToken] = useState(false);
   const [error, setError] = useState('');
+  const [streamUp, setStreamUp] = useState(false);
+  const [ackedAt, setAckedAt] = useState(() => Date.now());
   const [leads, setLeads] = useState<Lead[]>([]);
+  // Ticks so time-derived state (freshness, overdue) decays without a server round trip.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 5000);
+    return () => clearInterval(t);
+  }, []);
   const [view, setView] = useState<View>('All');
   const [query, setQuery] = useState('');
   const [selId, setSelId] = useState<string | null>(null);
@@ -67,6 +107,7 @@ export function App() {
   const refresh = useCallback(async () => {
     try {
       const { leads } = await api.leads();
+
       setLeads(leads);
       setError('');
     } catch (e) {
@@ -91,19 +132,43 @@ export function App() {
     })();
   }, [refresh]);
 
-  // realtime queue: InboxRoom pushes on new leads and chat events
+  /**
+   * Realtime queue: InboxRoom pushes on new leads and chat turns.
+   *
+   * Reconnects on drop. Without this the socket dies on a laptop sleeping, a network blip or
+   * a dev hot-reload, and the queue just quietly stops updating — a rep would sit in front of
+   * a stale list with no indication anything was wrong, which is worse than no realtime.
+   * Also re-syncs on reconnect, since anything that happened while we were away was missed.
+   */
   useEffect(() => {
     if (!org) return;
     let ws: WebSocket | null = null;
     let stop = false;
-    (async () => {
+    let attempt = 0;
+    let timer: number | undefined;
+
+    const open = async () => {
+      if (stop) return;
       try {
         ws = await api.socket('/api/inbox/stream');
         if (stop) return ws.close();
+        ws.onopen = () => { attempt = 0; setStreamUp(true); refresh(); };
         ws.onmessage = () => refresh();
-      } catch { /* queue still works without push */ }
-    })();
-    return () => { stop = true; ws?.close(); };
+        ws.onclose = () => {
+          setStreamUp(false);
+          if (stop) return;
+          const wait = Math.min(30000, 1000 * 2 ** attempt++);   // 1s, 2s, 4s … capped
+          timer = setTimeout(open, wait) as unknown as number;
+        };
+      } catch {
+        if (stop) return;
+        const wait = Math.min(30000, 1000 * 2 ** attempt++);
+        timer = setTimeout(open, wait) as unknown as number;
+      }
+    };
+    open();
+
+    return () => { stop = true; clearTimeout(timer); ws?.close(); };
   }, [org, refresh]);
 
   const openLead = useCallback(async (id: string) => {
@@ -156,6 +221,13 @@ export function App() {
       { title: `Today · ${rest.length}`, rows: rest },
     ].filter((g) => g.rows.length);
   }, [shown]);
+
+  // Arrived since the rep last acknowledged the queue. Survives reconnects because it is
+  // derived from created_at, not from diffing polls.
+  const newSinceAck = useMemo(
+    () => leads.filter((l) => new Date(l.created_at).getTime() > ackedAt).length,
+    [leads, ackedAt],
+  );
 
   const counts = useMemo(() => ({
     new: leads.filter((l) => l.status === 'new').length,
@@ -215,7 +287,10 @@ export function App() {
         <div className="search">
           <input placeholder="Search leads" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <span className="counts">{counts.new} new · {counts.rush} rush</span>
+        <span className="counts">
+          <span className={`dot${streamUp ? ' ok pulse' : ''}`} style={{ display: 'inline-block', marginRight: 6 }} />
+          {counts.new} new · {counts.rush} rush
+        </span>
       </header>
 
       {flowSlug ? (
@@ -241,16 +316,29 @@ export function App() {
         </aside>
 
         <div className="queue">
+          {newSinceAck > 0 && (
+            <button className="newpill" onClick={() => {
+              setAckedAt(Date.now());
+              document.querySelector('.queue')?.scrollTo({ top: 0, behavior: 'smooth' });
+            }}>
+              {newSinceAck} new lead{newSinceAck > 1 ? 's' : ''}
+            </button>
+          )}
           {groups.map((g) => (
             <div key={g.title}>
               <div className="qgroup">{g.title}</div>
               {g.rows.map((l) => {
                 const s = summarise(l);
+                const u = urgency(l);
+                const hot = l.status === 'live' || isFresh(l);
                 return (
-                  <button key={l.id} className={`row${l.status === 'live' ? ' live' : ''}`}
+                  <button key={l.id}
+                          className={`row${l.status === 'live' ? ' live' : ''}${isFresh(l) ? ' fresh' : ''}`}
+                          style={{ borderLeftColor: selId === l.id ? 'var(--ink)' : u.color }}
+                          title={u.label}
                           aria-selected={selId === l.id} onClick={() => openLead(l.id)}>
                     <div className="r1">
-                      <span className={`dot${l.status === 'live' ? ' ok' : ''}`} />
+                      <span className={`dot${hot ? ' ok pulse' : ''}`} style={hot ? undefined : { background: u.color }} />
                       {l.rush && <span className="tag rush">Rush</span>}
                       {l.status === 'live' && <span className="tag live">Live</span>}
                       <span className="name">{l.contact_name ?? l.contact_email ?? l.contact_phone ?? 'Anonymous'}</span>

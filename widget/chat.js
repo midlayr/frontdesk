@@ -3,11 +3,16 @@
    No framework. Reads tenant brand + flow from /widget/config, opens a WebSocket to the ChatSession DO. */
 (function () {
   const tag = document.currentScript; const org = tag.dataset.org; const flow = tag.dataset.flow || 'quote-intake';
-  const API = tag.dataset.api || 'https://api.midlayr.app';
+  // Default to wherever this script came from: on cdn.midlayr.com data-api names the API,
+  // but for a Worker serving its own /widget/chat.js the same origin is already correct.
+  const API = tag.dataset.api || new URL(tag.src, location.href).origin;
   const vid = localStorage.getItem('ml_vid') || (localStorage.setItem('ml_vid', crypto.randomUUID()), localStorage.getItem('ml_vid'));
   let sid = sessionStorage.getItem('ml_sid');
 
-  fetch(`${API}/widget/config?org=${org}&flow=${flow}`).then(r => r.json()).then(boot).catch(() => {});
+  fetch(`${API}/widget/config?org=${org}&flow=${flow}`)
+    .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(`${r.status} ${t}`))))
+    .then(boot)
+    .catch(e => console.error('[midlayr] widget config failed:', e));
 
   function boot(cfg) {
     const b = cfg.brand || {}; const w = cfg.widget || {}; const color = b.color || '#0B7FA8'; const ink = b.ink || '#14161A'; const paper = b.paper || '#FBFAF8';
@@ -51,7 +56,9 @@
     function connect() {
       if (ws) return;
       if (!sid) { sid = crypto.randomUUID(); sessionStorage.setItem('ml_sid', sid); }
-      const q = new URLSearchParams({ org: cfg.orgId, flow, sid, vid, role: 'visitor', ref: document.referrer, page: location.pathname, ua: navigator.userAgent });
+      // The session route resolves the tenant by slug, the same public identifier the
+      // script tag carries — never the internal org id.
+      const q = new URLSearchParams({ org, flow, sid, vid, role: 'visitor', ref: document.referrer, page: location.pathname, ua: navigator.userAgent });
       ws = new WebSocket(`${API.replace(/^http/, 'ws')}/widget/session?${q}`);
       ws.onmessage = e => { const m = JSON.parse(e.data);
         if (m.type === 'hello') { M.innerHTML = ''; m.turns.forEach(turn); chips(m.chips); if (m.state === 'live') setLive(); }

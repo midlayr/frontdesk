@@ -16,7 +16,7 @@ bucket_name = "frontdesk-files"
 # Published chat flow + widget settings, read on every widget load (edge-cached)
 [[kv_namespaces]]
 binding = "CONFIG"
-id = "<wrangler kv namespace create CONFIG>"
+id = "d2e75694f3434c91ad641e913a0fd317"
 
 # One object per live chat session / per org inbox for realtime fan-out
 [[durable_objects.bindings]]

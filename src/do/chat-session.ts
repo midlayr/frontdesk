@@ -6,7 +6,7 @@ import { advance as engineAdvance, asksOf, chipsFor, type FlowState } from '../f
 
 type Turn = { who: 'visitor' | 'bot' | 'rep'; text: string; at: number };
 type Step = { kind: 'ask'; prompt: string; field: string; chips?: string; skippable?: boolean } | { kind: 'rule'; words: string; handoff: string; route: string } | { kind: 'ticket'; text: string };
-type SessionState = { sid: string; orgId: string; flowId: string; flowVersion: number; steps: Step[]; stepIdx: number; captured: Record<string, string>; turns: Turn[]; state: 'bot' | 'live' | 'done'; leadId?: string; repId?: string; visitor: Record<string, unknown> };
+type SessionState = { sid: string; orgId: string; flowSlug: string; flowId: string; flowVersion: number; steps: Step[]; stepIdx: number; captured: Record<string, string>; turns: Turn[]; state: 'bot' | 'live' | 'done'; leadId?: string; repId?: string; visitor: Record<string, unknown> };
 
 export class ChatSession extends DurableObject<Env> {
   private s!: SessionState;
@@ -31,6 +31,9 @@ export class ChatSession extends DurableObject<Env> {
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('expected websocket', { status: 426 });
     const role = (url.searchParams.get('role') as 'visitor' | 'rep') || 'visitor';
     await this.load(url);
+    // Every connection, not just a cold one: load() returns early while the object is warm,
+    // so a check inside it only ran after an eviction.
+    if (role === 'visitor') await this.adoptNewerFlow();
     // Ask the opening question *before* the socket exists, so it travels inside `hello`.
     // Broadcasting it after acceptWebSocket races the 101 handshake and the client misses
     // it; and botAsk alone never persisted, so it was also lost on hibernation.
@@ -134,10 +137,46 @@ export class ChatSession extends DurableObject<Env> {
     const sid = url.searchParams.get('sid') ?? this.ctx.id.toString();
     const cfg = await this.env.CONFIG.get<{ id: string; version: number; steps: Step[] }>(`flow:${orgId}:${flowSlug}`, 'json');
     if (!cfg) throw new Error('flow not published');
-    this.s = { sid, orgId, flowId: cfg.id, flowVersion: cfg.version, steps: cfg.steps, stepIdx: 0, captured: {}, turns: [], state: 'bot', visitor: { referrer: url.searchParams.get('ref'), landing: url.searchParams.get('page'), ua: url.searchParams.get('ua') } };
+    this.s = { sid, orgId, flowSlug, flowId: cfg.id, flowVersion: cfg.version, steps: cfg.steps, stepIdx: 0, captured: {}, turns: [], state: 'bot', visitor: { referrer: url.searchParams.get('ref'), landing: url.searchParams.get('page'), ua: url.searchParams.get('ua') } };
     await this.save();
   }
   private save() { return this.ctx.storage.put('s', this.s); }
+
+  /**
+   * A visitor's session id lives in sessionStorage, so it outlives a publish — left alone,
+   * anyone who opened the widget before the change keeps replaying the old script until they
+   * close the tab, which looks exactly like "publish did nothing".
+   *
+   * So pick up a newer published version, but only while the conversation has not really
+   * started: swapping the questions out from under someone mid-answer would strand them on a
+   * step that no longer exists and lose what they had already told us.
+   */
+  private async adoptNewerFlow() {
+    // A rep is on the line: never touch the script underneath them.
+    if (this.s.state === 'live') return;
+
+    const last = this.s.turns[this.s.turns.length - 1]?.at ?? 0;
+    const idleMs = Date.now() - last;
+    const barelyStarted = this.s.turns.length <= 1;
+    const finished = this.s.state === 'done';
+    const abandoned = idleMs > 30 * 60 * 1000;   // came back later; this is a new enquiry
+
+    // Mid-answer and still warm — resuming beats restarting, even on an older script.
+    if (!barelyStarted && !finished && !abandoned) return;
+
+    const slug = this.s.flowSlug || 'quote-intake';
+    const cfg = await this.env.CONFIG.get<{ id: string; version: number; steps: Step[] }>(
+      `flow:${this.s.orgId}:${slug}`, 'json');
+    if (!cfg || cfg.version === this.s.flowVersion) return;
+
+    this.s.flowId = cfg.id;
+    this.s.flowVersion = cfg.version;
+    this.s.steps = cfg.steps;
+    this.s.stepIdx = 0;
+    this.s.captured = {};
+    this.s.turns = [];   // cleared so the new opening question is asked on connect
+    await this.save();
+  }
   private async ensureLead() {
     if (this.s.leadId) return;
     // Worker-side helper does the INSERT (contact by captured.contact, lead channel='chat', chat_sessions row) and returns leadId

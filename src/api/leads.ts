@@ -47,8 +47,12 @@ leads.get('/:id', async (c) => {
     // trailing to_jsonb wins over the text[] from SELECT * (see note above)
     const [lead] = await tx`
       SELECT l.*, to_jsonb(l.missing_fields) AS missing_fields,
+             -- the list endpoint joins contacts; without the same join here the ticket
+             -- header fell back to "Anonymous" for a lead that plainly has a contact
+             c.name AS contact_name, c.phone AS contact_phone, c.email AS contact_email,
              (SELECT do_id FROM chat_sessions WHERE lead_id = l.id ORDER BY started_at DESC LIMIT 1) AS chat_sid
-        FROM leads l WHERE l.id = ${id}`;
+        FROM leads l LEFT JOIN contacts c ON c.id = l.contact_id
+       WHERE l.id = ${id}`;
     if (!lead) return null;
     const messages = await tx`SELECT id, channel, direction, author, body, provider_id, sent_at
                                 FROM messages WHERE lead_id = ${id} ORDER BY sent_at`;

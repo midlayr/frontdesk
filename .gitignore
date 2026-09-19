@@ -5,3 +5,5 @@ dist/
 .DS_Store
 wrangler.dev.toml
 SETUP-LOG.md
+web/node_modules/
+web/dist/

@@ -29,6 +29,12 @@ class_name = "InboxRoom"
 tag = "v1"
 new_sqlite_classes = ["ChatSession", "InboxRoom"]
 
+# Self-binding: the chat DO calls back into the Worker for Postgres writes,
+# since a Durable Object has no Hyperdrive binding of its own.
+[[services]]
+binding = "INTERNAL"
+service = "dumont-frontdesk"
+
 # Async work: transcription, spec extraction, enrichment, drip sends
 [[queues.producers]]
 binding = "JOBS"

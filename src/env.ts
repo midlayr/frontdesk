@@ -6,6 +6,7 @@ export interface Env {
   CONFIG: KVNamespace;
   JOBS: Queue<Job>;
   AI: Ai;
+  INTERNAL: Fetcher;          // self service-binding, so DOs can call Worker routes
   CHAT_SESSION: DurableObjectNamespace;
   INBOX_ROOM: DurableObjectNamespace;
   TWILIO_SID: string;
@@ -27,6 +28,18 @@ export type Job =
   | { kind: 'drip_send';     orgId: string; enrollmentId: string };
 
 // The tenant, as resolved once per request and carried on the context.
+/** A published chat flow, as stored in KV under flow:<orgId>:<slug>. */
+export type Step =
+  | { kind: 'ask'; prompt: string; field: string; chips?: string; skippable?: boolean }
+  | { kind: 'rule'; words: string; handoff: string; route: string }
+  | { kind: 'ticket'; text: string };
+
+export interface PublishedFlow {
+  id: string;
+  version: number;
+  steps: Step[];
+}
+
 export interface Org {
   id: string;
   slug: string;

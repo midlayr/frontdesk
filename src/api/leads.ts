@@ -23,8 +23,13 @@ leads.get('/', async (c) => {
            -- to_jsonb: Hyperdrive needs fetch_types:false, which leaves postgres.js unable to
            -- parse text[] — without this the client receives the string '{}' instead of [].
            to_jsonb(l.missing_fields) AS missing_fields,
-           c.name AS contact_name, c.phone AS contact_phone, c.email AS contact_email
-      FROM leads l LEFT JOIN contacts c ON c.id = l.contact_id
+           c.name AS contact_name, c.phone AS contact_phone, c.email AS contact_email,
+           cs.do_id AS chat_sid
+      FROM leads l
+      LEFT JOIN contacts c ON c.id = l.contact_id
+      LEFT JOIN LATERAL (
+        SELECT do_id FROM chat_sessions WHERE lead_id = l.id ORDER BY started_at DESC LIMIT 1
+      ) cs ON true
      WHERE (${status ?? null}::text IS NULL OR l.status = ${status ?? null}::lead_status)
        AND (${assignee ?? null}::text IS NULL OR l.assignee_id = ${assignee ?? null})
        AND (${q ?? null}::text IS NULL OR l.search @@ plainto_tsquery('simple', ${q ?? null}))
@@ -41,7 +46,9 @@ leads.get('/:id', async (c) => {
   const found = await withOrg(c.get('sql'), org.id, async (tx) => {
     // trailing to_jsonb wins over the text[] from SELECT * (see note above)
     const [lead] = await tx`
-      SELECT l.*, to_jsonb(l.missing_fields) AS missing_fields FROM leads l WHERE l.id = ${id}`;
+      SELECT l.*, to_jsonb(l.missing_fields) AS missing_fields,
+             (SELECT do_id FROM chat_sessions WHERE lead_id = l.id ORDER BY started_at DESC LIMIT 1) AS chat_sid
+        FROM leads l WHERE l.id = ${id}`;
     if (!lead) return null;
     const messages = await tx`SELECT id, channel, direction, author, body, provider_id, sent_at
                                 FROM messages WHERE lead_id = ${id} ORDER BY sent_at`;
@@ -71,6 +78,67 @@ leads.post('/:id/reextract', async (c) => {
 
   await c.env.JOBS.send({ kind: 'extract_specs', orgId: org.id, leadId: id });
   return c.json({ ok: true, queued: 'extract_specs' });
+});
+
+/**
+ * The rep's end of a live chat.
+ *
+ * Deliberately separate from /widget/session: that route is public and always opens a
+ * visitor socket, so a rep socket has to sit behind /api where auth already applies.
+ */
+leads.get('/:id/chat', async (c) => {
+  if (c.req.header('upgrade') !== 'websocket') return c.text('expected websocket', 426);
+  const org = c.get('org');
+  const id = c.req.param('id');
+
+  const [row] = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ do_id: string }[]>`
+      SELECT do_id FROM chat_sessions
+       WHERE lead_id = ${id} AND do_id IS NOT NULL
+       ORDER BY started_at DESC LIMIT 1`);
+  if (!row) return c.text('no chat session for this lead', 404);
+
+  const url = new URL('https://do/');
+  url.searchParams.set('role', 'rep');
+  url.searchParams.set('sid', row.do_id);
+  return c.env.CHAT_SESSION.get(c.env.CHAT_SESSION.idFromName(row.do_id)).fetch(url.toString(), c.req.raw);
+});
+
+/** Rep joins a live chat: hand the DO the rep's identity so both sides see the switch. */
+leads.post('/:id/takeover', async (c) => {
+  const org = c.get('org');
+  const userId = c.get('userId');
+  const id = c.req.param('id');
+
+  const found = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [row] = await tx<{ do_id: string | null; name: string }[]>`
+      SELECT cs.do_id, u.name
+        FROM chat_sessions cs
+        JOIN leads l ON l.id = cs.lead_id
+        LEFT JOIN users u ON u.id = ${userId}
+       WHERE cs.lead_id = ${id}
+       ORDER BY cs.started_at DESC LIMIT 1`;
+    return row ?? null;
+  });
+
+  if (!found?.do_id) return c.json({ error: 'no chat session for this lead' }, 404);
+
+  const stub = c.env.CHAT_SESSION.get(c.env.CHAT_SESSION.idFromName(found.do_id));
+  const res = await stub.fetch('https://do/takeover', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-internal-token': c.env.SESSION_SECRET },
+    body: JSON.stringify({ repId: userId, repName: found.name ?? 'A rep' }),
+  });
+  if (!res.ok) return c.json({ error: `takeover failed: ${await res.text()}` }, 502);
+
+  await withOrg(c.get('sql'), org.id, async (tx) => {
+    await tx`UPDATE chat_sessions SET rep_id = ${userId}, state = 'live' WHERE do_id = ${found.do_id}`;
+    await tx`UPDATE leads SET status = 'live' WHERE id = ${id}`;
+    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+             VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'takeover', ${tx.json({})})`;
+  });
+
+  return c.json({ ok: true });
 });
 
 const Reply = z.object({ body: z.string().min(1).max(1600) });

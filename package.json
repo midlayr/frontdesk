@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:widget": "node scripts/build-widget.mjs",
+    "build:web": "node scripts/build-widget.mjs",
+    "predeploy": "npm run build:web"
   },
   "repository": {
     "type": "git",

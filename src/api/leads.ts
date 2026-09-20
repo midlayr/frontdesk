@@ -605,12 +605,20 @@ async function replyByEmail(
   const signature = render(sms.signature ?? '', { org: org.name }).trim();
   const outgoing = signature ? `${body}\n\n${signature}` : body;
 
-  const from = org.comms.email_from
-    ? `${org.name} <${org.comms.email_from}>`
-    : `${org.name} <${org.comms.email_inbound ?? ''}>`;
-  if (!org.comms.email_from && !org.comms.email_inbound) {
-    return c.json({ error: 'tenant has no comms.email_from configured' }, 500);
-  }
+  /**
+   * From has to be an address on a domain Mailgun signs for us. The shop's own public
+   * address is not: sending as quotes@dumontprinting.com without DKIM on their domain is
+   * unaligned mail, which lands in spam or is rejected outright. So we send under our own
+   * domain with their name on it, and only use their address once they have verified it.
+   *
+   * Reply-To points at the inbound box rather than at From, so a customer's reply comes
+   * back to us and threads onto this ticket instead of vanishing into a mailbox nobody
+   * watches.
+   */
+  const sender = org.comms.email_from ?? org.comms.email_inbound;
+  if (!sender) return c.json({ error: 'tenant has no comms.email_from configured' }, 500);
+  const from = `${org.name} <${sender}>`;
+  const replyTo = org.comms.email_inbound ?? sender;
 
   // The ticket number rides in the subject as the fallback for a client that drops
   // In-Reply-To, which webmail forwarding does more often than you would hope.
@@ -619,7 +627,7 @@ async function replyByEmail(
   let sent;
   try {
     sent = await sendEmail(c.env, {
-      from, to, subject, text: outgoing,
+      from, to, subject, text: outgoing, replyTo,
       inReplyTo: thread.inReplyTo, references: thread.references,
     });
   } catch (err) {

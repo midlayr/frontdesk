@@ -9,6 +9,7 @@ export interface Lead {
   intent_score: number | null; first_reply_at: string | null; created_at: string;
   updated_at: string; last_in_at: string | null;
   contact_name: string | null; contact_phone: string | null; contact_email: string | null;
+  company_name?: string | null;
   chat_sid: string | null;
 }
 
@@ -64,6 +65,15 @@ export const api = {
     const r = await fetch(url(`/api/leads/${id}/reply`), {
       method: 'POST', headers: { ...headers(), 'content-type': 'application/json' },
       body: JSON.stringify({ body }),
+    });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json();
+  },
+
+  patch: async (id: string, body: Record<string, unknown>) => {
+    const r = await fetch(url(`/api/leads/${id}`), {
+      method: 'PATCH', headers: { ...headers(), 'content-type': 'application/json' },
+      body: JSON.stringify(body),
     });
     if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
     return r.json();

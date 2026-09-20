@@ -53,8 +53,11 @@ leads.get('/:id', async (c) => {
              -- the list endpoint joins contacts; without the same join here the ticket
              -- header fell back to "Anonymous" for a lead that plainly has a contact
              c.name AS contact_name, c.phone AS contact_phone, c.email AS contact_email,
+             co.name AS company_name,
              (SELECT do_id FROM chat_sessions WHERE lead_id = l.id ORDER BY started_at DESC LIMIT 1) AS chat_sid
-        FROM leads l LEFT JOIN contacts c ON c.id = l.contact_id
+        FROM leads l
+        LEFT JOIN contacts c ON c.id = l.contact_id
+        LEFT JOIN companies co ON co.id = l.company_id
        WHERE l.id = ${id}`;
     if (!lead) return null;
     const messages = await tx`SELECT id, channel, direction, author, body, provider_id, sent_at,
@@ -86,6 +89,121 @@ leads.post('/:id/reextract', async (c) => {
 
   await c.env.JOBS.send({ kind: 'extract_specs', orgId: org.id, leadId: id });
   return c.json({ ok: true, queued: 'extract_specs' });
+});
+
+const SPEC_FIELDS = ['product', 'qty', 'size', 'stock', 'color', 'finish'] as const;
+
+const Patch = z.object({
+  product: z.string().nullable().optional(),
+  qty: z.number().int().positive().nullable().optional(),
+  size: z.string().nullable().optional(),
+  stock: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
+  finish: z.string().nullable().optional(),
+  rush: z.boolean().optional(),
+  deadline_at: z.string().datetime().nullable().optional(),
+  status: z.enum(['live','new','needs_info','replied','quoted','won','lost','closed','spam']).optional(),
+  contact: z.object({
+    name: z.string().nullable().optional(),
+    company: z.string().nullable().optional(),
+    email: z.string().email().nullable().optional(),
+    phone: z.string().nullable().optional(),
+  }).optional(),
+});
+
+/**
+ * Inline edit of a ticket.
+ *
+ * Matters most on voicemail: a caller leaves a number and rarely spells out their company or
+ * email, so the rep fills it in while listening. Contact edits write through to the contacts
+ * row rather than sitting on the lead, so the next enquiry from that person already knows who
+ * they are — and a named company is matched or created the same way the chat flow does it.
+ *
+ * Unlike extraction, an edit here is authoritative: a rep correcting 500 to 1000 overwrites,
+ * where the model only ever fills blanks.
+ */
+leads.patch('/:id', async (c) => {
+  const org = c.get('org');
+  const userId = c.get('userId');
+  const id = c.req.param('id');
+
+  const parsed = Patch.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: 'bad patch', detail: parsed.error.issues }, 400);
+  const p = parsed.data;
+
+  const result = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [lead] = await tx<{ contact_id: string | null }[]>`
+      SELECT contact_id FROM leads WHERE id = ${id}`;
+    if (!lead) return null;
+
+    if (p.contact) {
+      let companyId: string | null = null;
+      if (p.contact.company) {
+        const [found] = await tx<{ id: string }[]>`
+          SELECT id FROM companies WHERE org_id = ${org.id} AND lower(name) = lower(${p.contact.company}) LIMIT 1`;
+        companyId = found?.id ?? ulid();
+        if (!found) {
+          await tx`INSERT INTO companies (id, org_id, name) VALUES (${companyId}, ${org.id}, ${p.contact.company})`;
+        }
+        await tx`UPDATE leads SET company_id = ${companyId} WHERE id = ${id}`;
+      }
+
+      let contactId = lead.contact_id;
+      if (!contactId) {
+        contactId = ulid();
+        await tx`INSERT INTO contacts (id, org_id, source) VALUES (${contactId}, ${org.id}, 'manual')`;
+        await tx`UPDATE leads SET contact_id = ${contactId} WHERE id = ${id}`;
+      }
+
+      // COALESCE on the *incoming* value: undefined leaves the column alone, an explicit
+      // value overwrites, so a rep can correct a bad transcription.
+      await tx`UPDATE contacts SET
+                 name = COALESCE(${p.contact.name ?? null}, name),
+                 email = COALESCE(${p.contact.email ?? null}, email),
+                 phone = COALESCE(${p.contact.phone ?? null}, phone),
+                 company_id = COALESCE(${companyId}, company_id)
+               WHERE id = ${contactId}`;
+    }
+
+    // Only the keys actually sent are written, so omitting a field leaves it alone while
+    // sending null clears it — which is what an inline editor needs.
+    const patch: Record<string, unknown> = {};
+    for (const f of SPEC_FIELDS) if (f in p) patch[f] = p[f] ?? null;
+    if (p.rush !== undefined) patch.rush = p.rush;
+    if (p.deadline_at !== undefined) patch.deadline_at = p.deadline_at;
+    if (p.status !== undefined) patch.status = p.status;
+
+    if (Object.keys(patch).length) {
+      await tx`UPDATE leads SET ${tx(patch)} WHERE id = ${id}`;
+
+      // Keep the dashed "missing" chips honest after a manual edit.
+      await tx`UPDATE leads SET missing_fields = ARRAY(
+                 SELECT f FROM unnest(ARRAY['product','qty','size','stock','color','finish']) AS f
+                  WHERE CASE f
+                          WHEN 'product' THEN product WHEN 'qty' THEN qty::text
+                          WHEN 'size' THEN size WHEN 'stock' THEN stock
+                          WHEN 'color' THEN color ELSE finish END IS NULL)
+               WHERE id = ${id}`;
+    }
+
+    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+             VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'edited', ${tx.json({
+               fields: [...Object.keys(patch), ...(p.contact ? Object.keys(p.contact).map((k) => `contact.${k}`) : [])],
+             })})`;
+
+    const [fresh] = await tx`
+      SELECT l.*, to_jsonb(l.missing_fields) AS missing_fields,
+             c.name AS contact_name, c.phone AS contact_phone, c.email AS contact_email,
+             co.name AS company_name
+        FROM leads l
+        LEFT JOIN contacts c ON c.id = l.contact_id
+        LEFT JOIN companies co ON co.id = l.company_id
+       WHERE l.id = ${id}`;
+    return { ok: true, lead: fresh };
+  });
+
+  if (!result) return c.json({ error: 'not found' }, 404);
+  return c.json(result);
 });
 
 /**

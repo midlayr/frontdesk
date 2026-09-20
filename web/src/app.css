@@ -216,3 +216,14 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .vm { display: flex; flex-direction: column; gap: 5px; margin-bottom: 7px; }
 .vm audio { width: 100%; max-width: 320px; height: 32px; }
 .vm .label { color: var(--ink-3); }
+
+/* inline-editable spec and contact cells */
+.scell.edit { cursor: text; }
+.scell.edit input { flex: 1; min-width: 0; border: 0; border-bottom: 1px solid transparent;
+                    background: none; font: 400 var(--text-md) var(--font-body); color: var(--ink);
+                    padding: 1px 0; }
+.scell.edit input::placeholder { color: var(--ink-3); font-style: italic; }
+.scell.edit:hover input { border-bottom-color: var(--line); }
+.scell.edit input:focus { outline: 0; border-bottom-color: var(--accent); }
+/* brief confirmation that an inline edit reached the server */
+.scell.edit.saved input { border-bottom-color: var(--ok); }

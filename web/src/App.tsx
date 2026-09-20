@@ -255,6 +255,16 @@ export function App() {
     }
   }
 
+  /** Optimistic enough to feel instant: the response carries the recomputed row. */
+  async function patchLead(body: Record<string, unknown>) {
+    if (!detail) return;
+    try {
+      const r = await api.patch(detail.lead.id, body);
+      if (r?.lead) setDetail((prev) => (prev ? { ...prev, lead: { ...prev.lead, ...r.lead } } : prev));
+      await refresh();
+    } catch (e) { setError(String(e)); }
+  }
+
   async function takeover() {
     if (!detail) return;
     try {
@@ -359,7 +369,8 @@ export function App() {
 
         {detail ? (
           <Ticket d={detail} live={live} draft={draft} setDraft={setDraft}
-                  send={send} sending={sending} takeover={takeover} error={error} />
+                  send={send} sending={sending} takeover={takeover} error={error}
+                  onPatch={patchLead} />
         ) : (
           <div className="ticket"><div className="empty">{error || 'Select a ticket'}</div></div>
         )}
@@ -400,10 +411,55 @@ function SpecCell({ k, v, missing }: { k: string; v: string | number | null; mis
   );
 }
 
-function Ticket({ d, live, draft, setDraft, send, sending, takeover, error }: {
+/**
+ * A spec or contact value the rep can correct in place.
+ *
+ * Saves on blur or Enter, and only when the value actually changed — a rep tabbing through
+ * the grid to read it should not write to the database on every field.
+ */
+function EditCell({ leadId, label, value, placeholder, type, onSave }: {
+  leadId: string; label: string; value: string | number | null;
+  placeholder?: string; type?: string; onSave: (v: string | null) => void;
+}) {
+  const asText = value == null ? '' : String(value);
+  const [v, setV] = useState(asText);
+  const [saved, setSaved] = useState(false);
+
+  /**
+   * Resets only when the rep opens a different ticket — never on `value` changing.
+   *
+   * Saving echoes the row back from the server, and feeding that echo into the input while
+   * someone is typing interleaves the two and produces things like
+   * "Fresno Ag HFresno Ag Hardwareardware". The field owns its text for as long as the
+   * ticket is open; the server is the source of truth only when the ticket changes.
+   */
+  useEffect(() => { setV(asText); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [leadId]);
+
+  /** Autosaves after typing stops, like the flow builder. Blur is too easy to miss. */
+  useEffect(() => {
+    if (v === asText) return;
+    const t = setTimeout(() => {
+      onSave(v.trim() === '' ? null : v.trim());
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1200);
+    }, 900);
+    return () => clearTimeout(t);
+  }, [v, asText, onSave]);
+
+  return (
+    <label className={`scell edit${saved ? ' saved' : ''}`}>
+      <span className="label">{label}</span>
+      <input type={type ?? 'text'} value={v} placeholder={placeholder}
+             onChange={(e) => setV(e.target.value)}
+             onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+    </label>
+  );
+}
+
+function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPatch }: {
   d: { lead: Lead; messages: Message[] }; live: boolean; draft: string;
   setDraft: (s: string) => void; send: () => void; sending: boolean;
-  takeover: () => void; error: string;
+  takeover: () => void; error: string; onPatch: (body: Record<string, unknown>) => void;
 }) {
   const l = d.lead;
   const miss = l.missing_fields ?? [];
@@ -421,21 +477,37 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error }: {
           {live && <span className="tag live">You are live</span>}
         </div>
 
-        <h1 className="tname">{who}</h1>
+        <h1 className="tname">{l.company_name || who}</h1>
         <div className="meta">
           {[l.channel, l.contact_phone, l.contact_email].filter(Boolean).join(' · ').toUpperCase()}
         </div>
 
+        <div className="section">Contact</div>
+        <div className="spec">
+          <EditCell leadId={l.id} label="name" value={l.contact_name} placeholder="who called?"
+                    onSave={(v) => onPatch({ contact: { name: v } })} />
+          <EditCell leadId={l.id} label="company" value={l.company_name ?? null} placeholder="company"
+                    onSave={(v) => onPatch({ contact: { company: v } })} />
+          <EditCell leadId={l.id} label="email" value={l.contact_email} placeholder="email for the quote" type="email"
+                    onSave={(v) => onPatch({ contact: { email: v } })} />
+          <EditCell leadId={l.id} label="phone" value={l.contact_phone} placeholder="phone"
+                    onSave={(v) => onPatch({ contact: { phone: v } })} />
+        </div>
+
         <div className="section">Spec</div>
         <div className="spec">
-          <SpecCell k="qty" v={l.qty} missing={miss.includes('qty')} />
-          <SpecCell k="stock" v={l.stock} missing={miss.includes('stock')} />
-          <SpecCell k="product" v={l.product} missing={miss.includes('product')} />
-          <SpecCell k="size" v={l.size} missing={miss.includes('size')} />
-          <SpecCell k="finish" v={l.finish} missing={miss.includes('finish')} />
-          <SpecCell k="color" v={l.color} missing={miss.includes('color')} />
-          <SpecCell k="rush" v={l.rush ? 'yes' : 'no'} missing={false} />
-          <SpecCell k="deadline" v={l.deadline_at ? new Date(l.deadline_at).toDateString() : null} missing={false} />
+          <EditCell leadId={l.id} label="qty" value={l.qty} placeholder={miss.includes('qty') ? '— ?' : ''}
+                    onSave={(v) => onPatch({ qty: v ? Number(v) : null })} />
+          <EditCell leadId={l.id} label="stock" value={l.stock} placeholder={miss.includes('stock') ? '— ?' : ''}
+                    onSave={(v) => onPatch({ stock: v })} />
+          <EditCell leadId={l.id} label="product" value={l.product} placeholder={miss.includes('product') ? '— ?' : ''}
+                    onSave={(v) => onPatch({ product: v })} />
+          <EditCell leadId={l.id} label="size" value={l.size} placeholder={miss.includes('size') ? '— ?' : ''}
+                    onSave={(v) => onPatch({ size: v })} />
+          <EditCell leadId={l.id} label="finish" value={l.finish} placeholder={miss.includes('finish') ? '— ?' : ''}
+                    onSave={(v) => onPatch({ finish: v })} />
+          <EditCell leadId={l.id} label="color" value={l.color} placeholder={miss.includes('color') ? '— ?' : ''}
+                    onSave={(v) => onPatch({ color: v })} />
         </div>
 
         <div className="section">What they asked for</div>

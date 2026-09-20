@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/flowbuilder.tsx","./src/flowmap.tsx","./src/settings.tsx","./src/api.ts","./src/flows-api.ts","./src/main.tsx"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/flowbuilder.tsx","./src/flowmap.tsx","./src/history.tsx","./src/settings.tsx","./src/api.ts","./src/flows-api.ts","./src/main.tsx"],"version":"5.9.3"}

@@ -19,6 +19,13 @@ export interface Message {
   has_audio?: boolean; transcript_status?: 'pending' | 'done' | 'failed' | null;
 }
 
+export interface Event {
+  id: string; kind: string; actor: string; actor_name: string | null;
+  detail: Record<string, unknown> | null; at: string;
+}
+
+export interface History { activity: Event[]; created_at: string; status: string }
+
 export interface OrgUser { id: string; name: string; email: string; role: string }
 
 /**
@@ -128,6 +135,8 @@ export const api = {
   },
 
   users: () => get<{ users: OrgUser[] }>('/api/users').then((r) => r.users),
+
+  activity: (id: string) => get<History>(`/api/leads/${id}/activity`),
 
   patch: async (id: string, body: Record<string, unknown>) => {
     const r = await fetch(url(`/api/leads/${id}`), {

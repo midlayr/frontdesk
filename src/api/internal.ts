@@ -193,6 +193,8 @@ internal.post('/leads/chat-turns', async (c) => {
 
     // Same rule as replying: automation owns the inbound states, a rep owns the rest. A
     // ticket already marked Quoted or Won stays there even if the visitor opens a new chat.
+    const [was] = await tx<{ status: string }[]>`SELECT status FROM leads WHERE id = ${body.leadId}`;
+
     await tx`UPDATE leads
                 SET status = CASE
                       WHEN ${body.state} = 'live' AND status IN ('new','needs_info','replied')
@@ -200,6 +202,15 @@ internal.post('/leads/chat-turns', async (c) => {
                       WHEN ${body.state} = 'done' AND status = 'live' THEN 'new'::lead_status
                       ELSE status END
               WHERE id = ${body.leadId}`;
+
+    // Logged like any other stage change, so the ticket's history accounts for the whole of
+    // its life rather than only the parts a human drove.
+    const [now] = await tx<{ status: string }[]>`SELECT status FROM leads WHERE id = ${body.leadId}`;
+    if (was && now && was.status !== now.status) {
+      await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+               VALUES (${ulid()}, ${body.orgId}, ${body.leadId}, 'system', 'stage',
+                       ${tx.json({ from: was.status, to: now.status, auto: true })})`;
+    }
   });
 
   return c.json({ ok: true });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, applyBrand, orgSlug, userId, type Lead, type Message, type Org, PIPELINE, STATUS_LABEL, STATUS_DOT, type OrgUser } from './api';
 import { FlowBuilder } from './FlowBuilder';
+import { History } from './History';
 import { Settings } from './Settings';
 
 const VIEWS = ['All', 'New', 'Mine', 'Rush', 'Working', 'Quoted', 'Won', 'Lost', 'Spam', 'Archived'] as const;
@@ -613,6 +614,8 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
           ))}
           {!d.messages.length && <div className="empty">No messages yet</div>}
         </div>
+
+        <History leadId={l.id} users={users} />
         {error && <p className="err">{error}</p>}
       </div>
 

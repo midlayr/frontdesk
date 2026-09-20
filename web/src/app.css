@@ -364,3 +364,32 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .pick select:focus { outline: none; }
 .pick.static { font: 400 12.5px var(--font-body); color: var(--ink-2); cursor: default; }
 .pick.assign .label { color: var(--ink-3); }
+
+/* ── ticket history ───────────────────────────────────────────────────────── */
+.hist-toggle { margin-left: auto; border: 0; background: none; color: var(--accent);
+  font: 400 11px var(--font-body); text-decoration: underline; cursor: pointer; }
+
+/* the stages a ticket has actually sat in, with how long each one held it */
+.hist-stages { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.hist-stage { display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 3px 8px;
+  font: 400 11px var(--font-body); color: var(--ink-2); background: var(--paper); }
+.hist-stage .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.hist-stage b { font: 500 10.5px var(--font-mono); color: var(--ink-3); }
+.hist-stage.now { border-color: var(--ink); color: var(--ink); }
+.hist-stage.now b { color: var(--ink-2); }
+.hist-now { margin: 0 0 14px; font: 400 11px var(--font-mono); letter-spacing: .04em;
+  color: var(--ink-3); }
+
+.hist { list-style: none; margin: 0; padding: 0; }
+.hist li { display: flex; flex-direction: column; }
+.hist-day { font: 500 10px var(--font-mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-3); margin: 14px 0 6px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--line); }
+.hist li:first-child .hist-day { margin-top: 0; }
+.hist-row { display: grid; grid-template-columns: 58px 1fr; gap: 10px; padding: 4px 0;
+  align-items: baseline; }
+.hist-at { font: 400 10.5px var(--font-mono); color: var(--ink-3); white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.hist-what { font-size: var(--text-sm); color: var(--ink-2); line-height: 1.45; }
+.hist li.strong .hist-what { color: var(--ink); font-weight: 500; }

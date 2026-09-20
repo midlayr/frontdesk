@@ -126,6 +126,34 @@ const Patch = z.object({
  * Unlike extraction, an edit here is authoritative: a rep correcting 500 to 1000 overwrites,
  * where the model only ever fills blanks.
  */
+/**
+ * The ticket's history.
+ *
+ * Every stage move, assignment, reply and edit, oldest first — the record of how a lead
+ * travelled the pipeline rather than just where it ended up. Actors are joined to a name
+ * here because a raw user id in a timeline is unreadable, and LEFT JOIN keeps the 'system'
+ * rows (inbound message, extraction) which match no user.
+ */
+leads.get('/:id/activity', async (c) => {
+  const org = c.get('org');
+  const id = c.req.param('id');
+
+  const rows = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [lead] = await tx<{ created_at: string; status: string }[]>`
+      SELECT created_at, status FROM leads WHERE id = ${id}`;
+    if (!lead) return null;
+    const activity = await tx<{ id: string; kind: string; actor: string; actor_name: string | null; detail: unknown; at: string }[]>`
+      SELECT a.id, a.kind, a.actor, u.name AS actor_name, a.detail, a.at
+        FROM activity a
+        LEFT JOIN users u ON u.id = a.actor
+       WHERE a.lead_id = ${id}
+       ORDER BY a.at, a.id`;
+    return { activity, created_at: lead.created_at, status: lead.status };
+  });
+
+  return rows ? c.json(rows) : c.json({ error: 'not found' }, 404);
+});
+
 leads.patch('/:id', async (c) => {
   const org = c.get('org');
   const userId = c.get('userId');
@@ -473,6 +501,7 @@ leads.post('/:id/reply', async (c) => {
   }
 
   const after = await withOrg(sql, org.id, async (tx) => {
+    const [was] = await tx<{ status: string }[]>`SELECT status FROM leads WHERE id = ${id}`;
     await tx`INSERT INTO messages (id, lead_id, channel, direction, author, body, provider_id)
              VALUES (${ulid()}, ${id}, 'sms', 'out', ${userId}, ${outgoing}, ${sent.sid})`;
     // Only a ticket still in an inbound state moves to 'replied'. Once a rep has put it at
@@ -487,7 +516,15 @@ leads.post('/:id/reply', async (c) => {
              VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'replied',
                      ${tx.json({ channel: 'sms', provider_id: sent.sid })})`;
 
+    // An automatic move is still a move. Without this the ticket's history shows the reply
+    // but not the new → replied it caused, and the stage strip attributes that whole period
+    // to the wrong stage.
     const [row] = await tx<{ status: string }[]>`SELECT status FROM leads WHERE id = ${id}`;
+    if (row && was && row.status !== was.status) {
+      await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+               VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'stage',
+                       ${tx.json({ from: was.status, to: row.status, auto: true })})`;
+    }
     return row?.status ?? null;
   });
 

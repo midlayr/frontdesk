@@ -57,10 +57,10 @@ export async function twilioVoice(req: Request, env: Env, sql: Sql): Promise<Res
 
   return xml(
     `<Response>` +
-      `<Say voice="Polly.Joanna">${xmlEscape(render(voice.greeting, vars))}</Say>` +
+      `<Say voice="${voice.tts_voice}">${xmlEscape(render(voice.greeting, vars))}</Say>` +
       `<Record action="${action}" method="POST" maxLength="${voice.max_seconds}" playBeep="true" trim="trim-silence" transcribe="false"/>` +
       // reached only if they hang up without recording
-      `<Say voice="Polly.Joanna">${xmlEscape(render(voice.no_input, vars))}</Say>` +
+      `<Say voice="${voice.tts_voice}">${xmlEscape(render(voice.no_input, vars))}</Say>` +
     `</Response>`,
   );
 }
@@ -86,7 +86,10 @@ export async function twilioRecording(req: Request, env: Env, sql: Sql, ctx: { w
   if (!ok) return new Response('bad signature', { status: 403 });
 
   // A hang-up with no words is not a lead.
-  if (duration < 2) return xml('<Response><Say voice="Polly.Joanna">Goodbye.</Say></Response>');
+  if (duration < 2) {
+    const { voice } = messagingFor(org);
+    return xml(`<Response><Say voice="${voice.tts_voice}">Goodbye.</Say></Response>`);
+  }
 
   const messageId = ulid();
   const key = `org/${org.id}/voicemail/${messageId}.mp3`;
@@ -150,5 +153,5 @@ export async function twilioRecording(req: Request, env: Env, sql: Sql, ctx: { w
   }
 
   const { voice } = messagingFor(org);
-  return xml(`<Response><Say voice="Polly.Joanna">${xmlEscape(render(voice.after_record, { org: org.name }))}</Say></Response>`);
+  return xml(`<Response><Say voice="${voice.tts_voice}">${xmlEscape(render(voice.after_record, { org: org.name }))}</Say></Response>`);
 }

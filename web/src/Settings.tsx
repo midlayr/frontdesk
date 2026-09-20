@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { orgSlug } from './api';
 
+interface Voice { id: string; label: string; neural: boolean }
+
 interface Messaging {
-  voice: { greeting: string; after_record: string; no_input: string; max_seconds: number };
+  voice: { greeting: string; after_record: string; no_input: string; max_seconds: number; tts_voice: string };
   sms: { auto_reply_enabled: boolean; auto_reply: string; signature: string };
 }
 
@@ -21,13 +23,17 @@ export function Settings() {
   const [m, setM] = useState<Messaging | null>(null);
   const [base, setBase] = useState<Messaging | null>(null);
   const [fallback, setFallback] = useState<Messaging | null>(null);
+  const [voices, setVoices] = useState<Voice[]>([]);
   const [state, setState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [err, setErr] = useState('');
+  const [previewTo, setPreviewTo] = useState(() => localStorage.getItem('fd_preview_to') ?? '');
+  const [previewState, setPreviewState] = useState<'idle' | 'calling' | 'ringing' | 'failed'>('idle');
+  const [previewErr, setPreviewErr] = useState('');
 
   useEffect(() => {
     fetch(url('/api/settings/messaging'), { headers: headers() })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d) => { setM(d.messaging); setBase(d.messaging); setFallback(d.defaults); })
+      .then((d) => { setM(d.messaging); setBase(d.messaging); setFallback(d.defaults); setVoices(d.voices ?? []); })
       .catch((e) => setErr(String(e)));
   }, []);
 
@@ -46,6 +52,28 @@ export function Settings() {
     } catch (e) {
       setErr(String(e).replace(/^Error:\s*/, ''));
       setState('idle');
+    }
+  }
+
+  /** Twilio has no synthesis endpoint, so the only faithful preview is a real call. */
+  async function preview() {
+    if (!m) return;
+    const to = previewTo.replace(/[^\d+]/g, '');
+    const e164 = to.startsWith('+') ? to : `+1${to.replace(/^1/, '')}`;
+    localStorage.setItem('fd_preview_to', previewTo);
+    setPreviewState('calling');
+    setPreviewErr('');
+    try {
+      const r = await fetch(url('/api/settings/messaging/preview'), {
+        method: 'POST', headers: headers(),
+        body: JSON.stringify({ to: e164, voice: m.voice.tts_voice, text: m.voice.greeting }),
+      });
+      if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? String(r.status));
+      setPreviewState('ringing');
+      setTimeout(() => setPreviewState('idle'), 8000);
+    } catch (e) {
+      setPreviewErr(String(e).replace(/^Error:\s*/, ''));
+      setPreviewState('failed');
     }
   }
 
@@ -93,6 +121,40 @@ export function Settings() {
                  onReset={v.no_input !== fallback.voice.no_input ? () => setVoice({ no_input: fallback.voice.no_input }) : undefined}>
             <textarea rows={2} value={v.no_input} onChange={(e) => setVoice({ no_input: e.target.value })} />
           </Field>
+
+          <Field label="Voice" hint="neural voices sound markedly less synthetic">
+            <select value={v.tts_voice} onChange={(e) => setVoice({ tts_voice: e.target.value })}>
+              <optgroup label="Neural">
+                {voices.filter((x) => x.neural).map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+              </optgroup>
+              <optgroup label="Standard · cheaper per character">
+                {voices.filter((x) => !x.neural).map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+              </optgroup>
+            </select>
+            <span className="label">
+              {voices.find((x) => x.id === v.tts_voice)?.neural
+                ? 'Neural — costs more per character than standard.'
+                : 'Standard — this is the flat, robotic-sounding engine.'}
+            </span>
+          </Field>
+
+          <div className="set-preview">
+            <span className="label">Hear it</span>
+            <p className="set-note" style={{ fontSize: 'var(--text-sm)' }}>
+              Twilio rings you and reads the greeting above in the selected voice. That is the
+              only accurate preview — your browser's built-in speech uses different voices
+              entirely and would not tell you anything useful.
+            </p>
+            <div className="set-call">
+              <input value={previewTo} placeholder="(559) 555-0123"
+                     onChange={(e) => setPreviewTo(e.target.value)} />
+              <button className="btn-ghost" type="button" onClick={preview}
+                      disabled={previewState === 'calling' || previewTo.replace(/\D/g, '').length < 10}>
+                {previewState === 'calling' ? 'Calling…' : previewState === 'ringing' ? 'Ringing you now' : 'Call me'}
+              </button>
+            </div>
+            {previewErr && <span className="err">{previewErr}</span>}
+          </div>
 
           <Field label="Maximum length" hint="seconds of recording">
             <input type="number" min={10} max={600} value={v.max_seconds}

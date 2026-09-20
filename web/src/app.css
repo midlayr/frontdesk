@@ -240,3 +240,6 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .set-reset { margin-left: 8px; border: 0; background: none; color: var(--accent);
              font: 400 10.5px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
 .set-preview { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+.set-call { display: flex; gap: 8px; align-items: center; }
+.set-call input { border: 1px solid var(--line); border-radius: var(--radius);
+                  padding: 0 11px; height: var(--control-h); background: var(--paper); width: 190px; }

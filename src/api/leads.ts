@@ -170,8 +170,10 @@ leads.get('/:id/audio/:messageId', async (c) => {
   const key = row?.audio_r2_key;
   if (!key || !key.startsWith(`org/${org.id}/`)) return c.json({ error: 'not found' }, 404);
 
-  const range = c.req.header('range');
-  const obj = await c.env.FILES.get(key, range ? { range: c.req.raw.headers } : undefined);
+  // Only ask R2 for a range when the client actually sent one, otherwise a plain GET comes
+  // back as a 206 for the whole object.
+  const wantsRange = !!c.req.header('range');
+  const obj = await c.env.FILES.get(key, wantsRange ? { range: c.req.raw.headers } : undefined);
   if (!obj) return c.json({ error: 'recording missing' }, 404);
 
   const headers = new Headers({
@@ -179,7 +181,7 @@ leads.get('/:id/audio/:messageId', async (c) => {
     'accept-ranges': 'bytes',
     'cache-control': 'private, max-age=3600',
   });
-  if (obj.range && 'offset' in obj.range) {
+  if (wantsRange && obj.range && 'offset' in obj.range) {
     const start = obj.range.offset ?? 0;
     const end = start + (obj.range.length ?? obj.size) - 1;
     headers.set('content-range', `bytes ${start}-${end}/${obj.size}`);

@@ -75,6 +75,13 @@ export const api = {
     return r.json();
   },
 
+  /** A 15-minute ticket for <audio>, which cannot send an auth header. */
+  mediaTicket: async (): Promise<string> => {
+    const r = await fetch(url('/api/ws-ticket?for=media'), { method: 'POST', headers: headers() });
+    if (!r.ok) throw new Error(`${r.status}`);
+    return (await r.json()).ticket as string;
+  },
+
   /** Sockets carry a one-minute ticket; the admin token must never appear in a URL. */
   socket: async (path: string) => {
     const u = new URL(path, location.origin);

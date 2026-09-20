@@ -370,6 +370,27 @@ export function App() {
   );
 }
 
+/**
+ * An <audio> element cannot send an auth header, so it fetches a short-lived signed ticket
+ * and carries that in the URL instead. Minted on mount so it is fresh when playback starts.
+ */
+function Voicemail({ leadId, messageId }: { leadId: string; messageId: string }) {
+  const [src, setSrc] = useState('');
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let dead = false;
+    api.mediaTicket()
+      .then((t) => { if (!dead) setSrc(`/api/leads/${leadId}/audio/${messageId}?org=${encodeURIComponent(orgSlug)}&ticket=${encodeURIComponent(t)}`); })
+      .catch(() => { if (!dead) setFailed(true); });
+    return () => { dead = true; };
+  }, [leadId, messageId]);
+
+  if (failed) return <span className="label">Could not load the recording</span>;
+  if (!src) return <span className="label">Loading recording…</span>;
+  return <audio controls preload="metadata" src={src} />;
+}
+
 function SpecCell({ k, v, missing }: { k: string; v: string | number | null; missing: boolean }) {
   return (
     <div className="scell">
@@ -430,8 +451,8 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error }: {
               <span className="who">{m.author === 'visitor' ? who : m.author === 'bot' ? 'Bot' : 'Rep'} · {age(m.sent_at)} ago</span>
               {m.has_audio && (
                 <div className="vm">
-                  <audio controls preload="none" src={`/api/leads/${l.id}/audio/${m.id}?org=${encodeURIComponent(orgSlug)}`} />
-                  <span className="label">
+                  <Voicemail leadId={l.id} messageId={m.id} />
+                      <span className="label">
                     {m.transcript_status === 'pending' ? 'Transcribing…'
                       : m.transcript_status === 'failed' ? 'Could not read the audio — listen and fill the spec in by hand'
                       : 'Voicemail · transcript below'}

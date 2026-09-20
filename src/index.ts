@@ -12,7 +12,7 @@ import { internal } from './api/internal';
 import { widget } from './api/widget';
 import { flows } from './api/flows';
 import { CHAT_JS } from './widget-asset';
-import { mintTicket, readTicket } from './ws-ticket';
+import { MEDIA_TTL_MS, mintTicket, readTicket } from './ws-ticket';
 import { CONSOLE_HTML } from './web-console';
 import { TEST_HTML } from './web-test';
 
@@ -96,9 +96,10 @@ app.use('/api/*', async (c, next) => {
 async function authenticate(c: Context<{ Bindings: Env; Variables: Vars }>): Promise<Response | null> {
   const isUpgrade = c.req.header('upgrade') === 'websocket';
 
-  // A browser WebSocket cannot send headers. Rather than put a long-lived secret in the
-  // query string, an upgrade presents a ticket minted by an ordinary authenticated request.
-  if (isUpgrade) {
+  // Neither a WebSocket nor an <audio>/<img> element can send headers, so both present a
+  // ticket minted by an ordinary authenticated request: short-lived, HMAC-signed, and scoped
+  // to one tenant and user. That is a capability, not a secret in a URL.
+  {
     const ticket = c.req.query('ticket');
     if (ticket) {
       const userId = await readTicket(c.env.SESSION_SECRET, c.get('org').id, ticket);
@@ -156,8 +157,13 @@ app.get('/api/org', (c) => {
 });
 
 /** Mint a ticket for the sockets. Requires ordinary auth; the ticket lasts one minute. */
-app.post('/api/ws-ticket', async (c) =>
-  c.json({ ticket: await mintTicket(c.env.SESSION_SECRET, c.get('org').id, c.get('userId')) }));
+app.post('/api/ws-ticket', async (c) => {
+  const media = c.req.query('for') === 'media';
+  return c.json({
+    ticket: await mintTicket(c.env.SESSION_SECRET, c.get('org').id, c.get('userId'), media ? MEDIA_TTL_MS : undefined),
+    expires_in: media ? MEDIA_TTL_MS : 60_000,
+  });
+});
 
 app.route('/api/leads', leads);
 app.route('/api/flows', flows);

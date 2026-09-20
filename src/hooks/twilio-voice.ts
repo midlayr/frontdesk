@@ -97,7 +97,16 @@ export async function twilioRecording(req: Request, env: Env, sql: Sql, ctx: { w
     console.error(`voicemail: could not fetch recording ${recordingSid}: ${audio.status}`);
     return xml('<Response/>');
   }
-  await env.FILES.put(key, audio.body, { httpMetadata: { contentType: 'audio/mpeg' } });
+
+  // Buffered, not streamed: R2 needs a known length and Twilio sends the recording without
+  // a content-length, which makes put() throw on the stream. Recording is capped at 180s
+  // above, so this is a couple of MB at worst.
+  const bytes = await audio.arrayBuffer();
+  if (bytes.byteLength === 0) {
+    console.error(`voicemail: empty recording ${recordingSid}`);
+    return xml('<Response/>');
+  }
+  await env.FILES.put(key, bytes, { httpMetadata: { contentType: 'audio/mpeg' } });
 
   const leadId = await withOrg(sql, org.id, async (tx) => {
     if (recordingSid) {

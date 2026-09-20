@@ -8,6 +8,8 @@
  */
 const enc = new TextEncoder();
 const TTL_MS = 60_000;
+/** Media needs longer: an <audio> element may re-request ranges while the rep listens. */
+export const MEDIA_TTL_MS = 15 * 60_000;
 
 function b64url(bytes: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(bytes)))
@@ -19,8 +21,8 @@ async function sign(secret: string, payload: string): Promise<string> {
   return b64url(await crypto.subtle.sign('HMAC', key, enc.encode(payload)));
 }
 
-export async function mintTicket(secret: string, orgId: string, userId: string): Promise<string> {
-  const exp = Date.now() + TTL_MS;
+export async function mintTicket(secret: string, orgId: string, userId: string, ttlMs = TTL_MS): Promise<string> {
+  const exp = Date.now() + ttlMs;
   const payload = `${orgId}.${userId}.${exp}`;
   return `${userId}.${exp}.${await sign(secret, payload)}`;
 }

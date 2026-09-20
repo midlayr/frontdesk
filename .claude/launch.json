@@ -6,6 +6,10 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "web"],
       "port": 5173
+    },
+    {
+      "name": "frontdesk-prod",
+      "url": "https://dumont-frontdesk.matt-dee.workers.dev"
     }
   ]
 }

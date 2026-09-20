@@ -343,7 +343,10 @@ export function App() {
       </header>
 
       {onSettings ? (
-        <Settings me={me} tab={path.startsWith('/settings/people') ? 'people' : 'messaging'} go={go} />
+        <Settings me={me} org={org}
+                  tab={path.startsWith('/settings/people') ? 'people'
+                     : path.startsWith('/settings/appearance') ? 'appearance' : 'messaging'}
+                  go={go} />
       ) : flowSlug ? (
         <FlowBuilder slug={flowSlug} accent={brand.color || '#0B7FA8'} />
       ) : (

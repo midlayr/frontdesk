@@ -43,10 +43,16 @@
   --shadow-widget: 0 12px 32px rgba(20,22,26,.16);
 
   /* scale */
-  --text-xs: 10.5px; --text-sm: 12.5px; --text-md: 13.5px; --text-base: 14px; --text-lg: 16px;
-  --h2: 24px; --h1: 30px;
+  /* One multiplier drives every size below, so a reader can enlarge the whole interface
+     without a rule-by-rule override. Controls grow with the text, or larger type clips
+     inside a fixed-height input. Set on :root by applyScale() from a stored preference. */
+  --ui-scale: 1;
+  --text-xs: calc(10.5px * var(--ui-scale)); --text-sm: calc(12.5px * var(--ui-scale));
+  --text-md: calc(13.5px * var(--ui-scale)); --text-base: calc(14px * var(--ui-scale));
+  --text-lg: calc(16px * var(--ui-scale));
+  --h2: calc(24px * var(--ui-scale)); --h1: calc(30px * var(--ui-scale));
   --track-mono: .08em;     /* letter-spacing on mono labels; .1em for section eyebrows */
-  --control-h: 34px; --control-h-sm: 28px;
+  --control-h: calc(34px * var(--ui-scale)); --control-h-sm: calc(28px * var(--ui-scale));
 }
 
 /* Tenant override example — the app sets these from GET /api/org at boot:

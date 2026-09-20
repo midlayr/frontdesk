@@ -225,6 +225,36 @@ function shade(hex: string, amt: number) {
   return `#${ch.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/**
+ * Text size, as a preference of the person reading rather than of the tenant.
+ *
+ * Kept in localStorage and never sent anywhere: two reps sharing an org should not fight
+ * over each other's eyesight, and a shop-floor screen wants larger type than a laptop.
+ * Applied before first paint from main.tsx so the page does not visibly resize.
+ */
+export const SCALES = [
+  { id: 'sm', label: 'Small', value: 0.9 },
+  { id: 'md', label: 'Default', value: 1 },
+  { id: 'lg', label: 'Large', value: 1.15 },
+  { id: 'xl', label: 'Larger', value: 1.3 },
+] as const;
+
+export type ScaleId = (typeof SCALES)[number]['id'];
+
+export function currentScale(): ScaleId {
+  try {
+    const v = localStorage.getItem('fd_scale');
+    if (SCALES.some((s) => s.id === v)) return v as ScaleId;
+  } catch { /* private mode, or storage blocked — the default is still correct */ }
+  return 'md';
+}
+
+export function applyScale(id: ScaleId) {
+  const s = SCALES.find((x) => x.id === id) ?? SCALES[1];
+  document.documentElement.style.setProperty('--ui-scale', String(s.value));
+  try { localStorage.setItem('fd_scale', id); } catch { /* not worth failing over */ }
+}
+
 export function applyBrand(org: Org) {
   const b = org.brand as Record<string, string>;
   const root = document.documentElement.style;
@@ -233,6 +263,19 @@ export function applyBrand(org: Org) {
     root.setProperty('--accent-deep', shade(b.color, -0.2));
     root.setProperty('--accent-tint', shade(b.color, 0.9));
     root.setProperty('--accent-tint-fg', shade(b.color, -0.2));
+  }
+  // paper and ink were stored on every org and read by nothing, so a tenant could set them
+  // and see no change at all. The secondary inks are derived rather than stored: three
+  // separate greys is a palette nobody wants to maintain.
+  if (b.paper) {
+    root.setProperty('--paper', b.paper);
+    root.setProperty('--paper-2', shade(b.paper, -0.04));
+    root.setProperty('--paper-3', shade(b.paper, -0.09));
+  }
+  if (b.ink) {
+    root.setProperty('--ink', b.ink);
+    root.setProperty('--ink-2', shade(b.ink, 0.35));
+    root.setProperty('--ink-3', shade(b.ink, 0.58));
   }
   document.title = b.app_name || `${org.name} · Front Desk`;
 }

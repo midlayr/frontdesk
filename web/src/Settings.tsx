@@ -1,3 +1,4 @@
+import { Appearance } from './Appearance';
 import { Team } from './Team';
 import { useEffect, useState } from 'react';
 import { orgSlug } from './api';
@@ -20,11 +21,26 @@ function headers(): Record<string, string> {
 const url = (p: string) => `${p}${p.includes('?') ? '&' : '?'}org=${encodeURIComponent(orgSlug)}`;
 
 /** Everything the system says to a customer, in one place. */
-export function Settings({ me, tab, go }: {
+export function Settings({ me, org, tab, go }: {
   me: { id: string; role: string } | null;
-  tab: 'messaging' | 'people';
+  org: { id: string; slug: string; name: string } | null;
+  tab: 'messaging' | 'people' | 'appearance';
   go: (to: string) => void;
 }) {
+  if (tab === 'appearance') {
+    return (
+      <div className="fb">
+        <header className="fb-head">
+          <div>
+            <span className="label">Settings</span>
+            <h2 className="fb-name">Appearance</h2>
+          </div>
+          <Tabs tab={tab} go={go} />
+        </header>
+        <div className="set-scroll"><Appearance me={me} org={org} /></div>
+      </div>
+    );
+  }
   if (tab === 'people') {
     return (
       <div className="fb">
@@ -47,6 +63,7 @@ function Tabs({ tab, go }: { tab: string; go: (to: string) => void }) {
     <span className="fb-view" style={{ marginLeft: 'auto' }}>
       <button data-on={tab === 'messaging'} onClick={() => go('/settings/messaging')}>Messaging</button>
       <button data-on={tab === 'people'} onClick={() => go('/settings/people')}>People</button>
+      <button data-on={tab === 'appearance'} onClick={() => go('/settings/appearance')}>Appearance</button>
     </span>
   );
 }

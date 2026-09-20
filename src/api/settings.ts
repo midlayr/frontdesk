@@ -29,6 +29,55 @@ const MessagingBody = z.object({
   }),
 });
 
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * The tenant's palette.
+ *
+ * Only the four colours a shop actually has an opinion about. Everything else in tokens.css
+ * is derived or structural, and letting someone set `--line` to crimson produces a mess no
+ * one asked for. Hex is validated rather than trusted: these values are written straight
+ * into a style property, so anything accepted here ends up in the page.
+ */
+const BrandBody = z.object({
+  color: z.string().regex(HEX, 'use a 6-digit hex colour').optional(),
+  ink: z.string().regex(HEX, 'use a 6-digit hex colour').optional(),
+  paper: z.string().regex(HEX, 'use a 6-digit hex colour').optional(),
+  app_name: z.string().min(1).max(60).optional(),
+});
+
+settings.get('/brand', (c) => {
+  const b = c.get('org').brand as Record<string, unknown>;
+  return c.json({
+    brand: {
+      color: b.color ?? '#0B7FA8',
+      ink: b.ink ?? '#14161A',
+      paper: b.paper ?? '#FBFAF8',
+      app_name: b.app_name ?? `${c.get('org').name} · Front Desk`,
+    },
+  });
+});
+
+settings.put('/brand', async (c) => {
+  const org = c.get('org');
+  const parsed = BrandBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: 'bad brand', detail: parsed.error.issues }, 400);
+
+  const saved = await withOrg(c.get('sql'), org.id, async (tx) => {
+    // Merged rather than replaced: brand also holds the logo keys, ticket prefix and bot
+    // name, none of which this editor knows about and all of which a replace would drop.
+    const [row] = await tx<{ brand: Record<string, unknown> }[]>`
+      UPDATE orgs SET brand = brand || ${tx.json(parsed.data)}::jsonb
+       WHERE id = ${org.id} RETURNING brand`;
+    return row?.brand ?? null;
+  });
+
+  // Without this the saved colour appears to do nothing for up to a minute, which reads as
+  // a broken Save button — the same trap the messaging editor hit.
+  await invalidateOrg(c.env, c.get('sql'), org);
+  return c.json({ ok: true, brand: saved });
+});
+
 /** What is said today, with the platform defaults alongside so the editor can offer a reset. */
 settings.get('/messaging', (c) => {
   const org = c.get('org');

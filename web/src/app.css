@@ -450,3 +450,33 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .files i { font-style: normal; font: 400 10.5px var(--font-mono); color: var(--ink-3); }
 .files em { font-style: normal; font-size: var(--text-xs); color: var(--warn); }
 .files-gone { color: var(--ink-3); text-decoration: line-through; }
+
+/* ── appearance ───────────────────────────────────────────────────────────── */
+.appear { max-width: 720px; }
+.appear-note { font-size: var(--text-sm); color: var(--ink-2); margin: 0 0 10px; }
+.appear-scale { width: fit-content; }
+.appear-sample { margin: 12px 0 4px; font-size: var(--text-base); color: var(--ink);
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--paper); }
+
+.appear-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.appear-presets button { display: flex; align-items: center; gap: 5px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper);
+  padding: 5px 9px 5px 6px; cursor: pointer; font: 400 12px var(--font-body); color: var(--ink-2); }
+.appear-presets button:hover:not(:disabled) { border-color: var(--ink-3); color: var(--ink); }
+.appear-presets button:disabled { opacity: .55; cursor: default; }
+.appear-presets i { width: 13px; height: 13px; border-radius: 2px; display: inline-block; }
+.appear-presets span { margin-left: 4px; }
+
+.appear-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px; margin-bottom: 18px; }
+.appear-swatch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.appear-swatch input[type='color'] { width: 34px; height: var(--control-h); padding: 2px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper);
+  cursor: pointer; }
+.appear-hex { width: 110px; border: 1px solid var(--line); border-radius: var(--radius);
+  height: var(--control-h); padding: 0 9px; font: 400 12.5px var(--font-mono); }
+.appear-swatch em { font-style: normal; font-size: var(--text-xs); color: var(--danger); }
+
+.appear-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.appear-live { font: 400 11px var(--font-mono); color: var(--ink-3); }

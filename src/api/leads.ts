@@ -16,11 +16,12 @@ leads.get('/', async (c) => {
   const status = c.req.query('status');
   const assignee = c.req.query('assignee');
   const q = c.req.query('q');
+  const archived = c.req.query('archived') === '1';
 
   const rows = await withOrg(c.get('sql'), org.id, (tx) => tx`
     SELECT l.id, l.ticket_no, l.channel, l.status, l.rush, l.deadline_at, l.assignee_id,
            l.product, l.qty, l.size, l.stock, l.color, l.finish,
-           l.confidence, l.intent_score, l.first_reply_at, l.created_at, l.updated_at,
+           l.confidence, l.intent_score, l.first_reply_at, l.created_at, l.updated_at, l.archived_at,
            -- newest inbound timestamp: lets the queue pulse a row that just got a reply,
            -- which updated_at alone would miss when only messages changed
            (SELECT max(sent_at) FROM messages m WHERE m.lead_id = l.id AND m.direction = 'in') AS last_in_at,
@@ -34,7 +35,8 @@ leads.get('/', async (c) => {
       LEFT JOIN LATERAL (
         SELECT do_id FROM chat_sessions WHERE lead_id = l.id ORDER BY started_at DESC LIMIT 1
       ) cs ON true
-     WHERE (${status ?? null}::text IS NULL OR l.status = ${status ?? null}::lead_status)
+     WHERE (CASE WHEN ${archived} THEN l.archived_at IS NOT NULL ELSE l.archived_at IS NULL END)
+       AND (${status ?? null}::text IS NULL OR l.status = ${status ?? null}::lead_status)
        AND (${assignee ?? null}::text IS NULL OR l.assignee_id = ${assignee ?? null})
        AND (${q ?? null}::text IS NULL OR l.search @@ plainto_tsquery('simple', ${q ?? null}))
      ORDER BY (l.status = 'live') DESC, l.rush DESC, l.deadline_at NULLS LAST, l.created_at
@@ -216,6 +218,76 @@ leads.patch('/:id', async (c) => {
 
   if (!result) return c.json({ error: 'not found' }, 404);
   return c.json(result);
+});
+
+/** Archive, and put back. Reversible, so no confirmation ceremony. */
+leads.post('/:id/archive', async (c) => {
+  const org = c.get('org');
+  const userId = c.get('userId');
+  const id = c.req.param('id');
+  const undo = c.req.query('undo') === '1';
+
+  const [row] = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const r = await tx<{ id: string }[]>`
+      UPDATE leads SET archived_at = ${undo ? null : new Date().toISOString()},
+                       archived_by = ${undo ? null : userId}
+       WHERE id = ${id} RETURNING id`;
+    if (r.length) {
+      await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+               VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, ${undo ? 'unarchived' : 'archived'}, ${tx.json({})})`;
+    }
+    return r;
+  });
+
+  return row ? c.json({ ok: true, archived: !undo }) : c.json({ error: 'not found' }, 404);
+});
+
+/**
+ * Delete a ticket for good.
+ *
+ * messages, attachments and activity cascade. Voicemail recordings in R2 do not — nothing
+ * in Postgres knows about the bucket — so their keys are collected first and removed after
+ * the row is gone. Orphaned audio would otherwise sit there indefinitely, billed monthly and
+ * invisible.
+ *
+ * Chat sessions and drip enrolments keep their rows with a null lead: they are records of
+ * something that happened, not children of the ticket.
+ */
+leads.delete('/:id', async (c) => {
+  const org = c.get('org');
+  const userId = c.get('userId');
+  const id = c.req.param('id');
+
+  const result = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [lead] = await tx<{ ticket_no: string }[]>`SELECT ticket_no FROM leads WHERE id = ${id}`;
+    if (!lead) return null;
+
+    const audio = await tx<{ audio_r2_key: string }[]>`
+      SELECT audio_r2_key FROM messages WHERE lead_id = ${id} AND audio_r2_key IS NOT NULL`;
+    const files = await tx<{ r2_key: string }[]>`
+      SELECT r2_key FROM attachments WHERE lead_id = ${id}`;
+
+    await tx`DELETE FROM leads WHERE id = ${id}`;
+    return {
+      ticket: lead.ticket_no,
+      keys: [...audio.map((a) => a.audio_r2_key), ...files.map((f) => f.r2_key)],
+    };
+  });
+
+  if (!result) return c.json({ error: 'not found' }, 404);
+
+  // Belt and braces: never let a crafted key reach outside the tenant's own prefix.
+  const mine = result.keys.filter((k) => k.startsWith(`org/${org.id}/`));
+  c.executionCtx.waitUntil(Promise.all(mine.map((k) => c.env.FILES.delete(k))));
+
+  // The lead is gone so its activity rows went with it; this one is the audit trail.
+  await withOrg(c.get('sql'), org.id, async (tx) => {
+    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+             VALUES (${ulid()}, ${org.id}, NULL, ${userId}, 'lead_deleted',
+                     ${tx.json({ ticket_no: result.ticket, files_removed: mine.length })})`;
+  });
+
+  return c.json({ ok: true, deleted: result.ticket, files_removed: mine.length });
 });
 
 /**

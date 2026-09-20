@@ -7,7 +7,7 @@ export interface Lead {
   stock: string | null; color: string | null; finish: string | null;
   confidence: Record<string, number>; missing_fields: string[];
   intent_score: number | null; first_reply_at: string | null; created_at: string;
-  updated_at: string; last_in_at: string | null;
+  updated_at: string; last_in_at: string | null; archived_at?: string | null;
   contact_name: string | null; contact_phone: string | null; contact_email: string | null;
   company_name?: string | null;
   chat_sid: string | null;
@@ -74,11 +74,24 @@ export const api = {
   logout: () => fetch(url('/api/session'), { method: 'DELETE', headers: headers() }),
 
   org: () => get<Org>('/api/org'),
-  leads: (q?: { status?: string; q?: string }) => {
+  leads: (q?: { status?: string; q?: string; archived?: boolean }) => {
     const s = new URLSearchParams();
     if (q?.status) s.set('status', q.status);
     if (q?.q) s.set('q', q.q);
+    if (q?.archived) s.set('archived', '1');
     return get<{ leads: Lead[] }>(`/api/leads${s.toString() ? `?${s}` : ''}`);
+  },
+
+  archive: async (id: string, undo = false) => {
+    const r = await fetch(url(`/api/leads/${id}/archive${undo ? '?undo=1' : ''}`), { method: 'POST', headers: headers() });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json();
+  },
+
+  remove: async (id: string) => {
+    const r = await fetch(url(`/api/leads/${id}`), { method: 'DELETE', headers: headers() });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json();
   },
   lead: (id: string) => get<{ lead: Lead; messages: Message[]; activity: unknown[] }>(`/api/leads/${id}`),
 

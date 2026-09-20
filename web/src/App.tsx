@@ -3,7 +3,7 @@ import { api, applyBrand, orgSlug, userId, type Lead, type Message, type Org } f
 import { FlowBuilder } from './FlowBuilder';
 import { Settings } from './Settings';
 
-const VIEWS = ['All', 'New', 'Mine', 'Rush', 'Needs info', 'Quoted', 'Won', 'Lost', 'Spam'] as const;
+const VIEWS = ['All', 'New', 'Mine', 'Rush', 'Needs info', 'Quoted', 'Won', 'Lost', 'Spam', 'Archived'] as const;
 type View = (typeof VIEWS)[number];
 
 const STATUS_OF: Partial<Record<View, string>> = {
@@ -59,6 +59,7 @@ function summarise(l: Lead) {
 }
 
 function matches(l: Lead, v: View) {
+  if (v === 'Archived') return true;   // the server already filtered to archived rows
   if (v === 'All') return true;
   if (v === 'Rush') return l.rush;
   if (v === 'Mine') return l.assignee_id === userId;
@@ -95,6 +96,10 @@ export function App() {
     return () => clearInterval(t);
   }, []);
   const [view, setView] = useState<View>('All');
+  // refresh() is a stable callback shared with the socket, so the current view is read from
+  // a ref rather than baked into its closure.
+  const viewRef = useRef<View>('All');
+  useEffect(() => { viewRef.current = view; }, [view]);
   const [query, setQuery] = useState('');
   const [selId, setSelId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ lead: Lead; messages: Message[] } | null>(null);
@@ -107,7 +112,7 @@ export function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const { leads } = await api.leads();
+      const { leads } = await api.leads({ archived: viewRef.current === 'Archived' });
 
       setLeads(leads);
       setError('');
@@ -266,6 +271,29 @@ export function App() {
     } catch (e) { setError(String(e)); }
   }
 
+  async function archiveLead(on: boolean) {
+    if (!detail) return;
+    try {
+      await api.archive(detail.lead.id, !on);
+      setSelId(null);
+      setDetail(null);
+      await refresh();
+    } catch (e) { setError(String(e)); }
+  }
+
+  /** Irreversible and takes the recordings with it, so it asks first and names the ticket. */
+  async function deleteLead() {
+    if (!detail) return;
+    const t = detail.lead.ticket_no;
+    if (!confirm(`Delete ${t} permanently?\n\nThe conversation, any voicemail recordings and attachments go with it. This cannot be undone — use Archive if you just want it out of the queue.`)) return;
+    try {
+      await api.remove(detail.lead.id);
+      setSelId(null);
+      setDetail(null);
+      await refresh();
+    } catch (e) { setError(String(e)); }
+  }
+
   async function takeover() {
     if (!detail) return;
     try {
@@ -314,7 +342,8 @@ export function App() {
         <aside className="rail">
           <span className="eyebrow">Views</span>
           {VIEWS.map((v) => (
-            <button key={v} aria-current={view === v} onClick={() => setView(v)}>
+            <button key={v} aria-current={view === v}
+                    onClick={() => { viewRef.current = v; setView(v); setSelId(null); setDetail(null); refresh(); }}>
               <span>{v}</span>
               <span>{v === 'All' ? leads.length : leads.filter((l) => matches(l, v)).length}</span>
             </button>
@@ -374,7 +403,7 @@ export function App() {
         {detail ? (
           <Ticket d={detail} live={live} draft={draft} setDraft={setDraft}
                   send={send} sending={sending} takeover={takeover} error={error}
-                  onPatch={patchLead} />
+                  onPatch={patchLead} onArchive={archiveLead} onDelete={deleteLead} />
         ) : (
           <div className="ticket"><div className="empty">{error || 'Select a ticket'}</div></div>
         )}
@@ -460,10 +489,11 @@ function EditCell({ leadId, label, value, placeholder, type, onSave }: {
   );
 }
 
-function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPatch }: {
+function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPatch, onArchive, onDelete }: {
   d: { lead: Lead; messages: Message[] }; live: boolean; draft: string;
   setDraft: (s: string) => void; send: () => void; sending: boolean;
   takeover: () => void; error: string; onPatch: (body: Record<string, unknown>) => void;
+  onArchive: (on: boolean) => void; onDelete: () => void;
 }) {
   const l = d.lead;
   const miss = l.missing_fields ?? [];
@@ -479,6 +509,10 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
           <span style={{ marginLeft: 'auto' }} className="tag">{l.status}</span>
           {isChat && !live && <button className="btn-primary" onClick={takeover}>Take over chat</button>}
           {live && <span className="tag live">You are live</span>}
+          <button className="btn-ghost" onClick={() => onArchive(!l.archived_at)}>
+            {l.archived_at ? 'Restore' : 'Archive'}
+          </button>
+          <button className="btn-ghost danger" onClick={onDelete}>Delete</button>
         </div>
 
         <h1 className="tname">{l.company_name || who}</h1>

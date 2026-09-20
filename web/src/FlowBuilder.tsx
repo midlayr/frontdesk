@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CONTACT_DEFAULTS, FIELDS, FIELD_GROUPS, KIND, ROUTES, ago, flowsApi, type Flow, type SimResult, type Step } from './flows-api';
+import { CONTACT_DEFAULTS, FIELDS, FIELD_GROUPS, KIND, ROUTES, TO_TICKET, ago, flowsApi, labelsOf, withIds, type Flow, type SimResult, type Step } from './flows-api';
 import { FlowMap } from './FlowMap';
 
 const SAVE_DEBOUNCE = 500;
@@ -39,11 +39,15 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
 
   useEffect(() => {
     flowsApi.get(slug).then((f) => {
+      // Branch targets are ids, so nothing can be pointed anywhere until every question has
+      // one. Seeding publishedSteps from the same array keeps a flow that merely gained ids
+      // from looking like an unpublished edit.
+      const steps = withIds(f.steps);
       setFlow(f);
-      setSteps(f.steps);
+      setSteps(steps);
       setVersion(f.version);
       setPublishedAt(f.published_at);
-      setPublishedSteps(JSON.stringify(f.steps));
+      setPublishedSteps(JSON.stringify(steps));
     }).catch((e) => setError(String(e)));
   }, [slug]);
 
@@ -80,7 +84,7 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
   function addQuestion() {
     setSteps((prev) => {
       const at = prev.findIndex((s) => s.kind !== 'ask');
-      const step: Step = { kind: 'ask', prompt: 'New question', field: 'notes', chips: '', skippable: true };
+      const step: Step = { kind: 'ask', id: crypto.randomUUID(), prompt: 'New question', field: 'notes', chips: '', skippable: true };
       const next = [...prev];
       next.splice(at < 0 ? next.length : at, 0, step);
       setSel(at < 0 ? next.length - 1 : at);
@@ -97,7 +101,7 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
       const at = prev.findIndex((s) => s.kind !== 'ask');
       const next = [...prev];
       next.splice(at < 0 ? next.length : at, 0,
-        ...missing.map((d): Step => ({ kind: 'ask', prompt: d.prompt, field: d.field, chips: '', skippable: !!d.skippable })));
+        ...missing.map((d): Step => ({ kind: 'ask', id: crypto.randomUUID(), prompt: d.prompt, field: d.field, chips: '', skippable: !!d.skippable })));
       return next;
     });
   }
@@ -134,6 +138,23 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
   const current = steps[sel];
   const askCount = useMemo(() => steps.filter(isAsk).length, [steps]);
 
+  /** Every question a quick reply could jump to, numbered as the list shows them. */
+  const targets = useMemo(
+    () => steps.flatMap((s, i) => (isAsk(s) ? [{ id: s.id!, n: steps.slice(0, i).filter(isAsk).length + 1, prompt: s.prompt }] : [])),
+    [steps]);
+
+  /** Point one answer somewhere, or back at the default by clearing it. */
+  const setEdge = useCallback((label: string, to: string) => {
+    setSteps((prev) => prev.map((s, i) => {
+      if (i !== sel || s.kind !== 'ask') return s;
+      const next = { ...(s.next ?? {}) };
+      if (to) next[label] = to; else delete next[label];
+      // Drop the key entirely when nothing is pinned, so an untouched flow stays byte-identical
+      // to what it was before branching existed and does not read as an unpublished edit.
+      return Object.keys(next).length ? { ...s, next } : (({ next: _drop, ...rest }) => rest)(s) as Step;
+    }));
+  }, [sel]);
+
   if (!flow) return <div className="fb-empty">{error || 'Loading flow…'}</div>;
 
   return (
@@ -155,7 +176,7 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
       </header>
 
       {view === 'map' ? (
-        <FlowMap steps={steps} accent={accent}
+        <FlowMap steps={steps} accent={accent} loops={new Set(sim?.loops ?? [])}
                  onPick={(i) => { setSel(i); setView('steps'); }} />
       ) : (
       <div className="fb-grid">
@@ -230,6 +251,33 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
                            onChange={(e) => update({ skippable: e.target.checked })} />
                     <span>Allow skipping this question</span>
                   </label>
+
+                  {labelsOf(current).length > 0 && (
+                    <div className="fb-field">
+                      <span className="label">
+                        Where each reply goes
+                        <i> · anything typed instead follows the default</i>
+                      </span>
+                      <div className="fb-edges">
+                        {labelsOf(current).map((label) => (
+                          <div key={label} className="fb-edge">
+                            <span className="fb-edge-chip">{label}</span>
+                            <span className="fb-edge-arrow">→</span>
+                            <select value={current.next?.[label] ?? ''}
+                                    onChange={(e) => setEdge(label, e.target.value)}>
+                              <option value="">Next question in order</option>
+                              {targets.filter((t) => t.id !== current.id).map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {String(t.n).padStart(2, '0')} · {t.prompt.length > 42 ? t.prompt.slice(0, 42) + '…' : t.prompt}
+                                </option>
+                              ))}
+                              <option value={TO_TICKET}>Create the ticket and finish</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
 

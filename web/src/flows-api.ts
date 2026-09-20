@@ -1,9 +1,47 @@
 import { orgSlug } from './api';
 
 export type Step =
-  | { kind: 'ask'; prompt: string; field: string; chips?: string; skippable?: boolean }
+  | {
+      kind: 'ask';
+      /** Stable across reorders, so a branch keeps pointing at the same question. */
+      id?: string;
+      prompt: string;
+      field: string;
+      chips?: string;
+      skippable?: boolean;
+      /** Chip label (or 'Skip') → an ask id, or 'ticket' to finish there. */
+      next?: Record<string, string>;
+    }
   | { kind: 'rule'; words: string; handoff: string; route: string; afterHours?: boolean }
   | { kind: 'ticket'; text: string };
+
+/** Where an answer can lead. Absent from `next` means "the following question". */
+export const FALL_THROUGH = '';
+export const TO_TICKET = 'ticket';
+
+/**
+ * Give every question an id, in place, before anything can point at one.
+ *
+ * The client has to do this rather than leaning on the server, because a branch target is an
+ * id and the save response does not hand the ids back — so the editor would be choosing
+ * destinations it has no name for. The server keeps whatever ids arrive and only invents one
+ * where it is missing.
+ */
+export function withIds(steps: Step[]): Step[] {
+  const seen = new Set<string>();
+  return steps.map((s) => {
+    if (s.kind !== 'ask') return s;
+    const id = s.id && !seen.has(s.id) ? s.id : crypto.randomUUID();
+    seen.add(id);
+    return { ...s, id };
+  });
+}
+
+/** The answer labels that get their own destination: the quick replies, plus Skip. */
+export function labelsOf(s: Extract<Step, { kind: 'ask' }>): string[] {
+  const chips = (s.chips ?? '').split(',').map((c) => c.trim()).filter(Boolean);
+  return s.skippable ? [...chips, 'Skip'] : chips;
+}
 
 export interface Flow {
   id: string; slug: string; name: string; steps: Step[];
@@ -17,6 +55,8 @@ export interface SimResult {
   state: 'bot' | 'live' | 'done';
   handedOff: boolean;
   completed: boolean;
+  /** Ids of questions a branch can loop back to. Computed server-side by the engine. */
+  loops: string[];
 }
 
 /** Mirrors the prototype's vocabulary so the builder reads like the design. */

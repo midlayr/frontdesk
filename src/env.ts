@@ -31,7 +31,26 @@ export type Job =
 // The tenant, as resolved once per request and carried on the context.
 /** A published chat flow, as stored in KV under flow:<orgId>:<slug>. */
 export type Step =
-  | { kind: 'ask'; prompt: string; field: string; chips?: string; skippable?: boolean }
+  | {
+      kind: 'ask';
+      /**
+       * Stable identity, so a branch keeps pointing at the same question after a reorder.
+       * Optional because flows authored before branching have none; the engine falls back
+       * to position for those, and the API backfills on the next save.
+       */
+      id?: string;
+      prompt: string;
+      field: string;
+      chips?: string;
+      skippable?: boolean;
+      /**
+       * Quick reply → where that answer goes. The key is the chip label exactly as shown
+       * (or 'Skip'); the value is an ask id, or 'ticket' to finish the flow there. Answers
+       * with no entry — including anything free-typed — fall through to the next question
+       * in order, which is what every flow did before branching existed.
+       */
+      next?: Record<string, string>;
+    }
   | { kind: 'rule'; words: string; handoff: string; route: string }
   | { kind: 'ticket'; text: string };
 

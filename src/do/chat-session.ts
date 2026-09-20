@@ -2,11 +2,11 @@
 // Runs the published flow (ask steps) server-side; persists turns to Postgres on ticket creation / handoff / end.
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../index';
-import { advance as engineAdvance, asksOf, chipsFor, type FlowState } from '../flow-engine';
+import { advance as engineAdvance, askById, asksOf, chipsFor, idOf, resume, type FlowState } from '../flow-engine';
 
 type Turn = { who: 'visitor' | 'bot' | 'rep'; text: string; at: number };
 type Step = { kind: 'ask'; prompt: string; field: string; chips?: string; skippable?: boolean } | { kind: 'rule'; words: string; handoff: string; route: string } | { kind: 'ticket'; text: string };
-type SessionState = { sid: string; orgId: string; flowSlug: string; flowId: string; flowVersion: number; steps: Step[]; stepIdx: number; captured: Record<string, string>; turns: Turn[]; state: 'bot' | 'live' | 'done'; leadId?: string; repId?: string; visitor: Record<string, unknown> };
+type SessionState = { sid: string; orgId: string; flowSlug: string; flowId: string; flowVersion: number; steps: Step[]; stepId: string | null; captured: Record<string, string>; turns: Turn[]; state: 'bot' | 'live' | 'done'; leadId?: string; repId?: string; visitor: Record<string, unknown> };
 
 export class ChatSession extends DurableObject<Env> {
   private s!: SessionState;
@@ -76,7 +76,12 @@ export class ChatSession extends DurableObject<Env> {
   // Rules live in src/flow-engine.ts so the builder's preview runs exactly this logic.
   private asks() { return asksOf(this.s.steps); }
   private chips() { return chipsFor(this.s.steps, this.s as unknown as FlowState); }
-  private async botAsk() { const a = this.asks()[this.s.stepIdx]; if (a) this.push({ who: 'bot', text: a.prompt, at: Date.now() }); }
+  private async botAsk() {
+    const a = askById(this.s.steps, this.s.stepId) ?? this.asks()[0];
+    if (!a) return;
+    this.s.stepId = idOf(this.s.steps, a);
+    this.push({ who: 'bot', text: a.prompt, at: Date.now() });
+  }
 
   /**
    * One visitor message. The decisions — capture, handoff rule, advance, ticket — all come
@@ -96,7 +101,7 @@ export class ChatSession extends DurableObject<Env> {
     const r = engineAdvance(this.s.steps, this.s as unknown as FlowState, text);
     this.s.turns = r.next.turns as Turn[];
     this.s.captured = r.next.captured;
-    this.s.stepIdx = r.next.stepIdx;
+    this.s.stepId = r.next.stepId;
     this.s.state = r.next.state;
 
     for (const t of this.s.turns.slice(before)) {
@@ -133,7 +138,12 @@ export class ChatSession extends DurableObject<Env> {
   private async load(url: URL) {
     if (this.s) return;
     const stored = await this.ctx.storage.get<SessionState>('s');
-    if (stored) { this.s = stored; return; }
+    if (stored) {
+      // A session that was mid-answer when branching shipped has stepIdx and no stepId.
+      // Translating it here keeps that visitor on the question they were actually asked.
+      this.s = { ...stored, ...resume(stored.steps, stored as unknown as FlowState & { stepIdx?: number }) };
+      return;
+    }
     const orgId = url.searchParams.get('org');
     if (!orgId) throw new Error('chat session not initialised');
     const flowSlug = url.searchParams.get('flow') || 'quote-intake';
@@ -143,7 +153,7 @@ export class ChatSession extends DurableObject<Env> {
     const sid = url.searchParams.get('sid') ?? this.ctx.id.toString();
     const cfg = await this.env.CONFIG.get<{ id: string; version: number; steps: Step[] }>(`flow:${orgId}:${flowSlug}`, 'json');
     if (!cfg) throw new Error('flow not published');
-    this.s = { sid, orgId, flowSlug, flowId: cfg.id, flowVersion: cfg.version, steps: cfg.steps, stepIdx: 0, captured: {}, turns: [], state: 'bot', visitor: { referrer: url.searchParams.get('ref'), landing: url.searchParams.get('page'), ua: url.searchParams.get('ua') } };
+    this.s = { sid, orgId, flowSlug, flowId: cfg.id, flowVersion: cfg.version, steps: cfg.steps, stepId: null, captured: {}, turns: [], state: 'bot', visitor: { referrer: url.searchParams.get('ref'), landing: url.searchParams.get('page'), ua: url.searchParams.get('ua') } };
     await this.save();
   }
   private save() { return this.ctx.storage.put('s', this.s); }
@@ -178,7 +188,7 @@ export class ChatSession extends DurableObject<Env> {
     this.s.flowId = cfg.id;
     this.s.flowVersion = cfg.version;
     this.s.steps = cfg.steps;
-    this.s.stepIdx = 0;
+    this.s.stepId = null;
     this.s.captured = {};
     this.s.turns = [];   // cleared so the new opening question is asked on connect
     await this.save();

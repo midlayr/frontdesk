@@ -250,8 +250,16 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 /* Two columns: the questions run down the left, the handoff rule is a rail on the right
    that touches every one of them, because the engine tests it on every reply. */
 .fm { overflow: auto; min-height: 0; background: var(--paper-2); }
-.fm-scroll { padding: 26px 30px 40px; max-width: 1080px; }
-.fm-grid { display: grid; grid-template-columns: minmax(280px, 1fr) 300px; column-gap: 0; }
+.fm-scroll { padding: 26px 30px 40px 132px; max-width: 1180px; }
+/* the branch curves are absolutely positioned against this, and bow left into the padding */
+.fm-wrap { position: relative; }
+.fm-edges { position: absolute; inset: 0; overflow: visible; pointer-events: none; z-index: 0; }
+.fm-edge-label { position: absolute; transform: translate(-50%, -50%); white-space: nowrap;
+  max-width: 116px; overflow: hidden; text-overflow: ellipsis;
+  font: 400 9.5px var(--font-mono); letter-spacing: .04em; color: var(--ink-2);
+  background: var(--paper-2); padding: 1px 4px; border-radius: var(--radius); z-index: 2; }
+.fm-loop { font: 400 10px var(--font-mono); color: var(--rush); }
+.fm-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(280px, 1fr) 300px; column-gap: 0; }
 .fm-cell { display: flex; flex-direction: column; align-items: flex-start; }
 .fm-rail { position: relative; padding-left: 40px; }
 /* the continuous dashed escape route; each cell contributes its own slice */
@@ -281,6 +289,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .fm-chip, .fm-word { font: 400 10.5px var(--font-mono); font-style: normal;
   border: 1px solid var(--line); border-radius: var(--radius); padding: 2px 6px; }
 .fm-chip.fm-skip, .fm-chip.fm-free { border-style: dashed; color: var(--ink-3); }
+.fm-chip.pinned { border-style: solid; font-weight: 500; }
 .fm-word { background: var(--paper-2); color: var(--warn); border-color: transparent; }
 .fm-word.fm-none { color: var(--ink-3); font-style: italic; }
 
@@ -310,3 +319,14 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .fm-rail { padding-left: 0; margin-top: 8px; }
   .fm-rail.on::before, .fm-tick { display: none; }
 }
+
+/* per-answer destinations in the step editor */
+.fb-edges { display: flex; flex-direction: column; gap: 6px; }
+.fb-edge { display: grid; grid-template-columns: minmax(70px, auto) 14px 1fr; align-items: center; gap: 8px; }
+.fb-edge-chip { font: 400 11px var(--font-mono); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 3px 7px; text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-edge-arrow { color: var(--ink-3); font-size: 12px; }
+.fb-edge select { border: 1px solid var(--line); border-radius: var(--radius);
+  height: var(--control-h-sm); background: var(--paper); font: 400 12.5px var(--font-body);
+  padding: 0 6px; min-width: 0; }

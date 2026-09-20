@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CONTACT_DEFAULTS, FIELDS, FIELD_GROUPS, KIND, ROUTES, ago, flowsApi, type Flow, type SimResult, type Step } from './flows-api';
+import { FlowMap } from './FlowMap';
 
 const SAVE_DEBOUNCE = 500;
 
@@ -21,6 +22,7 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
   const [flow, setFlow] = useState<Flow | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [sel, setSel] = useState(0);
+  const [view, setView] = useState<'steps' | 'map'>('steps');
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [publishedSteps, setPublishedSteps] = useState<string>('');
   const [version, setVersion] = useState(0);
@@ -142,12 +144,20 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
           <h2 className="fb-name">{flow.name}</h2>
         </div>
         <span className="fb-ver">v{version} · published {ago(publishedAt)}</span>
+        <span className="fb-view">
+          <button data-on={view === 'steps'} onClick={() => setView('steps')}>Steps</button>
+          <button data-on={view === 'map'} onClick={() => setView('map')}>Map</button>
+        </span>
         <span className="fb-save">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Draft saved' : ''}</span>
         <button className={`fb-publish${dirty ? ' dirty' : ''}`} onClick={publish} disabled={!dirty}>
           {dirty ? 'Publish changes' : 'Published'}
         </button>
       </header>
 
+      {view === 'map' ? (
+        <FlowMap steps={steps} accent={accent}
+                 onPick={(i) => { setSel(i); setView('steps'); }} />
+      ) : (
       <div className="fb-grid">
         {/* ── 1 · steps ── */}
         <div className="fb-steps">
@@ -314,6 +324,7 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -245,3 +245,68 @@ button:disabled { opacity: .45; cursor: not-allowed; }
                   padding: 0 11px; height: var(--control-h); background: var(--paper); width: 190px; }
 .btn-ghost.danger { color: var(--danger); border-color: var(--line); }
 .btn-ghost.danger:hover { border-color: var(--danger); }
+
+/* ── flow map ─────────────────────────────────────────────────────────────── */
+/* Two columns: the questions run down the left, the handoff rule is a rail on the right
+   that touches every one of them, because the engine tests it on every reply. */
+.fm { overflow: auto; min-height: 0; background: var(--paper-2); }
+.fm-scroll { padding: 26px 30px 40px; max-width: 1080px; }
+.fm-grid { display: grid; grid-template-columns: minmax(280px, 1fr) 300px; column-gap: 0; }
+.fm-cell { display: flex; flex-direction: column; align-items: flex-start; }
+.fm-rail { position: relative; padding-left: 40px; }
+/* the continuous dashed escape route; each cell contributes its own slice */
+.fm-rail.on::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  border-left: 1px dashed var(--warn); opacity: .55; }
+/* the tick from a question out to the rail, level with the node's kind line */
+.fm-tick { position: absolute; left: -110px; top: 26px; width: 110px;
+  border-top: 1px dashed var(--warn); opacity: .55; }
+
+.fm-node { display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+  width: 100%; text-align: left; background: var(--paper); border: 1px solid var(--line);
+  border-left-width: 3px; border-radius: var(--radius); padding: 11px 13px; cursor: pointer; }
+.fm-node:hover { border-color: var(--ink-3); }
+.fm-node:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+.fm-rule, .fm-live { margin-bottom: 18px; }
+.fm-live { margin-top: 18px; }
+
+.fm-top { display: flex; align-items: baseline; gap: 8px; width: 100%; }
+.fm-n { font: 500 10.5px var(--font-mono); color: var(--ink-3); }
+.fm-kind { font: 500 10.5px var(--font-mono); letter-spacing: .08em; }
+.fm-field { margin-left: auto; font: 400 10.5px var(--font-mono); color: var(--ink-3); }
+.fm-prompt { font-size: var(--text-md); font-weight: 500; line-height: 1.35; }
+.fm-note { font: 400 10.5px var(--font-mono); letter-spacing: .04em; color: var(--ink-3);
+  text-transform: none; line-height: 1.4; }
+
+.fm-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.fm-chip, .fm-word { font: 400 10.5px var(--font-mono); font-style: normal;
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 2px 6px; }
+.fm-chip.fm-skip, .fm-chip.fm-free { border-style: dashed; color: var(--ink-3); }
+.fm-word { background: var(--paper-2); color: var(--warn); border-color: transparent; }
+.fm-word.fm-none { color: var(--ink-3); font-style: italic; }
+
+.fm-terminus { display: inline-flex; align-items: center; gap: 8px;
+  font: 400 11px var(--font-mono); letter-spacing: .06em; color: var(--ink-2); }
+.fm-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* the arrowed connector between one node and the next */
+.fm-join { display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 0; margin-left: 26px; }
+.fm-join-line { width: 1px; height: 14px; background: var(--line); position: relative; }
+.fm-join-line::after { content: ''; position: absolute; left: -3px; bottom: -1px;
+  border: 3.5px solid transparent; border-top-color: var(--line); }
+.fm-join-label { font: 400 9.5px var(--font-mono); letter-spacing: .06em; color: var(--ink-3); }
+
+.fm-foot { margin-top: 24px; font-size: var(--text-sm); color: var(--ink-2); max-width: 560px; }
+
+/* the Steps / Map switch in the builder header */
+.fb-view { display: flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.fb-view button { border: 0; background: var(--paper); color: var(--ink-2);
+  font: 400 11px var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
+  padding: 0 12px; height: var(--control-h-sm); cursor: pointer; }
+.fb-view button[data-on='true'] { background: var(--ink); color: var(--paper); }
+
+@media (max-width: 1100px) {
+  .fm-grid { grid-template-columns: 1fr; }
+  .fm-rail { padding-left: 0; margin-top: 8px; }
+  .fm-rail.on::before, .fm-tick { display: none; }
+}

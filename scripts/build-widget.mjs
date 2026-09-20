@@ -7,11 +7,10 @@ writeFileSync('src/widget-asset.ts',
   'export const CHAT_JS = `' + esc + '`;\n');
 console.log('src/widget-asset.ts written from widget/chat.js');
 
-// The rep console and the widget test page ride along, so `wrangler deploy` is all it takes
-// to have something to look at. A real Pages project replaces this later.
+// The plain-HTML console at /console predates the React app and stays as a dependency-free
+// fallback for poking at the API. The real rep app is web/, served from [assets].
 for (const [file, out, name] of [
   ['web/console.html', 'src/web-console.ts', 'CONSOLE_HTML'],
-  ['web/dumontprinting-test.html', 'src/web-test.ts', 'TEST_HTML'],
 ]) {
   const html = readFileSync(file, 'utf8');
   const e = html.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');

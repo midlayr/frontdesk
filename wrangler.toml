@@ -3,6 +3,17 @@ main = "src/index.ts"
 compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
+# The rep app (web/), built by Vite. Served by this Worker rather than a separate Pages
+# project so the app and the API share an origin: the session cookie is SameSite=Lax and a
+# cross-site XHR would never send it, and resolveOrg() reads the tenant off the hostname.
+# A hit here never runs the Worker, so the bundle costs no requests.
+# not_found_handling stays "none": the SPA fallback lives in the Worker (see app.notFound),
+# because "single-page-application" would answer /api/* with index.html instead.
+[assets]
+directory = "web/dist"
+binding = "ASSETS"
+not_found_handling = "none"
+
 # Relational data — Postgres (Neon/Supabase) pooled through Hyperdrive
 [[hyperdrive]]
 binding = "HYPERDRIVE"

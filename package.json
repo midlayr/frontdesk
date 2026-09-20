@@ -7,8 +7,8 @@
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
     "build:widget": "node scripts/build-widget.mjs",
-    "build:web": "node scripts/build-widget.mjs",
-    "predeploy": "npm run build:web"
+    "build:web": "npm --prefix web run build",
+    "predeploy": "npm run build:widget && npm run build:web"
   },
   "repository": {
     "type": "git",

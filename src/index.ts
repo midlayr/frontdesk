@@ -19,7 +19,6 @@ import {
   readCookie, readSession, sessionCookie, verifyPassword,
 } from './auth';
 import { CONSOLE_HTML } from './web-console';
-import { TEST_HTML } from './web-test';
 
 export { ChatSession } from './do/chat-session';
 export { InboxRoom } from './do/inbox-room';
@@ -279,12 +278,39 @@ app.get('/api/inbox/stream', async (c) => {
 const html = (body: string) =>
   new Response(body, { headers: { 'content-type': 'text/html; charset=utf-8' } });
 
-// Two pages so the system is visible without a separate front-end deploy. The rep console
-// authenticates like any other /api client; it is a working stand-in until the Pages app.
+// The dependency-free console predates the React app and stays as a way to poke at the API
+// with nothing built. The widget test page ships as a static asset, so /demo is just its
+// older name.
 app.get('/console', () => html(CONSOLE_HTML));
-app.get('/demo', () => html(TEST_HTML));
+app.get('/demo', (c) => c.redirect('/dumontprinting-test.html', 301));
 
 app.get('/health', (c) => c.json({ ok: true }));
+
+/**
+ * SPA fallback.
+ *
+ * Static assets are served before the Worker runs, so anything reaching here is either a
+ * real miss or a client-side route (/settings, /chat/flows/<slug>). Reloading one of those
+ * must return the app, not a 404 — but only for a browser asking for a page. A miss under
+ * /api, /hooks, /internal or /widget, or any non-GET, keeps its honest 404, since answering
+ * a fetch() with HTML turns a typo into an unreadable JSON parse error.
+ */
+const APP_SHELL_EXEMPT = ['/api', '/hooks', '/internal', '/widget'];
+
+app.notFound(async (c) => {
+  const url = new URL(c.req.url);
+  const wantsPage = (c.req.method === 'GET' || c.req.method === 'HEAD')
+    && (c.req.header('accept') ?? '').includes('text/html')
+    && !APP_SHELL_EXEMPT.some((p) => url.pathname === p || url.pathname.startsWith(p + '/'));
+
+  if (!wantsPage) return c.json({ error: 'not found' }, 404);
+
+  // 200, not 404: the Worker cannot tell /chat/flows/quote-intake from a typo, and the app
+  // decides which it is once it boots. index.html carries no-cache, so a later deploy is
+  // picked up rather than a stale shell pointing at hashed bundles that no longer exist.
+  const shell = await c.env.ASSETS.fetch(new URL('/index.html', url));
+  return new Response(shell.body, { status: 200, headers: shell.headers });
+});
 
 export default {
   fetch: app.fetch,

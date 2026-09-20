@@ -21,9 +21,9 @@
   <hr>
   <p>Need a quote? Use the chat at the bottom right.</p>
   <div class="note">
-    Test page for the Midlayr Chat widget, served by the Vite dev server. The script tag is
-    exactly what a tenant pastes into their site — <code>data-org</code> and nothing else.
-    <code>/w.js</code>, <code>/widget</code> and <code>/api</code> proxy through to the Worker.
+    Test page for the Midlayr Chat widget. The script tag is exactly what a tenant pastes
+    into their site — <code>data-org</code> and nothing else. Same origin as the Worker, so
+    <code>/w.js</code>, <code>/widget</code> and <code>/api</code> resolve without a proxy.
   </div>
 </div>
 <script src="/w.js" data-org="dumont" data-flow="quote-intake" async></script>

@@ -6,6 +6,7 @@ export interface Env {
   CONFIG: KVNamespace;
   JOBS: Queue<Job>;
   AI: Ai;
+  ASSETS: Fetcher;            // the built rep app in web/dist
   INTERNAL: Fetcher;          // self service-binding, so DOs can call Worker routes
   CHAT_SESSION: DurableObjectNamespace;
   INBOX_ROOM: DurableObjectNamespace;

@@ -1,0 +1,4 @@
+# Vite fingerprints these, so the name changes whenever the bytes do. Without this they are
+# revalidated on every page load — a 304 each, but a round trip before the app can start.
+/assets/*
+  cache-control: public, max-age=31536000, immutable

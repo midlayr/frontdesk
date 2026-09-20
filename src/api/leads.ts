@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Env, Org } from '../env';
 import { withOrg, type Sql } from '../db';
 import { sendSms } from '../lib/twilio';
+import { messagingFor, render } from '../lib/messaging';
 
 type Vars = { org: Org; sql: Sql; userId: string };
 
@@ -358,9 +359,15 @@ leads.post('/:id/reply', async (c) => {
   const from = org.comms.sms_number;
   if (!from) return c.json({ error: 'tenant has no comms.sms_number configured' }, 500);
 
+  // The signature is appended on the way out and stored with the message, so the thread
+  // shows exactly what the customer received rather than what the rep typed.
+  const { sms } = messagingFor(org);
+  const signature = render(sms.signature ?? '', { org: org.name }).trim();
+  const outgoing = signature ? `${body}\n\n${signature}` : body;
+
   let sent;
   try {
-    sent = await sendSms(c.env, from, target.phone, body);
+    sent = await sendSms(c.env, from, target.phone, outgoing);
   } catch (err) {
     console.error('reply send failed', err);
     return c.json({ error: String(err instanceof Error ? err.message : err) }, 502);
@@ -368,7 +375,7 @@ leads.post('/:id/reply', async (c) => {
 
   await withOrg(sql, org.id, async (tx) => {
     await tx`INSERT INTO messages (id, lead_id, channel, direction, author, body, provider_id)
-             VALUES (${ulid()}, ${id}, 'sms', 'out', ${userId}, ${body}, ${sent.sid})`;
+             VALUES (${ulid()}, ${id}, 'sms', 'out', ${userId}, ${outgoing}, ${sent.sid})`;
     await tx`UPDATE leads
                 SET status = 'replied',
                     first_reply_at = COALESCE(first_reply_at, now())

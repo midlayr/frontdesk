@@ -33,8 +33,14 @@ if (userId) localStorage.setItem('fd_user', userId);
 export function setToken(t: string) { sessionStorage.setItem('fd_token', t); }
 export function getToken() { return sessionStorage.getItem('fd_token') ?? ''; }
 
+/**
+ * The session cookie does the work and rides along automatically. The dev-user and operator
+ * headers stay only as an escape hatch for automation and local work, and are simply absent
+ * for a signed-in person.
+ */
 function headers(): Record<string, string> {
-  const h: Record<string, string> = { 'x-dev-user': userId };
+  const h: Record<string, string> = {};
+  if (userId) h['x-dev-user'] = userId;
   const t = getToken();
   if (t) h['x-admin-token'] = t;
   return h;
@@ -51,7 +57,22 @@ async function get<T>(path: string): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+export interface Me { user: { id: string; name: string; email: string; role: string } | null; org: { id: string; slug: string; name: string } }
+
 export const api = {
+  me: () => get<Me>('/api/me'),
+
+  login: async (email: string, password: string) => {
+    const r = await fetch(url('/api/session'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!r.ok) throw new Error(((await r.json().catch(() => null)) as { error?: string } | null)?.error ?? `${r.status}`);
+    return r.json();
+  },
+
+  logout: () => fetch(url('/api/session'), { method: 'DELETE', headers: headers() }),
+
   org: () => get<Org>('/api/org'),
   leads: (q?: { status?: string; q?: string }) => {
     const s = new URLSearchParams();

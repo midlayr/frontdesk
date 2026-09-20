@@ -70,6 +70,26 @@ export async function resolveOrgByPhone(env: Env, sql: Sql, to: string): Promise
   });
 }
 
+/**
+ * Drop every cached copy of an org after its row changes.
+ *
+ * resolveOrg caches under one key per hostname, plus <slug>.PLATFORM_DOMAIN, and
+ * resolveOrgByPhone caches under the SMS number. Clearing only one of them means a settings
+ * save appears to do nothing for up to a minute — which reads as a broken Save button.
+ */
+export async function invalidateOrg(env: Env, sql: Sql, org: Org): Promise<void> {
+  const keys = [
+    `org:${org.slug}.${env.PLATFORM_DOMAIN}`.toLowerCase(),
+    `org:sms:${(org.comms.sms_number ?? '').trim()}`,
+  ];
+
+  const hosts = await sql.unsafe<{ hostname: string }[]>(
+    'SELECT hostname FROM org_domains WHERE org_id = $1', [org.id]);
+  for (const h of hosts) keys.push(`org:${h.hostname.toLowerCase()}`);
+
+  await Promise.all(keys.map((k) => env.CONFIG.delete(k)));
+}
+
 /** Ticket prefix is tenant data, never a constant in code. */
 export function ticketPrefix(org: Org): string {
   const fromBrand = (org.brand as { ticket_prefix?: unknown }).ticket_prefix;

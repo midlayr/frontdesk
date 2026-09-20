@@ -4,6 +4,7 @@ import { withOrg, type Sql, type Tx } from '../db';
 import { resolveOrgByPhone, ticketPrefix } from '../org';
 import { findThreadableLead } from '../lib/threading';
 import { verifySignature, emptyTwiml } from '../lib/twilio';
+import { messagingFor, render } from '../lib/messaging';
 
 /** Next ticket number for the tenant. The UPDATE ... RETURNING locks the counter row. */
 async function nextTicket(tx: Tx, org: Org): Promise<string> {
@@ -52,6 +53,9 @@ export async function twilioSms(req: Request, env: Env, sql: Sql): Promise<Respo
   const ok = await verifySignature(env.TWILIO_AUTH_TOKEN, req.url, params, req.headers.get('x-twilio-signature'));
   if (!ok) return new Response('bad signature', { status: 403 });
 
+  let isNewLead = false;
+  let ticketNo: string | null = null;
+
   const leadId = await withOrg(sql, org.id, async (tx) => {
     // Webhook retries replay the same MessageSid. The unique partial index on
     // messages.provider_id makes the insert the idempotency check.
@@ -71,7 +75,8 @@ export async function twilioSms(req: Request, env: Env, sql: Sql): Promise<Respo
       id = openId;
     } else {
       id = ulid();
-      const ticketNo = await nextTicket(tx, org);
+      isNewLead = true;
+      ticketNo = await nextTicket(tx, org);
       await tx`INSERT INTO leads (id, org_id, ticket_no, contact_id, channel, status)
                VALUES (${id}, ${org.id}, ${ticketNo}, ${contactId}, 'sms', 'new')`;
       await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
@@ -93,6 +98,18 @@ export async function twilioSms(req: Request, env: Env, sql: Sql): Promise<Respo
 
   if (leadId) {
     await env.JOBS.send({ kind: 'extract_specs', orgId: org.id, leadId });
+  }
+
+  // An acknowledgement, if the tenant wants one. Sent as TwiML rather than a separate API
+  // call so it costs nothing extra and cannot race the inbound write. Only on a new ticket:
+  // auto-replying to every message in a running conversation is maddening.
+  const { sms } = messagingFor(org);
+  if (leadId && isNewLead && sms.auto_reply_enabled && sms.auto_reply.trim()) {
+    const body = render(sms.auto_reply, { org: org.name, ticket: ticketNo ?? '' });
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${body.replace(/[<&]/g, '')}</Message></Response>`,
+      { headers: { 'content-type': 'text/xml' } },
+    );
   }
 
   return emptyTwiml();

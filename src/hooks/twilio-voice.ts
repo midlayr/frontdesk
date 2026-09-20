@@ -4,6 +4,7 @@ import { withOrg, type Sql, type Tx } from '../db';
 import { resolveOrgByPhone, ticketPrefix } from '../org';
 import { findThreadableLead } from '../lib/threading';
 import { verifySignature } from '../lib/twilio';
+import { messagingFor, render, xmlEscape } from '../lib/messaging';
 
 const xml = (body: string) =>
   new Response(`<?xml version="1.0" encoding="UTF-8"?>${body}`, { headers: { 'content-type': 'text/xml' } });
@@ -50,17 +51,16 @@ export async function twilioVoice(req: Request, env: Env, sql: Sql): Promise<Res
   const ok = await verifySignature(env.TWILIO_AUTH_TOKEN, req.url, params, req.headers.get('x-twilio-signature'));
   if (!ok) return new Response('bad signature', { status: 403 });
 
-  const greeting = (org.comms as { voice_greeting?: string }).voice_greeting
-    ?? `Thanks for calling ${org.name}. Nobody is free right now — leave the details of your job after the tone and we'll come straight back to you.`;
-
+  const { voice } = messagingFor(org);
+  const vars = { org: org.name };
   const action = new URL('/hooks/twilio/recording', req.url).toString();
 
   return xml(
     `<Response>` +
-      `<Say voice="Polly.Joanna">${greeting.replace(/[<&]/g, '')}</Say>` +
-      `<Record action="${action}" method="POST" maxLength="180" playBeep="true" trim="trim-silence" transcribe="false"/>` +
+      `<Say voice="Polly.Joanna">${xmlEscape(render(voice.greeting, vars))}</Say>` +
+      `<Record action="${action}" method="POST" maxLength="${voice.max_seconds}" playBeep="true" trim="trim-silence" transcribe="false"/>` +
       // reached only if they hang up without recording
-      `<Say voice="Polly.Joanna">We didn't catch that. Please call back or text us. Goodbye.</Say>` +
+      `<Say voice="Polly.Joanna">${xmlEscape(render(voice.no_input, vars))}</Say>` +
     `</Response>`,
   );
 }
@@ -149,5 +149,6 @@ export async function twilioRecording(req: Request, env: Env, sql: Sql, ctx: { w
     ctx.waitUntil(env.JOBS.send({ kind: 'transcribe', orgId: org.id, messageId }));
   }
 
-  return xml('<Response><Say voice="Polly.Joanna">Got it — thanks. We\'ll be in touch shortly. Goodbye.</Say></Response>');
+  const { voice } = messagingFor(org);
+  return xml(`<Response><Say voice="Polly.Joanna">${xmlEscape(render(voice.after_record, { org: org.name }))}</Say></Response>`);
 }

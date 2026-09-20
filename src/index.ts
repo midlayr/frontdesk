@@ -11,8 +11,13 @@ import { leads } from './api/leads';
 import { internal } from './api/internal';
 import { widget } from './api/widget';
 import { flows } from './api/flows';
+import { settings } from './api/settings';
 import { CHAT_JS } from './widget-asset';
 import { MEDIA_TTL_MS, mintTicket, readTicket } from './ws-ticket';
+import {
+  COOKIE, clearCookie, createSession, destroySession, hashPassword,
+  readCookie, readSession, sessionCookie, verifyPassword,
+} from './auth';
 import { CONSOLE_HTML } from './web-console';
 import { TEST_HTML } from './web-test';
 
@@ -71,6 +76,48 @@ app.post('/hooks/twilio/sms', (c) => twilioSms(c.req.raw, c.env, c.get('sql')));
 app.post('/hooks/twilio/voice', (c) => twilioVoice(c.req.raw, c.env, c.get('sql')));
 app.post('/hooks/twilio/recording', (c) => twilioRecording(c.req.raw, c.env, c.get('sql'), c.executionCtx));
 
+/**
+ * Sign in.
+ *
+ * Rate-limited only by Postgres and PBKDF2's own cost for now — 210k iterations makes
+ * guessing expensive, but a real deployment wants attempt throttling on top.
+ */
+app.post('/api/session', async (c) => {
+  const body = await c.req.json().catch(() => null) as { email?: string; password?: string } | null;
+  const email = body?.email?.trim().toLowerCase();
+  const password = body?.password;
+  if (!email || !password) return c.json({ error: 'email and password required' }, 400);
+
+  const sql = c.get('sql');
+  const org = await resolveOrg(c.env, sql, new URL(c.req.url));
+  if (!org) return c.json({ error: 'unknown tenant' }, 404);
+
+  // users is under RLS, so this has to run inside the tenant's context — a plain query
+  // returns zero rows and every login looks like a wrong password. Scoping to the resolved
+  // org also means a valid password cannot sign you into a tenant you do not belong to.
+  const [user] = await withOrg(sql, org.id, (tx) =>
+    tx<{ id: string; password_hash: string | null }[]>`
+      SELECT id, password_hash FROM users WHERE email = ${email} AND org_id = ${org.id}`);
+
+  // Same work and the same answer whether or not the account exists, so this cannot be used
+  // to enumerate who has a login.
+  const ok = await verifyPassword(password, user?.password_hash ?? null);
+  if (!user || !ok) return c.json({ error: 'wrong email or password' }, 401);
+
+  const url = new URL(c.req.url);
+  const { token, expires } = await createSession(
+    sql, user.id, org.id, c.req.header('user-agent') ?? null, c.req.header('cf-connecting-ip') ?? null);
+
+  c.header('set-cookie', sessionCookie(token, expires, url.protocol === 'https:'));
+  return c.json({ ok: true, userId: user.id });
+});
+
+app.delete('/api/session', async (c) => {
+  await destroySession(c.get('sql'), readCookie(c.req.header('cookie') ?? null, COOKIE));
+  c.header('set-cookie', clearCookie(new URL(c.req.url).protocol === 'https:'));
+  return c.json({ ok: true });
+});
+
 // Everything below is tenant-scoped by hostname.
 app.use('/api/*', async (c, next) => {
   const url = new URL(c.req.url);
@@ -94,6 +141,23 @@ app.use('/api/*', async (c, next) => {
  * cannot authenticate at all, which is deliberate.
  */
 async function authenticate(c: Context<{ Bindings: Env; Variables: Vars }>): Promise<Response | null> {
+  const org = c.get('org');
+
+  // A real session cookie first. It is sent automatically on fetches, WebSocket handshakes
+  // and <audio>/<img> loads, which is why it replaces the ticket dance for anything
+  // same-origin, and it is HttpOnly so page script cannot read or leak it.
+  const cookie = readCookie(c.req.header('cookie') ?? null, COOKIE);
+  if (cookie) {
+    const session = await readSession(c.get('sql'), cookie);
+    // The session names its own tenant; a cookie from one org must not work on another's
+    // hostname even though both resolve through the same Worker.
+    if (session && session.orgId === org.id) {
+      c.set('userId', session.userId);
+      return null;
+    }
+    if (session) return c.json({ error: 'session is for another tenant' }, 403);
+  }
+
   const isUpgrade = c.req.header('upgrade') === 'websocket';
 
   // Neither a WebSocket nor an <audio>/<img> element can send headers, so both present a
@@ -118,17 +182,16 @@ async function authenticate(c: Context<{ Bindings: Env; Variables: Vars }>): Pro
   const onDevHost = isDevHost(new URL(c.req.url).hostname);
 
   if (!onDevHost) {
-    if (!adminToken) return c.json({ error: 'session auth not implemented; use x-admin-token' }, 501);
+    if (!adminToken) return c.json({ error: 'not signed in' }, 401);
     if (!c.env.SESSION_SECRET || !timingSafeEqual(adminToken, c.env.SESSION_SECRET)) {
       return c.json({ error: 'bad admin token' }, 401);
     }
   }
 
-  if (!devUser) return c.json({ error: 'x-dev-user required' }, 401);
+  if (!devUser) return c.json({ error: 'not signed in' }, 401);
 
   // Looked up inside the tenant's own context, so a user id from another org resolves to
   // nothing however the caller authenticated.
-  const org = c.get('org');
   const [user] = await withOrg(c.get('sql'), org.id, (tx) =>
     tx<{ id: string }[]>`SELECT id FROM users WHERE id = ${devUser}`);
   if (!user) return c.json({ error: 'unknown user for tenant' }, 401);
@@ -141,6 +204,42 @@ app.use('/api/*', async (c, next) => {
   const failed = await authenticate(c);
   if (failed) return failed;
   await next();
+});
+
+app.get('/api/me', async (c) => {
+  const org = c.get('org');
+  const [user] = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ id: string; name: string; email: string; role: string }[]>`
+      SELECT id, name, email, role FROM users WHERE id = ${c.get('userId')}`);
+  return c.json({ user, org: { id: org.id, slug: org.slug, name: org.name } });
+});
+
+/**
+ * Set a user's password. Bootstrap path, so it takes the operator token rather than a
+ * session — that is the legitimate use for a root credential: creating the first login.
+ * A self-service change belongs behind a session and the current password.
+ */
+app.post('/api/users/:id/password', async (c) => {
+  if (c.req.header('x-admin-token') !== c.env.SESSION_SECRET) {
+    return c.json({ error: 'operator token required' }, 403);
+  }
+  const body = await c.req.json().catch(() => null) as { password?: string } | null;
+  if (!body?.password || body.password.length < 12) {
+    return c.json({ error: 'password must be at least 12 characters' }, 400);
+  }
+
+  const org = c.get('org');
+  const id = c.req.param('id');
+  const hash = await hashPassword(body.password);
+  const [updated] = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ id: string }[]>`
+      UPDATE users SET password_hash = ${hash}, password_set_at = now()
+       WHERE id = ${id} RETURNING id`);
+  if (!updated) return c.json({ error: 'not found' }, 404);
+
+  // Any existing sessions belong to the old password.
+  await c.get('sql')`DELETE FROM sessions WHERE user_id = ${id}`;
+  return c.json({ ok: true });
 });
 
 app.get('/api/org', (c) => {
@@ -167,6 +266,7 @@ app.post('/api/ws-ticket', async (c) => {
 
 app.route('/api/leads', leads);
 app.route('/api/flows', flows);
+app.route('/api/settings', settings);
 
 /** Realtime queue updates: one InboxRoom per tenant, every open rep tab subscribed. */
 app.get('/api/inbox/stream', async (c) => {

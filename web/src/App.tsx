@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, applyBrand, getToken, orgSlug, setToken, userId, type Lead, type Message, type Org } from './api';
+import { api, applyBrand, orgSlug, userId, type Lead, type Message, type Org } from './api';
 import { FlowBuilder } from './FlowBuilder';
+import { Settings } from './Settings';
 
 const VIEWS = ['All', 'New', 'Mine', 'Rush', 'Needs info', 'Quoted', 'Won', 'Lost', 'Spam'] as const;
 type View = (typeof VIEWS)[number];
@@ -275,9 +276,10 @@ export function App() {
     } catch (e) { setError(String(e)); }
   }
 
-  if (needToken) return <TokenGate onDone={() => { setNeedToken(false); location.reload(); }} />;
+  if (needToken) return <Login onDone={() => location.reload()} />;
 
   const flowSlug = path.startsWith('/chat/flows/') ? path.slice('/chat/flows/'.length) : '';
+  const onSettings = path.startsWith('/settings');
   const brand = (org?.brand ?? {}) as Record<string, string>;
   const logo = brand.logo_url ? `${brand.logo_url}` : '/brand/dumont/logo-horizontal.png';
 
@@ -292,7 +294,7 @@ export function App() {
           <button aria-current={!flowSlug} onClick={() => go('/')}>Inbox</button>
           <button title="Not built yet">Campaigns</button>
           <button aria-current={!!flowSlug} onClick={() => go('/chat/flows/quote-intake')}>Chat</button>
-          <button title="Not built yet">Order form</button>
+          <button aria-current={onSettings} onClick={() => go('/settings/messaging')}>Settings</button>
         </nav>
         <div className="search">
           <input placeholder="Search leads" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -303,7 +305,9 @@ export function App() {
         </span>
       </header>
 
-      {flowSlug ? (
+      {onSettings ? (
+        <Settings />
+      ) : flowSlug ? (
         <FlowBuilder slug={flowSlug} accent={brand.color || '#0B7FA8'} />
       ) : (
       <div className="panes">
@@ -551,20 +555,52 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
   );
 }
 
-/** Off localhost the API needs the operator token. It stays in sessionStorage only. */
-function TokenGate({ onDone }: { onDone: () => void }) {
-  const [v, setV] = useState(getToken());
+/**
+ * Sign in.
+ *
+ * Password is the only provider implemented, but the org's `auth` column already says which
+ * providers a tenant allows, so Microsoft/Google/SAML buttons slot in beside this without
+ * changing how sessions work.
+ */
+function Login({ onDone }: { onDone: () => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr('');
+    try {
+      await api.login(email.trim(), password);
+      onDone();
+    } catch (e) {
+      setErr(String(e).replace(/^Error:\s*/, ''));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="gate">
-      <form onSubmit={(e) => { e.preventDefault(); setToken(v.trim()); onDone(); }}>
-        <span className="eyebrow">Front Desk · {orgSlug}</span>
-        <p style={{ fontSize: 'var(--text-md)', color: 'var(--ink-2)', margin: 0 }}>
-          This deployment has no user sessions yet. Paste the operator token (SESSION_SECRET).
-          It can act as any user in any tenant, so only use it on a machine you trust.
-        </p>
-        <input autoFocus value={v} onChange={(e) => setV(e.target.value)} placeholder="SESSION_SECRET"
-               style={{ height: 'var(--control-h)', border: '1px solid var(--line)', borderRadius: 'var(--radius)', padding: '0 11px' }} />
-        <button className="btn-primary" type="submit">Open Front Desk</button>
+      <form onSubmit={submit}>
+        <span className="eyebrow">Front Desk</span>
+        <h1 className="display" style={{ fontSize: 'var(--h2)', margin: '2px 0 10px' }}>Sign in</h1>
+        <label className="fb-field">
+          <span className="label">Email</span>
+          <input type="email" autoComplete="username" autoFocus required
+                 value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <label className="fb-field">
+          <span className="label">Password</span>
+          <input type="password" autoComplete="current-password" required
+                 value={password} onChange={(e) => setPassword(e.target.value)} />
+        </label>
+        {err && <p className="err">{err}</p>}
+        <button className="btn-primary" type="submit" disabled={busy}>
+          {busy ? 'Signing in…' : 'Sign in'}
+        </button>
       </form>
     </div>
   );

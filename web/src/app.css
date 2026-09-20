@@ -64,8 +64,8 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 /* ── ticket ── */
 .ticket { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .tscroll { overflow: auto; padding: 22px 26px; flex: 1; min-height: 0; }
-.thead { display: flex; align-items: baseline; gap: 12px; }
-.tno { font-family: var(--font-display); font-variation-settings: 'wdth' var(--display-wdth);
+.thead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; row-gap: 8px; }
+.tno { white-space: nowrap; flex: none; font-family: var(--font-display); font-variation-settings: 'wdth' var(--display-wdth);
        font-weight: 700; font-size: var(--h2); letter-spacing: -.01em; }
 .tname { font-family: var(--font-display); font-variation-settings: 'wdth' var(--display-wdth);
          font-weight: 700; font-size: var(--h1); letter-spacing: -.02em; line-height: 1.1; margin: 10px 0 2px; }
@@ -349,3 +349,18 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .fb-edge select { border: 1px solid var(--line); border-radius: var(--radius);
   height: var(--control-h-sm); background: var(--paper); font: 400 12.5px var(--font-body);
   padding: 0 6px; min-width: 0; }
+
+/* ── status and assignee pickers in the ticket header ─────────────────────── */
+/* Native <select> on purpose: the OS menu is keyboard- and screen-reader-correct for free,
+   and it is what the design shows. Only the closed state is styled. */
+.pick { display: inline-flex; align-items: center; gap: 7px; height: var(--control-h-sm);
+  padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--paper); cursor: pointer; }
+.pick:hover { border-color: var(--ink-3); }
+.pick:focus-within { outline: 1px solid var(--accent); outline-offset: 1px; }
+.pick .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.pick select { border: 0; background: none; font: 400 12.5px var(--font-body); color: var(--ink);
+  padding: 0 2px 0 0; cursor: pointer; max-width: 150px; }
+.pick select:focus { outline: none; }
+.pick.static { font: 400 12.5px var(--font-body); color: var(--ink-2); cursor: default; }
+.pick.assign .label { color: var(--ink-3); }

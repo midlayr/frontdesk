@@ -191,9 +191,12 @@ internal.post('/leads/chat-turns', async (c) => {
                     ended_at = CASE WHEN ${body.state} = 'done' THEN now() ELSE ended_at END
               WHERE id = ${body.sessionId}`;
 
+    // Same rule as replying: automation owns the inbound states, a rep owns the rest. A
+    // ticket already marked Quoted or Won stays there even if the visitor opens a new chat.
     await tx`UPDATE leads
                 SET status = CASE
-                      WHEN ${body.state} = 'live' THEN 'live'::lead_status
+                      WHEN ${body.state} = 'live' AND status IN ('new','needs_info','replied')
+                        THEN 'live'::lead_status
                       WHEN ${body.state} = 'done' AND status = 'live' THEN 'new'::lead_status
                       ELSE status END
               WHERE id = ${body.leadId}`;

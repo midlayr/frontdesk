@@ -241,6 +241,15 @@ app.post('/api/users/:id/password', async (c) => {
   return c.json({ ok: true });
 });
 
+/** The org's reps, for the assignee picker. Scoped by RLS, so it cannot list another tenant. */
+app.get('/api/users', async (c) => {
+  const org = c.get('org');
+  const users = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ id: string; name: string; email: string; role: string }[]>`
+      SELECT id, name, email, role FROM users WHERE org_id = ${org.id} ORDER BY name`);
+  return c.json({ users });
+});
+
 app.get('/api/org', (c) => {
   const org = c.get('org');
   const brand = org.brand as Record<string, unknown>;

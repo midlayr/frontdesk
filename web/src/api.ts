@@ -19,6 +19,29 @@ export interface Message {
   has_audio?: boolean; transcript_status?: 'pending' | 'done' | 'failed' | null;
 }
 
+export interface OrgUser { id: string; name: string; email: string; role: string }
+
+/**
+ * The pipeline, in the order a job moves through it.
+ *
+ * One list drives the ticket's status picker and the queue's views, so a stage cannot be
+ * offered in one place and missing from the other. 'live' and 'closed' are deliberately
+ * absent: 'live' is set by the chat session, not chosen by a rep, and 'closed' has no
+ * meaning the shop uses yet.
+ */
+export const PIPELINE = ['new', 'needs_info', 'replied', 'quoted', 'won', 'lost', 'spam'] as const;
+
+export const STATUS_LABEL: Record<string, string> = {
+  new: 'New', needs_info: 'Working', replied: 'Replied', quoted: 'Quoted',
+  won: 'Won', lost: 'Lost', spam: 'Spam', closed: 'Closed', live: 'Live',
+};
+
+export const STATUS_DOT: Record<string, string> = {
+  new: 'var(--accent)', needs_info: 'var(--warn)', replied: 'var(--ink-3)',
+  quoted: 'var(--accent-deep)', won: 'var(--ok)', lost: 'var(--ink-3)',
+  spam: 'var(--ink-3)', closed: 'var(--ink-3)', live: 'var(--ok-bright)',
+};
+
 export interface Org {
   id: string; slug: string; name: string;
   brand: Record<string, string | boolean | null>;
@@ -103,6 +126,8 @@ export const api = {
     if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
     return r.json();
   },
+
+  users: () => get<{ users: OrgUser[] }>('/api/users').then((r) => r.users),
 
   patch: async (id: string, body: Record<string, unknown>) => {
     const r = await fetch(url(`/api/leads/${id}`), {

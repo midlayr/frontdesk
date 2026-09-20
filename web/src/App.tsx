@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, applyBrand, orgSlug, userId, type Lead, type Message, type Org } from './api';
+import { api, applyBrand, orgSlug, userId, type Lead, type Message, type Org, PIPELINE, STATUS_LABEL, STATUS_DOT, type OrgUser } from './api';
 import { FlowBuilder } from './FlowBuilder';
 import { Settings } from './Settings';
 
-const VIEWS = ['All', 'New', 'Mine', 'Rush', 'Needs info', 'Quoted', 'Won', 'Lost', 'Spam', 'Archived'] as const;
+const VIEWS = ['All', 'New', 'Mine', 'Rush', 'Working', 'Quoted', 'Won', 'Lost', 'Spam', 'Archived'] as const;
 type View = (typeof VIEWS)[number];
 
+// Same labels as the ticket's status picker, from the same map in api.ts: a stage renamed
+// there must not leave the rail saying something else about the very same rows.
 const STATUS_OF: Partial<Record<View, string>> = {
-  New: 'new', 'Needs info': 'needs_info', Quoted: 'quoted', Won: 'won', Lost: 'lost', Spam: 'spam',
+  New: 'new', Working: 'needs_info', Quoted: 'quoted', Won: 'won', Lost: 'lost', Spam: 'spam',
 };
 
 const CHANNEL_TAG: Record<string, string> = { sms: 'SM', voice: 'VM', email: 'EM', form: 'WF', chat: 'CB' };
@@ -86,6 +88,7 @@ export function App() {
   const [org, setOrg] = useState<Org | null>(null);
   const [needToken, setNeedToken] = useState(false);
   const [error, setError] = useState('');
+  const [users, setUsers] = useState<OrgUser[]>([]);
   const [streamUp, setStreamUp] = useState(false);
   const [ackedAt, setAckedAt] = useState(() => Date.now());
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -271,6 +274,9 @@ export function App() {
     } catch (e) { setError(String(e)); }
   }
 
+  // The assignee list changes far less often than the queue, so it is fetched once.
+  useEffect(() => { api.users().then(setUsers).catch(() => {}); }, []);
+
   async function archiveLead(on: boolean) {
     if (!detail) return;
     try {
@@ -403,7 +409,7 @@ export function App() {
         {detail ? (
           <Ticket d={detail} live={live} draft={draft} setDraft={setDraft}
                   send={send} sending={sending} takeover={takeover} error={error}
-                  onPatch={patchLead} onArchive={archiveLead} onDelete={deleteLead} />
+                  onPatch={patchLead} onArchive={archiveLead} onDelete={deleteLead} users={users} />
         ) : (
           <div className="ticket"><div className="empty">{error || 'Select a ticket'}</div></div>
         )}
@@ -489,11 +495,11 @@ function EditCell({ leadId, label, value, placeholder, type, onSave }: {
   );
 }
 
-function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPatch, onArchive, onDelete }: {
+function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPatch, onArchive, onDelete, users }: {
   d: { lead: Lead; messages: Message[] }; live: boolean; draft: string;
   setDraft: (s: string) => void; send: () => void; sending: boolean;
   takeover: () => void; error: string; onPatch: (body: Record<string, unknown>) => void;
-  onArchive: (on: boolean) => void; onDelete: () => void;
+  onArchive: (on: boolean) => void; onDelete: () => void; users: OrgUser[];
 }) {
   const l = d.lead;
   const miss = l.missing_fields ?? [];
@@ -506,7 +512,40 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
         <div className="thead">
           <span className="label">Ticket</span>
           <span className="tno">{l.ticket_no}</span>
-          <span style={{ marginLeft: 'auto' }} className="tag">{l.status}</span>
+          <span style={{ marginLeft: 'auto' }} />
+
+          {/* A live chat's stage belongs to the chat session, not to a rep: the session
+              writes 'live' while someone is connected and hands it back when it ends, so
+              offering the picker here would only be overwritten. */}
+          {l.status === 'live' ? (
+            <span className="pick static">
+              <i className="dot" style={{ background: STATUS_DOT.live }} />
+              {STATUS_LABEL.live}
+            </span>
+          ) : (
+            <label className="pick">
+              <i className="dot" style={{ background: STATUS_DOT[l.status] ?? 'var(--ink-3)' }} />
+              <select value={l.status} onChange={(e) => onPatch({ status: e.target.value })}>
+                {/* A status the picker does not list — 'closed' on an old ticket — is added
+                    so selecting it is possible to leave but never to enter. */}
+                {(PIPELINE as readonly string[]).includes(l.status)
+                  ? null
+                  : <option value={l.status}>{STATUS_LABEL[l.status] ?? l.status}</option>}
+                {PIPELINE.map((st) => (
+                  <option key={st} value={st}>{STATUS_LABEL[st]}</option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <label className="pick assign">
+            <span className="label">Assign</span>
+            <select value={l.assignee_id ?? ''}
+                    onChange={(e) => onPatch({ assignee_id: e.target.value || null })}>
+              <option value="">Unassigned</option>
+              {users.map((u) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+            </select>
+          </label>
           {isChat && !live && <button className="btn-primary" onClick={takeover}>Take over chat</button>}
           {live && <span className="tag live">You are live</span>}
           <button className="btn-ghost" onClick={() => onArchive(!l.archived_at)}>

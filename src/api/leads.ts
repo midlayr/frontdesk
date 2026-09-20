@@ -106,6 +106,7 @@ const Patch = z.object({
   rush: z.boolean().optional(),
   deadline_at: z.string().datetime().nullable().optional(),
   status: z.enum(['live','new','needs_info','replied','quoted','won','lost','closed','spam']).optional(),
+  assignee_id: z.string().nullable().optional(),
   contact: z.object({
     name: z.string().nullable().optional(),
     company: z.string().nullable().optional(),
@@ -135,9 +136,17 @@ leads.patch('/:id', async (c) => {
   const p = parsed.data;
 
   const result = await withOrg(c.get('sql'), org.id, async (tx) => {
-    const [lead] = await tx<{ contact_id: string | null }[]>`
-      SELECT contact_id FROM leads WHERE id = ${id}`;
+    const [lead] = await tx<{ contact_id: string | null; status: string; assignee_id: string | null }[]>`
+      SELECT contact_id, status, assignee_id FROM leads WHERE id = ${id}`;
     if (!lead) return null;
+
+    // Checked rather than trusted: an id from another tenant would otherwise be written
+    // straight onto the row, and the queue would show a ticket owned by nobody it can name.
+    if (p.assignee_id) {
+      const [who] = await tx<{ id: string }[]>`
+        SELECT id FROM users WHERE id = ${p.assignee_id} AND org_id = ${org.id}`;
+      if (!who) return 'bad-assignee' as const;
+    }
 
     if (p.contact) {
       let companyId: string | null = null;
@@ -175,6 +184,7 @@ leads.patch('/:id', async (c) => {
     if (p.rush !== undefined) patch.rush = p.rush;
     if (p.deadline_at !== undefined) patch.deadline_at = p.deadline_at;
     if (p.status !== undefined) patch.status = p.status;
+    if (p.assignee_id !== undefined) patch.assignee_id = p.assignee_id;
 
     if (Object.keys(patch).length) {
       await tx`UPDATE leads SET ${tx(patch)} WHERE id = ${id}`;
@@ -200,10 +210,26 @@ leads.patch('/:id', async (c) => {
                WHERE id = ${id}`;
     }
 
-    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
-             VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'edited', ${tx.json({
-               fields: [...Object.keys(patch), ...(p.contact ? Object.keys(p.contact).map((k) => `contact.${k}`) : [])],
-             })})`;
+    // A stage change is its own event, not a field edit: it is the one thing a customer
+    // history has to be able to replay, and 'edited {fields:[status]}' cannot say what to.
+    if (p.status !== undefined && p.status !== lead.status) {
+      await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+               VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'stage',
+                       ${tx.json({ from: lead.status, to: p.status })})`;
+    }
+
+    if (p.assignee_id !== undefined && p.assignee_id !== lead.assignee_id) {
+      await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+               VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'assigned',
+                       ${tx.json({ from: lead.assignee_id, to: p.assignee_id })})`;
+    }
+
+    const edited = [...Object.keys(patch).filter((f) => f !== 'status' && f !== 'assignee_id'),
+                    ...(p.contact ? Object.keys(p.contact).map((k) => `contact.${k}`) : [])];
+    if (edited.length) {
+      await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+               VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'edited', ${tx.json({ fields: edited })})`;
+    }
 
     const [fresh] = await tx`
       SELECT l.*, to_jsonb(l.missing_fields) AS missing_fields,
@@ -217,6 +243,7 @@ leads.patch('/:id', async (c) => {
   });
 
   if (!result) return c.json({ error: 'not found' }, 404);
+  if (result === 'bad-assignee') return c.json({ error: 'no such user in this tenant' }, 400);
   return c.json(result);
 });
 
@@ -445,17 +472,26 @@ leads.post('/:id/reply', async (c) => {
     return c.json({ error: String(err instanceof Error ? err.message : err) }, 502);
   }
 
-  await withOrg(sql, org.id, async (tx) => {
+  const after = await withOrg(sql, org.id, async (tx) => {
     await tx`INSERT INTO messages (id, lead_id, channel, direction, author, body, provider_id)
              VALUES (${ulid()}, ${id}, 'sms', 'out', ${userId}, ${outgoing}, ${sent.sid})`;
+    // Only a ticket still in an inbound state moves to 'replied'. Once a rep has put it at
+    // Quoted, Won, Lost, Closed or Spam that is a deliberate position in the pipeline, and
+    // sending a follow-up text must not quietly drag it backwards.
     await tx`UPDATE leads
-                SET status = 'replied',
+                SET status = CASE WHEN status IN ('new','needs_info','replied')
+                                  THEN 'replied'::lead_status ELSE status END,
                     first_reply_at = COALESCE(first_reply_at, now())
               WHERE id = ${id}`;
     await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
              VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'replied',
                      ${tx.json({ channel: 'sms', provider_id: sent.sid })})`;
+
+    const [row] = await tx<{ status: string }[]>`SELECT status FROM leads WHERE id = ${id}`;
+    return row?.status ?? null;
   });
 
-  return c.json({ ok: true, provider_id: sent.sid, status: 'replied' });
+  // The row's real status, not 'replied': a ticket already at Quoted or Won stays there, and
+  // reporting otherwise would have the caller update its copy to something untrue.
+  return c.json({ ok: true, provider_id: sent.sid, status: after });
 });

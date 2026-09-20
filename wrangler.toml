@@ -69,6 +69,11 @@ PLATFORM_DOMAIN = "midlayr.app"          # <slug>.midlayr.app default per tenant
 WIDGET_ORIGIN = "https://cdn.midlayr.com"
 # Workers AI retires models; swap this rather than editing src/jobs/extract-specs.ts
 AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+
+# The Mailgun domain replies are sent through. Must be one Mailgun signs for us: a tenant's
+# own address is only usable as From once their domain is verified there too.
+# Set MAILGUN_BASE_URL = "https://api.eu.mailgun.net" for an EU account.
+MAILGUN_DOMAIN = "midlayr.com"
 # secrets (wrangler secret put): DATABASE_URL (local dev only; prod uses Hyperdrive),
 #   TWILIO_AUTH_TOKEN, TWILIO_SID, SESSION_SECRET,
 #   MAILGUN_API_KEY      — sending

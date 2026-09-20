@@ -80,6 +80,58 @@ async function nextTicket(tx: Tx, orgId: string, prefix: string): Promise<string
 }
 
 /** Chat reached the point of being a real enquiry: create contact + lead + chat_sessions row. */
+/**
+ * Open a ticket for an email.
+ *
+ * Separate from the chat path because the identity is different: an email always carries a
+ * usable address, so the contact is matched on it and reused across enquiries — which is
+ * what makes a returning customer one record rather than a new one every quarter.
+ */
+internal.post('/leads/from-email', async (c) => {
+  const body = await c.req.json<{
+    orgId: string;
+    contact: { name: string | null; email: string };
+    subject: string; body: string;
+    assigneeId: string | null; status: string;
+  }>();
+
+  const sql = c.get('sql');
+  const [org] = await sql<{ slug: string; brand: Record<string, unknown> }[]>`
+    SELECT slug, brand FROM orgs WHERE id = ${body.orgId}`;
+  if (!org) return c.json({ error: 'unknown org' }, 404);
+  const prefix = ticketPrefix({ slug: org.slug, brand: org.brand } as never);
+
+  const out = await withOrg(sql, body.orgId, async (tx) => {
+    const email = body.contact.email.toLowerCase();
+
+    let [contact] = await tx<{ id: string; name: string | null }[]>`
+      SELECT id, name FROM contacts WHERE org_id = ${body.orgId} AND email = ${email} LIMIT 1`;
+    if (!contact) {
+      const id = ulid();
+      await tx`INSERT INTO contacts (id, org_id, name, email, source)
+               VALUES (${id}, ${body.orgId}, ${body.contact.name}, ${email}, 'inbound')`;
+      contact = { id, name: body.contact.name };
+    } else if (!contact.name && body.contact.name) {
+      await tx`UPDATE contacts SET name = ${body.contact.name} WHERE id = ${contact.id}`;
+    }
+
+    const ticketNo = await nextTicket(tx, body.orgId, prefix);
+    const leadId = ulid();
+    await tx`INSERT INTO leads (id, org_id, ticket_no, contact_id, channel, status, assignee_id, spec)
+             VALUES (${leadId}, ${body.orgId}, ${ticketNo}, ${contact.id}, 'email',
+                     ${body.status}::lead_status, ${body.assigneeId},
+                     ${tx.json({ subject: body.subject })})`;
+
+    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+             VALUES (${ulid()}, ${body.orgId}, ${leadId}, 'system', 'lead_created',
+                     ${tx.json({ channel: 'email', ticket_no: ticketNo, from: email })})`;
+
+    return { id: leadId, ticket_no: ticketNo };
+  });
+
+  return c.json(out);
+});
+
 internal.post('/leads/from-chat', async (c) => {
   const body = await c.req.json<{
     orgId: string; sessionId: string; captured: Record<string, string>;

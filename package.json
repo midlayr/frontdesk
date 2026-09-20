@@ -9,7 +9,7 @@
     "build:widget": "node scripts/build-widget.mjs",
     "build:web": "npm --prefix web run build",
     "predeploy": "npm run build:widget && npm run build:web",
-    "test": "tsx tests/flow-engine.test.ts"
+    "test": "tsx tests/flow-engine.test.ts && tsx tests/email.test.ts"
   },
   "repository": {
     "type": "git",
@@ -25,15 +25,16 @@
   "homepage": "https://github.com/midlayr/frontdesk#readme",
   "dependencies": {
     "hono": "^4.13.8",
+    "postal-mime": "^3.0.0",
     "postgres": "^3.4.9",
     "ulid": "^3.0.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260919.1",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "wrangler": "^4.135.0",
-    "tsx": "^4.23.15"
+    "wrangler": "^4.135.0"
   },
   "allowScripts": {
     "workerd@1.20260918.1": true,

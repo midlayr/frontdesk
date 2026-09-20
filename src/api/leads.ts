@@ -414,6 +414,38 @@ leads.post('/:id/takeover', async (c) => {
  * belonging to someone else simply does not resolve. Range requests are honoured so the
  * browser's audio scrubber works.
  */
+/**
+ * Download an attachment.
+ *
+ * Artwork is the job in a print shop, so a file that arrived by email has to be retrievable,
+ * not merely recorded. The key is re-checked against this tenant's prefix even though it was
+ * read inside the tenant's own context — a bucket has no row-level security, so the prefix
+ * is the only thing standing between one shop's artwork and another's.
+ */
+leads.get('/:id/file/:fileId', async (c) => {
+  const org = c.get('org');
+  const { id, fileId } = c.req.param();
+
+  const [row] = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ r2_key: string | null; filename: string; mime: string }[]>`
+      SELECT r2_key, filename, mime FROM attachments
+       WHERE id = ${fileId} AND lead_id = ${id}`);
+
+  if (!row?.r2_key || !row.r2_key.startsWith(`org/${org.id}/`)) return c.json({ error: 'not found' }, 404);
+  const obj = await c.env.FILES.get(row.r2_key);
+  if (!obj) return c.json({ error: 'file missing' }, 404);
+
+  return new Response(obj.body, {
+    headers: {
+      'content-type': row.mime || 'application/octet-stream',
+      // attachment, not inline: a rep clicking artwork wants the file, and it stops an
+      // HTML or SVG attachment from a stranger rendering on our own origin.
+      'content-disposition': `attachment; filename="${row.filename.replace(/["\\]/g, '')}"`,
+      'cache-control': 'private, max-age=3600',
+    },
+  });
+});
+
 leads.get('/:id/audio/:messageId', async (c) => {
   const org = c.get('org');
   const { id, messageId } = c.req.param();

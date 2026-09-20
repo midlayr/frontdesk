@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, applyBrand, orgSlug, userId, type Lead, type Message, type Org, PIPELINE, STATUS_LABEL, STATUS_DOT, type OrgUser } from './api';
+import { api, applyBrand, orgSlug, userId, type Attachment, type Lead, type Message, type Org, PIPELINE, STATUS_LABEL, STATUS_DOT, type OrgUser } from './api';
 import { FlowBuilder } from './FlowBuilder';
 import { History } from './History';
 import { Settings } from './Settings';
@@ -499,7 +499,7 @@ function EditCell({ leadId, label, value, placeholder, type, onSave }: {
 }
 
 function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPatch, onArchive, onDelete, users }: {
-  d: { lead: Lead; messages: Message[] }; live: boolean; draft: string;
+  d: { lead: Lead; messages: Message[]; attachments?: Attachment[] }; live: boolean; draft: string;
   setDraft: (s: string) => void; send: () => void; sending: boolean;
   takeover: () => void; error: string; onPatch: (body: Record<string, unknown>) => void;
   onArchive: (on: boolean) => void; onDelete: () => void; users: OrgUser[];
@@ -617,6 +617,8 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
           {!d.messages.length && <div className="empty">No messages yet</div>}
         </div>
 
+        <Files leadId={l.id} files={d.attachments ?? []} />
+
         <History leadId={l.id} users={users} />
         {error && <p className="err">{error}</p>}
       </div>
@@ -681,5 +683,33 @@ function Login({ onDone }: { onDone: () => void }) {
         </button>
       </form>
     </div>
+  );
+}
+
+/** Everything that arrived with the job. In a print shop this is usually the job. */
+function Files({ leadId, files }: { leadId: string; files: Attachment[] }) {
+  if (!files.length) return null;
+  const size = (n: number) =>
+    n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`;
+
+  return (
+    <>
+      <div className="section">Files</div>
+      <ul className="files">
+        {files.map((f) => (
+          <li key={f.id}>
+            {f.r2_key ? (
+              <a href={`/api/leads/${leadId}/file/${f.id}?org=${encodeURIComponent(orgSlug)}`}
+                 download={f.filename}>{f.filename}</a>
+            ) : (
+              <span className="files-gone">{f.filename}</span>
+            )}
+            <i>{size(f.bytes)}</i>
+            {/* Recorded with no file: it arrived too large for mail to carry. */}
+            {!f.r2_key && <em>too large to attach — ask for a link</em>}
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

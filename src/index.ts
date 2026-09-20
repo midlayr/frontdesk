@@ -6,6 +6,7 @@ import { connect, withOrg, type Sql } from './db';
 import { resolveOrg } from './org';
 import { twilioSms } from './hooks/twilio-sms';
 import { twilioVoice, twilioRecording } from './hooks/twilio-voice';
+import { handleEmail } from './hooks/email';
 import { transcribe } from './jobs/transcribe';
 import { extractSpecs } from './jobs/extract-specs';
 import { leads } from './api/leads';
@@ -75,6 +76,36 @@ app.get('/widget/chat.js', serveWidget);
 app.post('/hooks/twilio/sms', (c) => twilioSms(c.req.raw, c.env, c.get('sql')));
 app.post('/hooks/twilio/voice', (c) => twilioVoice(c.req.raw, c.env, c.get('sql')));
 app.post('/hooks/twilio/recording', (c) => twilioRecording(c.req.raw, c.env, c.get('sql'), c.executionCtx));
+
+/**
+ * Inbound email over HTTP.
+ *
+ * The same handler Cloudflare Email Routing calls, reachable as a webhook so an inbound
+ * provider can post here instead — and, more usefully day to day, so a raw .eml can be
+ * pushed at it in a test without a domain, an MX record or a mailbox.
+ *
+ * The envelope recipient is a separate field rather than read from the headers, because a
+ * bcc'd address is not in the headers at all.
+ */
+app.post('/hooks/email', async (c) => {
+  if (c.req.header('x-internal-token') !== c.env.SESSION_SECRET) {
+    return c.json({ error: 'operator token required' }, 403);
+  }
+  const to = c.req.query('to') ?? c.req.header('x-envelope-to') ?? '';
+  const from = c.req.query('from') ?? c.req.header('x-envelope-from') ?? '';
+  if (!to) return c.json({ error: 'envelope recipient required (?to=)' }, 400);
+
+  const raw = await c.req.arrayBuffer();
+  try {
+    const out = await handleEmail({ to, from, raw }, c.env, c.get('sql'), c.executionCtx);
+    return c.json(out, out.ok ? 200 : 202);   // 202: understood, deliberately not a ticket
+  } catch (err) {
+    // The caller holds the operator token, and a provider retrying a message forever because
+    // all it ever sees is "Internal Server Error" is worse than telling it what broke.
+    console.error('email hook failed', err);
+    return c.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, 500);
+  }
+});
 
 /**
  * Sign in.
@@ -463,6 +494,27 @@ app.notFound(async (c) => {
 
 export default {
   fetch: app.fetch,
+
+  /**
+   * Cloudflare Email Routing delivers here. `message.to` is the envelope recipient, which is
+   * the whole reason a bcc drop-box can work: that address was stripped from the headers
+   * before the message ever left the sender's client.
+   */
+  async email(message: ForwardableEmailMessage, env: Env, ctx: ExecutionContext): Promise<void> {
+    const sql = connect(env);
+    try {
+      const raw = await new Response(message.raw).arrayBuffer();
+      const out = await handleEmail({ to: message.to, from: message.from, raw }, env, sql, ctx);
+      if (!out.ok) console.warn(`email: ${out.reason}`);
+      else console.log(`email → ${out.ticket} (${out.direction}, ${out.attachments} files)`);
+    } catch (err) {
+      console.error('email: failed', err);
+      // Rejecting tells the sender something went wrong rather than silently dropping a job.
+      message.setReject('Could not process this message');
+    } finally {
+      ctx.waitUntil(sql.end());
+    }
+  },
 
   async queue(batch: MessageBatch<Job>, env: Env): Promise<void> {
     const sql = connect(env);

@@ -65,7 +65,7 @@ export interface Org {
   slug: string;
   name: string;
   brand: Record<string, unknown>;
-  comms: { email_from?: string; sms_number?: string; voice_number?: string; signature?: string };
+  comms: { email_from?: string; email_inbound?: string; sms_number?: string; voice_number?: string; signature?: string };
   widget: Record<string, unknown>;
   features: Record<string, boolean>;
 }

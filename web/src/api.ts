@@ -19,6 +19,10 @@ export interface Message {
   has_audio?: boolean; transcript_status?: 'pending' | 'done' | 'failed' | null;
 }
 
+export interface Attachment {
+  id: string; filename: string; mime: string; bytes: number; r2_key: string | null;
+}
+
 export interface Event {
   id: string; kind: string; actor: string; actor_name: string | null;
   detail: Record<string, unknown> | null; at: string;

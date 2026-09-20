@@ -71,6 +71,36 @@ export async function resolveOrgByPhone(env: Env, sql: Sql, to: string): Promise
 }
 
 /**
+ * destination address → org.
+ *
+ * Driven by the envelope recipient, not the To header. The whole point of a BCC drop-box is
+ * that the address is invisible in the message: BCC recipients are stripped before delivery
+ * and survive only in the SMTP envelope, so a tenant looked up from To/Cc would be found for
+ * a forward and missed for every BCC.
+ *
+ * Three ways to match, so a shop can hand out something readable and still tag threads:
+ *   1. the exact address on the org  (dumont@in.midlayr.app)
+ *   2. the same address plus a tag   (dumont+banners@in.midlayr.app)
+ *   3. the local part as the slug    (anything catch-all routed for that tenant)
+ */
+export async function resolveOrgByEmail(env: Env, sql: Sql, to: string): Promise<Org | null> {
+  const address = to.trim().toLowerCase();
+  if (!address.includes('@')) return null;
+  const [local, domain] = address.split('@');
+  const base = `${local.split('+')[0]}@${domain}`;
+
+  return cached(env, `mail:${base}`, async () => {
+    const rows = await sql.unsafe<Org[]>(
+      `SELECT ${SELECT_ORG} FROM orgs
+        WHERE status = 'active'
+          AND (lower(comms->>'email_inbound') = $1 OR slug = $2)`,
+      [base, local.split('+')[0]],
+    );
+    return rows[0] ?? null;
+  });
+}
+
+/**
  * Drop every cached copy of an org after its row changes.
  *
  * resolveOrg caches under one key per hostname, plus <slug>.PLATFORM_DOMAIN, and
@@ -81,6 +111,7 @@ export async function invalidateOrg(env: Env, sql: Sql, org: Org): Promise<void>
   const keys = [
     `org:${org.slug}.${env.PLATFORM_DOMAIN}`.toLowerCase(),
     `org:sms:${(org.comms.sms_number ?? '').trim()}`,
+    `org:mail:${String(org.comms.email_inbound ?? '').trim().toLowerCase()}`,
   ];
 
   const hosts = await sql.unsafe<{ hostname: string }[]>(

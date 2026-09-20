@@ -440,3 +440,13 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 
 .team-err { color: var(--danger); font-size: var(--text-sm); }
 .team-ok { color: var(--ok); font-size: var(--text-sm); }
+
+/* ── attachments ──────────────────────────────────────────────────────────── */
+.files { list-style: none; margin: 0 0 4px; padding: 0; }
+.files li { display: flex; align-items: baseline; gap: 10px; padding: 7px 0;
+  border-bottom: 1px solid var(--line); font-size: var(--text-sm); }
+.files li:last-child { border-bottom: 0; }
+.files a { color: var(--accent); }
+.files i { font-style: normal; font: 400 10.5px var(--font-mono); color: var(--ink-3); }
+.files em { font-style: normal; font-size: var(--text-xs); color: var(--warn); }
+.files-gone { color: var(--ink-3); text-decoration: line-through; }

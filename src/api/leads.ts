@@ -606,17 +606,21 @@ async function replyByEmail(
   const outgoing = signature ? `${body}\n\n${signature}` : body;
 
   /**
-   * From has to be an address on a domain Mailgun signs for us. The shop's own public
-   * address is not: sending as quotes@dumontprinting.com without DKIM on their domain is
-   * unaligned mail, which lands in spam or is rejected outright. So we send under our own
-   * domain with their name on it, and only use their address once they have verified it.
+   * From is derived from the platform's own verified sending domain, not read from
+   * comms.email_from. That field holds the shop's public address — quotes@dumontprinting.com
+   * — and sending as it without DKIM on their domain is unaligned mail, which lands in spam
+   * or is rejected. Deriving it means the From address cannot be wrong because someone typed
+   * the shop's real address into a settings field, which is the obvious thing to do.
+   * comms.email_sender overrides it once a tenant has verified a domain of their own.
    *
    * Reply-To points at the inbound box rather than at From, so a customer's reply comes
    * back to us and threads onto this ticket instead of vanishing into a mailbox nobody
    * watches.
    */
-  const sender = org.comms.email_from ?? org.comms.email_inbound;
-  if (!sender) return c.json({ error: 'tenant has no comms.email_from configured' }, 500);
+  const sender = org.comms.email_sender || `${org.slug}@${c.env.MAILGUN_DOMAIN}`;
+  if (!c.env.MAILGUN_DOMAIN && !org.comms.email_sender) {
+    return c.json({ error: 'no verified sending domain configured' }, 500);
+  }
   const from = `${org.name} <${sender}>`;
   const replyTo = org.comms.email_inbound ?? sender;
 

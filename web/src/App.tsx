@@ -107,7 +107,7 @@ export function App() {
   useEffect(() => { viewRef.current = view; }, [view]);
   const [query, setQuery] = useState('');
   const [selId, setSelId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<{ lead: Lead; messages: Message[] } | null>(null);
+  const [detail, setDetail] = useState<{ lead: Lead; messages: Message[]; attachments: Attachment[] } | null>(null);
   const [live, setLive] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -188,7 +188,7 @@ export function App() {
     chatWs.current?.close();
     chatWs.current = null;
     const d = await api.lead(id);
-    setDetail({ lead: d.lead, messages: d.messages });
+    setDetail({ lead: d.lead, messages: d.messages, attachments: d.attachments ?? [] });
 
     if (d.lead.channel === 'chat' && d.lead.chat_sid) {
       const ws = await api.socket(`/api/leads/${id}/chat`);
@@ -354,7 +354,14 @@ export function App() {
             <button key={v} aria-current={view === v}
                     onClick={() => { viewRef.current = v; setView(v); setSelId(null); setDetail(null); refresh(); }}>
               <span>{v}</span>
-              <span>{v === 'All' ? leads.length : leads.filter((l) => matches(l, v)).length}</span>
+              {/* Archived rows are filtered out server-side, so the loaded list contains none
+                  of them and counting it here reported the whole queue as archived. The
+                  count is only knowable while that view is the one being shown. */}
+              <span>
+                {v === 'All' ? leads.length
+                  : v === 'Archived' ? (view === 'Archived' ? leads.length : '')
+                  : leads.filter((l) => matches(l, v)).length}
+              </span>
             </button>
           ))}
           <hr />

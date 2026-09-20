@@ -135,7 +135,8 @@ export const api = {
     if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
     return r.json();
   },
-  lead: (id: string) => get<{ lead: Lead; messages: Message[]; activity: unknown[] }>(`/api/leads/${id}`),
+  lead: (id: string) =>
+    get<{ lead: Lead; messages: Message[]; attachments: Attachment[]; activity: unknown[] }>(`/api/leads/${id}`),
 
   reply: async (id: string, body: string) => {
     const r = await fetch(url(`/api/leads/${id}/reply`), {

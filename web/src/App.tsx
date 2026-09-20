@@ -90,6 +90,7 @@ export function App() {
   const [needToken, setNeedToken] = useState(false);
   const [error, setError] = useState('');
   const [users, setUsers] = useState<OrgUser[]>([]);
+  const [me, setMe] = useState<{ id: string; name: string; email: string; role: string } | null>(null);
   const [streamUp, setStreamUp] = useState(false);
   const [ackedAt, setAckedAt] = useState(() => Date.now());
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -277,6 +278,7 @@ export function App() {
 
   // The assignee list changes far less often than the queue, so it is fetched once.
   useEffect(() => { api.users().then(setUsers).catch(() => {}); }, []);
+  useEffect(() => { api.me().then((r) => setMe(r.user)).catch(() => {}); }, []);
 
   async function archiveLead(on: boolean) {
     if (!detail) return;
@@ -341,7 +343,7 @@ export function App() {
       </header>
 
       {onSettings ? (
-        <Settings />
+        <Settings me={me} tab={path.startsWith('/settings/people') ? 'people' : 'messaging'} go={go} />
       ) : flowSlug ? (
         <FlowBuilder slug={flowSlug} accent={brand.color || '#0B7FA8'} />
       ) : (

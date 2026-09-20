@@ -26,7 +26,15 @@ export interface Event {
 
 export interface History { activity: Event[]; created_at: string; status: string }
 
-export interface OrgUser { id: string; name: string; email: string; role: string }
+export interface OrgUser {
+  id: string; name: string; email: string; role: 'sales' | 'admin';
+  disabled_at?: string | null; last_seen_at?: string | null; password_set_at?: string | null;
+}
+
+export const ROLES: { id: 'sales' | 'admin'; label: string; can: string }[] = [
+  { id: 'sales', label: 'Sales', can: 'Works the queue: reply, edit a spec, move and assign tickets.' },
+  { id: 'admin', label: 'Admin', can: 'Everything sales can do, plus the chat flow, messaging and people.' },
+];
 
 /**
  * The pipeline, in the order a job moves through it.
@@ -137,6 +145,36 @@ export const api = {
   users: () => get<{ users: OrgUser[] }>('/api/users').then((r) => r.users),
 
   activity: (id: string) => get<History>(`/api/leads/${id}/activity`),
+
+  addUser: async (body: { name: string; email: string; role: string }) => {
+    const r = await fetch(url('/api/users'), {
+      method: 'POST', headers: { ...headers(), 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j as { error?: string }).error ?? `${r.status}`);
+    return j as { user: OrgUser };
+  },
+
+  updateUser: async (id: string, body: { name?: string; role?: string; disabled?: boolean }) => {
+    const r = await fetch(url(`/api/users/${id}`), {
+      method: 'PATCH', headers: { ...headers(), 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j as { error?: string }).error ?? `${r.status}`);
+    return j as { user: OrgUser };
+  },
+
+  setPassword: async (id: string, password: string) => {
+    const r = await fetch(url(`/api/users/${id}/password`), {
+      method: 'POST', headers: { ...headers(), 'content-type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j as { error?: string }).error ?? `${r.status}`);
+    return j;
+  },
 
   patch: async (id: string, body: Record<string, unknown>) => {
     const r = await fetch(url(`/api/leads/${id}`), {

@@ -1,3 +1,4 @@
+import { Team } from './Team';
 import { useEffect, useState } from 'react';
 import { orgSlug } from './api';
 
@@ -19,7 +20,38 @@ function headers(): Record<string, string> {
 const url = (p: string) => `${p}${p.includes('?') ? '&' : '?'}org=${encodeURIComponent(orgSlug)}`;
 
 /** Everything the system says to a customer, in one place. */
-export function Settings() {
+export function Settings({ me, tab, go }: {
+  me: { id: string; role: string } | null;
+  tab: 'messaging' | 'people';
+  go: (to: string) => void;
+}) {
+  if (tab === 'people') {
+    return (
+      <div className="fb">
+        <header className="fb-head">
+          <div>
+            <span className="label">Settings</span>
+            <h2 className="fb-name">People</h2>
+          </div>
+          <Tabs tab={tab} go={go} />
+        </header>
+        <div className="set-scroll"><Team me={me} /></div>
+      </div>
+    );
+  }
+  return <Messaging tab={tab} go={go} />;
+}
+
+function Tabs({ tab, go }: { tab: string; go: (to: string) => void }) {
+  return (
+    <span className="fb-view" style={{ marginLeft: 'auto' }}>
+      <button data-on={tab === 'messaging'} onClick={() => go('/settings/messaging')}>Messaging</button>
+      <button data-on={tab === 'people'} onClick={() => go('/settings/people')}>People</button>
+    </span>
+  );
+}
+
+function Messaging({ tab, go }: { tab: string; go: (to: string) => void }) {
   const [m, setM] = useState<Messaging | null>(null);
   const [base, setBase] = useState<Messaging | null>(null);
   const [fallback, setFallback] = useState<Messaging | null>(null);
@@ -91,6 +123,7 @@ export function Settings() {
           <span className="label">Settings</span>
           <h2 className="fb-name">Messaging</h2>
         </div>
+        <Tabs tab={tab} go={go} />
         <span className="fb-save">{state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : ''}</span>
         <button className={`fb-publish${dirty ? ' dirty' : ''}`} onClick={save} disabled={!dirty || state === 'saving'}>
           {dirty ? 'Save changes' : 'Saved'}

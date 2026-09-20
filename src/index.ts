@@ -1,5 +1,6 @@
 // Midlayr Front Desk · Worker entry
 import { Hono, type Context } from 'hono';
+import { ulid } from 'ulid';
 import type { Env, Job, Org } from './env';
 import { connect, withOrg, type Sql } from './db';
 import { resolveOrg } from './org';
@@ -24,7 +25,7 @@ export { ChatSession } from './do/chat-session';
 export { InboxRoom } from './do/inbox-room';
 export type { Env, Job };
 
-type Vars = { org: Org; sql: Sql; userId: string };
+type Vars = { org: Org; sql: Sql; userId: string; role: 'sales' | 'admin' };
 const app = new Hono<{ Bindings: Env; Variables: Vars }>();
 
 function isDevHost(hostname: string): boolean {
@@ -96,7 +97,8 @@ app.post('/api/session', async (c) => {
   // org also means a valid password cannot sign you into a tenant you do not belong to.
   const [user] = await withOrg(sql, org.id, (tx) =>
     tx<{ id: string; password_hash: string | null }[]>`
-      SELECT id, password_hash FROM users WHERE email = ${email} AND org_id = ${org.id}`);
+      SELECT id, password_hash FROM users
+       WHERE email = ${email} AND org_id = ${org.id} AND disabled_at IS NULL`);
 
   // Same work and the same answer whether or not the account exists, so this cannot be used
   // to enumerate who has a login.
@@ -152,7 +154,7 @@ async function authenticate(c: Context<{ Bindings: Env; Variables: Vars }>): Pro
     // hostname even though both resolve through the same Worker.
     if (session && session.orgId === org.id) {
       c.set('userId', session.userId);
-      return null;
+      return roleOf(c, session.userId);
     }
     if (session) return c.json({ error: 'session is for another tenant' }, 403);
   }
@@ -171,7 +173,7 @@ async function authenticate(c: Context<{ Bindings: Env; Variables: Vars }>): Pro
         tx<{ id: string }[]>`SELECT id FROM users WHERE id = ${userId}`);
       if (!user) return c.json({ error: 'unknown user for tenant' }, 401);
       c.set('userId', user.id);
-      return null;
+      return roleOf(c, user.id);
     }
   }
 
@@ -196,7 +198,31 @@ async function authenticate(c: Context<{ Bindings: Env; Variables: Vars }>): Pro
   if (!user) return c.json({ error: 'unknown user for tenant' }, 401);
 
   c.set('userId', user.id);
+  return roleOf(c, user.id);
+}
+
+/**
+ * Load the caller's role onto the request.
+ *
+ * Roles were stored and displayed but checked nowhere, which made them decorative: a sales
+ * user could rewrite the messaging templates or publish a flow. Reading it once here means
+ * every guarded route asks the same question of the same value.
+ */
+async function roleOf(c: Context<{ Bindings: Env; Variables: Vars }>, userId: string): Promise<Response | null> {
+  const [row] = await withOrg(c.get('sql'), c.get('org').id, (tx) =>
+    tx<{ role: 'sales' | 'admin'; disabled_at: string | null }[]>`
+      SELECT role, disabled_at FROM users WHERE id = ${userId}`);
+  if (!row) return c.json({ error: 'unknown user for tenant' }, 401);
+  // A session outlives the account it belongs to, so this is where a disabled colleague is
+  // actually stopped — not only at the login form.
+  if (row.disabled_at) return c.json({ error: 'this account has been disabled' }, 403);
+  c.set('role', row.role);
   return null;
+}
+
+/** Guard for anything that changes how the whole tenant works. */
+function adminOnly(c: Context<{ Bindings: Env; Variables: Vars }>): Response | null {
+  return c.get('role') === 'admin' ? null : c.json({ error: 'admins only' }, 403);
 }
 
 app.use('/api/*', async (c, next) => {
@@ -219,8 +245,11 @@ app.get('/api/me', async (c) => {
  * A self-service change belongs behind a session and the current password.
  */
 app.post('/api/users/:id/password', async (c) => {
-  if (c.req.header('x-admin-token') !== c.env.SESSION_SECRET) {
-    return c.json({ error: 'operator token required' }, 403);
+  // Two ways in: the platform operator token, which bootstraps the very first login before
+  // any admin exists, or an admin of this tenant setting one for a colleague they added.
+  const operator = c.env.SESSION_SECRET && c.req.header('x-admin-token') === c.env.SESSION_SECRET;
+  if (!operator && c.get('role') !== 'admin') {
+    return c.json({ error: 'admins only' }, 403);
   }
   const body = await c.req.json().catch(() => null) as { password?: string } | null;
   if (!body?.password || body.password.length < 12) {
@@ -241,13 +270,105 @@ app.post('/api/users/:id/password', async (c) => {
   return c.json({ ok: true });
 });
 
-/** The org's reps, for the assignee picker. Scoped by RLS, so it cannot list another tenant. */
+/**
+ * The org's people. Everyone may read the list — the assignee picker needs it — but only an
+ * admin may change it. Disabled accounts are included so an admin can see and re-enable
+ * them; the assignee picker filters them out on the client.
+ */
 app.get('/api/users', async (c) => {
   const org = c.get('org');
   const users = await withOrg(c.get('sql'), org.id, (tx) =>
-    tx<{ id: string; name: string; email: string; role: string }[]>`
-      SELECT id, name, email, role FROM users WHERE org_id = ${org.id} ORDER BY name`);
+    tx<{ id: string; name: string; email: string; role: string; disabled_at: string | null;
+         last_seen_at: string | null; password_set_at: string | null }[]>`
+      SELECT id, name, email, role, disabled_at, last_seen_at, password_set_at
+        FROM users WHERE org_id = ${org.id}
+       ORDER BY disabled_at NULLS FIRST, name`);
   return c.json({ users });
+});
+
+/**
+ * Add a colleague.
+ *
+ * Created without a password: an account nobody can sign into yet is the safe default, and
+ * the admin sets one through the same endpoint used to reset it. Email is unique across the
+ * whole platform, not per tenant, so a clash is reported as such rather than as a 500.
+ */
+app.post('/api/users', async (c) => {
+  const denied = adminOnly(c); if (denied) return denied;
+  const org = c.get('org');
+
+  const body = await c.req.json().catch(() => null) as
+    { name?: string; email?: string; role?: string } | null;
+  const name = body?.name?.trim();
+  const email = body?.email?.trim().toLowerCase();
+  const role = body?.role;
+  if (!name || !email) return c.json({ error: 'name and email are required' }, 400);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return c.json({ error: 'that is not an email address' }, 400);
+  if (role !== 'sales' && role !== 'admin') return c.json({ error: 'role must be sales or admin' }, 400);
+
+  // ON CONFLICT rather than a prior SELECT or a caught exception. users.email is unique
+  // across the whole platform, so a SELECT inside this tenant's RLS context cannot see a
+  // collision with another tenant and would report "available" right up to the insert
+  // failing. The unique index is not RLS-filtered, so letting it decide is both correct and
+  // free of any dependency on how a driver shapes its errors. It also declines to say which
+  // tenant holds the address.
+  const id = ulid();
+  const [created] = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ id: string }[]>`
+      INSERT INTO users (id, org_id, email, name, role, invited_by)
+      VALUES (${id}, ${org.id}, ${email}, ${name}, ${role}::user_role, ${c.get('userId')})
+      ON CONFLICT (email) DO NOTHING
+      RETURNING id`);
+  if (!created) return c.json({ error: 'that email address is already in use' }, 409);
+
+  return c.json({ ok: true, user: { id, name, email, role, disabled_at: null } }, 201);
+});
+
+/** Change a colleague's name, role, or whether they can sign in. */
+app.patch('/api/users/:id', async (c) => {
+  const denied = adminOnly(c); if (denied) return denied;
+  const org = c.get('org');
+  const id = c.req.param('id');
+  const me = c.get('userId');
+
+  const body = await c.req.json().catch(() => null) as
+    { name?: string; role?: string; disabled?: boolean } | null;
+  if (!body) return c.json({ error: 'nothing to change' }, 400);
+  if (body.role && body.role !== 'sales' && body.role !== 'admin') {
+    return c.json({ error: 'role must be sales or admin' }, 400);
+  }
+
+  // Locking yourself out, or removing the last admin, leaves a tenant nobody can administer
+  // and no self-service way back in. Cheaper to refuse than to recover from.
+  if (id === me && (body.disabled === true || body.role === 'sales')) {
+    return c.json({ error: 'you cannot remove your own admin access' }, 400);
+  }
+  if (body.role === 'sales' || body.disabled === true) {
+    const [{ n }] = await withOrg(c.get('sql'), org.id, (tx) =>
+      tx<{ n: number }[]>`SELECT count(*)::int AS n FROM users
+                           WHERE org_id = ${org.id} AND role = 'admin' AND disabled_at IS NULL
+                             AND id <> ${id}`);
+    if (!n) return c.json({ error: 'that is the last admin — promote someone else first' }, 400);
+  }
+
+  const updated = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const patch: Record<string, unknown> = {};
+    if (body.name !== undefined) patch.name = body.name.trim();
+    if (body.role !== undefined) patch.role = body.role;
+    if (body.disabled !== undefined) patch.disabled_at = body.disabled ? new Date().toISOString() : null;
+    if (!Object.keys(patch).length) return null;
+
+    const [row] = await tx<{ id: string; name: string; email: string; role: string; disabled_at: string | null }[]>`
+      UPDATE users SET ${tx(patch)} WHERE id = ${id} AND org_id = ${org.id}
+      RETURNING id, name, email, role, disabled_at`;
+    return row ?? null;
+  });
+  if (!updated) return c.json({ error: 'not found' }, 404);
+
+  // A disabled account keeps its rows but must not keep its way in.
+  if (body.disabled === true) await c.get('sql')`DELETE FROM sessions WHERE user_id = ${id}`;
+
+  return c.json({ ok: true, user: updated });
 });
 
 app.get('/api/org', (c) => {
@@ -273,6 +394,25 @@ app.post('/api/ws-ticket', async (c) => {
 });
 
 app.route('/api/leads', leads);
+
+/**
+ * Who may change what.
+ *
+ * Sales works the queue: read, reply, edit a spec, move a ticket, assign it. Anything that
+ * changes how the tenant behaves for everyone — the bot's script, the voice and SMS copy —
+ * is an admin decision. Reading those is open, so a sales user can see the flow their
+ * conversations are following and simulate it, but not publish a change to it.
+ */
+app.use('/api/flows/*', async (c, next) => {
+  const write = c.req.method !== 'GET' && !c.req.path.endsWith('/simulate');
+  if (write) { const denied = adminOnly(c); if (denied) return denied; }
+  await next();
+});
+app.use('/api/settings/*', async (c, next) => {
+  if (c.req.method !== 'GET') { const denied = adminOnly(c); if (denied) return denied; }
+  await next();
+});
+
 app.route('/api/flows', flows);
 app.route('/api/settings', settings);
 

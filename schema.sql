@@ -4,7 +4,7 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS citext;   -- users.email, contacts.email, platform_users.email
 
-CREATE TYPE user_role     AS ENUM ('rep','admin');
+CREATE TYPE user_role     AS ENUM ('sales','admin');
 CREATE TYPE channel       AS ENUM ('voice','sms','email','form','chat');
 CREATE TYPE lead_status   AS ENUM ('live','new','needs_info','replied','quoted','won','lost','closed','spam');
 CREATE TYPE msg_direction AS ENUM ('in','out');
@@ -43,8 +43,12 @@ CREATE TABLE platform_users (
 CREATE TABLE users (
   id text PRIMARY KEY, org_id text NOT NULL REFERENCES orgs(id),
   email citext NOT NULL UNIQUE, name text NOT NULL, role user_role NOT NULL,
+  -- Never deleted: seven tables reference a user, so removing one would take the ticket
+  -- history with it. Disabling ends the sessions and blocks the login instead.
+  disabled_at timestamptz, invited_by text REFERENCES users(id),
   last_seen_at timestamptz, created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX users_active ON users (org_id) WHERE disabled_at IS NULL;
 
 -- ── people & companies (Pathfinder / enrichment) ────────
 CREATE TABLE companies (

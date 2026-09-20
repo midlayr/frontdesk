@@ -145,6 +145,12 @@ export function FlowMap({ steps, accent, onPick, loops }: {
                       ? words.map((w) => <i key={w} className="fm-word">{w}</i>)
                       : <i className="fm-word fm-none">no keywords — never fires</i>}
                   </span>
+                  {/* Shown only when the column is too narrow for the rail, where the
+                      separate LIVE REP node would land eight questions away from its
+                      cause and the rule would read as the step before question 01. */}
+                  <span className="fm-rule-outcome">
+                    → a rep takes over: “{rule.handoff || '—'}”
+                  </span>
                 </button>
               )}
             </div>

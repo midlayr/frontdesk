@@ -2,6 +2,7 @@ import { ulid } from 'ulid';
 import type { Env, Org } from '../env';
 import { withOrg, type Sql, type Tx } from '../db';
 import { resolveOrgByPhone, ticketPrefix } from '../org';
+import { findThreadableLead } from '../lib/threading';
 import { verifySignature, emptyTwiml } from '../lib/twilio';
 
 /** Next ticket number for the tenant. The UPDATE ... RETURNING locks the counter row. */
@@ -62,16 +63,12 @@ export async function twilioSms(req: Request, env: Env, sql: Sql): Promise<Respo
 
     const contactId = await findOrCreateContact(tx, org.id, from);
 
-    // Keep a running conversation on one ticket instead of opening a new one per text.
-    const [open] = await tx<{ id: string }[]>`
-      SELECT id FROM leads
-       WHERE org_id = ${org.id} AND contact_id = ${contactId}
-         AND status NOT IN ('won','lost','closed','spam')
-       ORDER BY created_at DESC LIMIT 1`;
+    // Same conversation only while it is still warm — see lib/threading.
+    const openId = await findThreadableLead(tx, org.id, contactId);
 
     let id: string;
-    if (open) {
-      id = open.id;
+    if (openId) {
+      id = openId;
     } else {
       id = ulid();
       const ticketNo = await nextTicket(tx, org);

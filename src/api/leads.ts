@@ -176,6 +176,17 @@ leads.patch('/:id', async (c) => {
     if (Object.keys(patch).length) {
       await tx`UPDATE leads SET ${tx(patch)} WHERE id = ${id}`;
 
+      // Remember which fields a human set. extract_specs will not touch these again, so a
+      // later message cannot quietly undo a correction the rep made while on the phone.
+      const locked = SPEC_FIELDS.filter((f) => f in p);
+      if (locked.length) {
+        await tx`UPDATE leads
+                    SET spec = jsonb_set(spec, '{locked_fields}',
+                          COALESCE(spec->'locked_fields', '[]'::jsonb) ||
+                          ${tx.json(locked)}::jsonb)
+                  WHERE id = ${id}`;
+      }
+
       // Keep the dashed "missing" chips honest after a manual edit.
       await tx`UPDATE leads SET missing_fields = ARRAY(
                  SELECT f FROM unnest(ARRAY['product','qty','size','stock','color','finish']) AS f

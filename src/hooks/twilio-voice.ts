@@ -2,6 +2,7 @@ import { ulid } from 'ulid';
 import type { Env, Org } from '../env';
 import { withOrg, type Sql, type Tx } from '../db';
 import { resolveOrgByPhone, ticketPrefix } from '../org';
+import { findThreadableLead } from '../lib/threading';
 import { verifySignature } from '../lib/twilio';
 
 const xml = (body: string) =>
@@ -116,15 +117,12 @@ export async function twilioRecording(req: Request, env: Env, sql: Sql, ctx: { w
     }
 
     const contactId = await findOrCreateContact(tx, org.id, from);
-    const [open] = await tx<{ id: string }[]>`
-      SELECT id FROM leads
-       WHERE org_id = ${org.id} AND contact_id = ${contactId}
-         AND status NOT IN ('won','lost','closed','spam')
-       ORDER BY created_at DESC LIMIT 1`;
+    // Same conversation only while it is still warm — see lib/threading.
+    const openId = await findThreadableLead(tx, org.id, contactId);
 
     let id: string;
-    if (open) {
-      id = open.id;
+    if (openId) {
+      id = openId;
     } else {
       id = ulid();
       const ticketNo = await nextTicket(tx, org);

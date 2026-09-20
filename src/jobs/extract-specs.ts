@@ -121,12 +121,19 @@ async function extract(env: Env, transcript: string): Promise<Spec | null> {
  * is still missing so the queue can show "needs info" and the rep knows what to ask.
  */
 export async function extractSpecs(env: Env, sql: Sql, orgId: string, leadId: string): Promise<void> {
-  const transcript = await withOrg(sql, orgId, async (tx) => {
+  const { transcript, locked } = await withOrg(sql, orgId, async (tx) => {
     const rows = await tx<{ body: string | null }[]>`
       SELECT body FROM messages
        WHERE lead_id = ${leadId} AND direction = 'in' AND body IS NOT NULL
        ORDER BY sent_at`;
-    return rows.map((r) => r.body).filter(Boolean).join('\n');
+    const [lead] = await tx<{ locked: string[] | null }[]>`
+      SELECT ARRAY(SELECT jsonb_array_elements_text(COALESCE(spec->'locked_fields','[]'::jsonb)))
+             AS locked
+        FROM leads WHERE id = ${leadId}`;
+    return {
+      transcript: rows.map((r) => r.body).filter(Boolean).join('\n'),
+      locked: new Set(lead?.locked ?? []),
+    };
   });
 
   if (!transcript.trim()) return;
@@ -139,16 +146,22 @@ export async function extractSpecs(env: Env, sql: Sql, orgId: string, leadId: st
 
   const missing = SPECIFIED.filter((f) => spec[f] === null || spec[f] === undefined);
 
+
+  // The model may revise its own earlier reading — "actually make that 1000" has to land —
+  // but a field a rep edited is off limits. COALESCE alone could only ever fill blanks,
+  // which meant a correction in a follow-up message was silently ignored.
+  const val = <T,>(field: keyof Spec, v: T): T | null => (locked.has(field) ? null : v);
+
   await withOrg(sql, orgId, async (tx) => {
     await tx`
       UPDATE leads SET
-        product        = COALESCE(${spec.product}, product),
-        qty            = COALESCE(${spec.qty}, qty),
-        size           = COALESCE(${spec.size}, size),
-        stock          = COALESCE(${spec.stock}, stock),
-        color          = COALESCE(${spec.color}, color),
-        finish         = COALESCE(${spec.finish}, finish),
-        rush           = COALESCE(${spec.rush}, rush),
+        product        = COALESCE(${val('product', spec.product)}, product),
+        qty            = COALESCE(${val('qty', spec.qty)}, qty),
+        size           = COALESCE(${val('size', spec.size)}, size),
+        stock          = COALESCE(${val('stock', spec.stock)}, stock),
+        color          = COALESCE(${val('color', spec.color)}, color),
+        finish         = COALESCE(${val('finish', spec.finish)}, finish),
+        rush           = COALESCE(${val('rush', spec.rush)}, rush),
         spec           = spec || ${tx.json(spec.notes ? { notes: spec.notes } : {})},
         confidence     = confidence || ${tx.json(spec.confidence)},
         -- passed as jsonb and rebuilt server-side: with fetch_types:false postgres.js

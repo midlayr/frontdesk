@@ -1,10 +1,11 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { ulid } from 'ulid';
 import { z } from 'zod';
 import type { Env, Org } from '../env';
 import { withOrg, type Sql } from '../db';
 import { sendSms } from '../lib/twilio';
 import { messagingFor, render } from '../lib/messaging';
+import { sendEmail } from '../lib/mailgun';
 
 type Vars = { org: Org; sql: Sql; userId: string };
 
@@ -509,8 +510,10 @@ leads.post('/:id/reply', async (c) => {
 
   if (!target) return c.json({ error: 'not found' }, 404);
 
+  if (target.channel === 'email') return replyByEmail(c, org, id, body, target.email);
+
   if (target.channel !== 'sms') {
-    // voice/email/chat replies land here once those channels ship (GETTING-STARTED §5).
+    // voice and chat replies land here once those channels ship (GETTING-STARTED §5).
     return c.json({ error: `reply on ${target.channel} not implemented yet` }, 501);
   }
   if (!target.phone) return c.json({ error: 'contact has no phone' }, 422);
@@ -564,3 +567,86 @@ leads.post('/:id/reply', async (c) => {
   // reporting otherwise would have the caller update its copy to something untrue.
   return c.json({ ok: true, provider_id: sent.sid, status: after });
 });
+
+/**
+ * Reply to an email ticket.
+ *
+ * Threading is the whole job here. The customer's client nests our reply under theirs only
+ * if In-Reply-To names the message we are answering, and their reply comes back to this
+ * ticket only because we store the Message-ID Mailgun gives us — which the inbound side
+ * matches on before it falls back to a subject tag or a time window.
+ */
+async function replyByEmail(
+  c: Context<{ Bindings: Env; Variables: Vars }>,
+  org: Org, id: string, body: string, to: string | null,
+): Promise<Response> {
+  if (!to) return c.json({ error: 'contact has no email address' }, 422);
+
+  const sql = c.get('sql');
+  const userId = c.get('userId');
+
+  const thread = await withOrg(sql, org.id, async (tx) => {
+    const [lead] = await tx<{ ticket_no: string; subject: string | null }[]>`
+      SELECT ticket_no, spec->>'subject' AS subject FROM leads WHERE id = ${id}`;
+    // The last thing they sent us is what we are replying to.
+    const [last] = await tx<{ provider_id: string | null }[]>`
+      SELECT provider_id FROM messages
+       WHERE lead_id = ${id} AND channel = 'email' AND direction = 'in' AND provider_id IS NOT NULL
+       ORDER BY sent_at DESC LIMIT 1`;
+    const prior = await tx<{ provider_id: string }[]>`
+      SELECT provider_id FROM messages
+       WHERE lead_id = ${id} AND channel = 'email' AND provider_id IS NOT NULL
+       ORDER BY sent_at`;
+    return { lead, inReplyTo: last?.provider_id ?? null, references: prior.map((p) => p.provider_id) };
+  });
+  if (!thread.lead) return c.json({ error: 'not found' }, 404);
+
+  const { sms } = messagingFor(org);
+  const signature = render(sms.signature ?? '', { org: org.name }).trim();
+  const outgoing = signature ? `${body}\n\n${signature}` : body;
+
+  const from = org.comms.email_from
+    ? `${org.name} <${org.comms.email_from}>`
+    : `${org.name} <${org.comms.email_inbound ?? ''}>`;
+  if (!org.comms.email_from && !org.comms.email_inbound) {
+    return c.json({ error: 'tenant has no comms.email_from configured' }, 500);
+  }
+
+  // The ticket number rides in the subject as the fallback for a client that drops
+  // In-Reply-To, which webmail forwarding does more often than you would hope.
+  const subject = `Re: [${thread.lead.ticket_no}] ${thread.lead.subject ?? 'Your enquiry'}`;
+
+  let sent;
+  try {
+    sent = await sendEmail(c.env, {
+      from, to, subject, text: outgoing,
+      inReplyTo: thread.inReplyTo, references: thread.references,
+    });
+  } catch (err) {
+    console.error('email reply failed', err);
+    return c.json({ error: String(err instanceof Error ? err.message : err) }, 502);
+  }
+
+  const after = await withOrg(sql, org.id, async (tx) => {
+    const [was] = await tx<{ status: string }[]>`SELECT status FROM leads WHERE id = ${id}`;
+    await tx`INSERT INTO messages (id, lead_id, channel, direction, author, body, provider_id)
+             VALUES (${ulid()}, ${id}, 'email', 'out', ${userId}, ${outgoing}, ${sent.id})`;
+    await tx`UPDATE leads
+                SET status = CASE WHEN status IN ('new','needs_info','replied')
+                                  THEN 'replied'::lead_status ELSE status END,
+                    first_reply_at = COALESCE(first_reply_at, now())
+              WHERE id = ${id}`;
+    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+             VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'replied',
+                     ${tx.json({ channel: 'email', provider_id: sent.id })})`;
+    const [now] = await tx<{ status: string }[]>`SELECT status FROM leads WHERE id = ${id}`;
+    if (was && now && was.status !== now.status) {
+      await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+               VALUES (${ulid()}, ${org.id}, ${id}, ${userId}, 'stage',
+                       ${tx.json({ from: was.status, to: now.status, auto: true })})`;
+    }
+    return now?.status ?? null;
+  });
+
+  return c.json({ ok: true, provider_id: sent.id, status: after });
+}

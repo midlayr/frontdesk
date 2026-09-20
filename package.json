@@ -9,7 +9,7 @@
     "build:widget": "node scripts/build-widget.mjs",
     "build:web": "npm --prefix web run build",
     "predeploy": "npm run build:widget && npm run build:web",
-    "test": "tsx tests/flow-engine.test.ts && tsx tests/email.test.ts"
+    "test": "tsx tests/flow-engine.test.ts && tsx tests/email.test.ts && tsx tests/mailgun.test.ts"
   },
   "repository": {
     "type": "git",

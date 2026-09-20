@@ -7,6 +7,7 @@ import { resolveOrg } from './org';
 import { twilioSms } from './hooks/twilio-sms';
 import { twilioVoice, twilioRecording } from './hooks/twilio-voice';
 import { handleEmail } from './hooks/email';
+import { mailgunInbound } from './hooks/mailgun';
 import { transcribe } from './jobs/transcribe';
 import { extractSpecs } from './jobs/extract-specs';
 import { leads } from './api/leads';
@@ -76,6 +77,17 @@ app.get('/widget/chat.js', serveWidget);
 app.post('/hooks/twilio/sms', (c) => twilioSms(c.req.raw, c.env, c.get('sql')));
 app.post('/hooks/twilio/voice', (c) => twilioVoice(c.req.raw, c.env, c.get('sql')));
 app.post('/hooks/twilio/recording', (c) => twilioRecording(c.req.raw, c.env, c.get('sql'), c.executionCtx));
+
+/**
+ * Inbound email from Mailgun.
+ *
+ * Authenticated by Mailgun's own signature rather than the operator token, since the caller
+ * is Mailgun and cannot hold ours.
+ */
+app.post('/hooks/mailgun', async (c) => {
+  const { status, body } = await mailgunInbound(c.req.raw, c.env, c.get('sql'), c.executionCtx);
+  return c.json(body, status as 200);
+});
 
 /**
  * Inbound email over HTTP.

@@ -26,7 +26,10 @@ export interface Delivery {
   /** The envelope recipient. For a bcc this is the only place the address appears. */
   to: string;
   from: string;
-  raw: ArrayBuffer | string;
+  /** The whole message. Preferred: nothing is lost and the parser is shared. */
+  raw?: ArrayBuffer | string;
+  /** Already parsed, for a provider that posts fields rather than MIME. */
+  mail?: ParsedEmail;
 }
 
 export interface Outcome {
@@ -51,7 +54,7 @@ export async function handleEmail(
   const org = await resolveOrgByEmail(env, sql, d.to);
   if (!org) return { ok: false, reason: `no tenant for ${d.to}` };
 
-  const mail = await parseEmail(d.raw);
+  const mail = d.mail ?? await parseEmail(d.raw ?? '');
   if (isAutomated(mail.header)) return { ok: false, reason: 'automated mail, ignored' };
 
   // Our own address in From means we are reading something we sent — the start of a loop.

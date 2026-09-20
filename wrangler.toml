@@ -69,4 +69,10 @@ PLATFORM_DOMAIN = "midlayr.app"          # <slug>.midlayr.app default per tenant
 WIDGET_ORIGIN = "https://cdn.midlayr.com"
 # Workers AI retires models; swap this rather than editing src/jobs/extract-specs.ts
 AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
-# secrets (wrangler secret put): DATABASE_URL (local dev only; prod uses Hyperdrive), TWILIO_AUTH_TOKEN, TWILIO_SID, RESEND_API_KEY, ENRICH_API_KEY, SESSION_SECRET
+# secrets (wrangler secret put): DATABASE_URL (local dev only; prod uses Hyperdrive),
+#   TWILIO_AUTH_TOKEN, TWILIO_SID, SESSION_SECRET,
+#   MAILGUN_API_KEY      — sending
+#   MAILGUN_SIGNING_KEY  — verifies inbound Route webhooks. A DIFFERENT key from the API key;
+#                          until it is set /hooks/mailgun rejects everything, which is the
+#                          right way round: an unverified webhook can forge tickets.
+# vars for Mailgun: MAILGUN_DOMAIN, and MAILGUN_BASE_URL for an EU account.

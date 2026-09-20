@@ -13,6 +13,10 @@ export interface Env {
   TWILIO_SID: string;
   TWILIO_AUTH_TOKEN: string;
   RESEND_API_KEY: string;
+  MAILGUN_API_KEY: string;
+  MAILGUN_SIGNING_KEY: string;    // verifies inbound Route webhooks; not the sending key
+  MAILGUN_DOMAIN: string;
+  MAILGUN_BASE_URL?: string;      // set to https://api.eu.mailgun.net for an EU account
   SESSION_SECRET: string;
   PLATFORM_DOMAIN: string;
   AI_MODEL?: string;

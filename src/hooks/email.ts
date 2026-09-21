@@ -4,6 +4,7 @@ import { withOrg, type Sql, type Tx } from '../db';
 import { resolveOrgByEmail } from '../org';
 import { parseEmail, isAutomated, type ParsedEmail, type Party } from '../lib/email';
 import { findThreadableLead } from '../lib/threading';
+import { stopOnReply } from './delivery';
 
 /**
  * Email into the queue.
@@ -73,6 +74,8 @@ export async function handleEmail(
     }
 
     if (shape.direction === 'in') {
+      // A customer answering ends any drip on this ticket, before the next one can go out.
+      await stopOnReply(tx, org.id, lead.id);
       await env.JOBS.send({ kind: 'extract_specs', orgId: org.id, leadId: lead.id } as Job);
     }
 

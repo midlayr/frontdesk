@@ -1,4 +1,5 @@
 import { ulid } from 'ulid';
+import { stopOnReply } from './delivery';
 import type { Env, Org } from '../env';
 import { withOrg, type Sql, type Tx } from '../db';
 import { resolveOrgByPhone, ticketPrefix } from '../org';
@@ -92,6 +93,9 @@ export async function twilioSms(req: Request, env: Env, sql: Sql): Promise<Respo
     await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
              VALUES (${ulid()}, ${org.id}, ${id}, 'system', 'message_in',
                      ${tx.json({ channel: 'sms', provider_id: providerId ?? null })})`;
+
+    // A text back ends any drip on this ticket, before the next step can go out.
+    await stopOnReply(tx, org.id, id);
 
     return id;
   });

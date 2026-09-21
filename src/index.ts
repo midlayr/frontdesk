@@ -8,6 +8,7 @@ import { twilioSms } from './hooks/twilio-sms';
 import { twilioVoice, twilioRecording } from './hooks/twilio-voice';
 import { handleEmail } from './hooks/email';
 import { mailgunInbound } from './hooks/mailgun';
+import { mailgunEvents, twilioStatus } from './hooks/delivery';
 import { transcribe } from './jobs/transcribe';
 import { extractSpecs } from './jobs/extract-specs';
 import { runDrips } from './jobs/drip';
@@ -89,6 +90,11 @@ app.post('/hooks/mailgun', async (c) => {
   const { status, body } = await mailgunInbound(c.req.raw, c.env, c.get('sql'), c.executionCtx);
   return c.json(body, status as 200);
 });
+
+// Delivery outcomes. Additive: they stamp timestamps onto messages a send already wrote,
+// and are what make the opened / clicked / bounced branch conditions answerable.
+app.post('/hooks/mailgun/events', (c) => mailgunEvents(c.req.raw, c.env, c.get('sql')));
+app.post('/hooks/twilio/status', (c) => twilioStatus(c.req.raw, c.env, c.get('sql')));
 
 /**
  * Inbound email over HTTP.

@@ -64,7 +64,13 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 /* ── ticket ── */
 .ticket { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .tscroll { overflow: auto; padding: 22px 26px; flex: 1; min-height: 0; }
-.thead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; row-gap: 8px; }
+.thead { display: flex; align-items: baseline; gap: 10px; }
+
+/* One row for the things a rep sets, full width, so nothing has to be truncated. */
+.tbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 8px;
+  margin: 10px 0 2px; }
+.tbar .tmenu-wrap { margin-left: auto; }
+.tbar .pick select { max-width: 190px; }
 .tno { white-space: nowrap; flex: none; font-family: var(--font-display); font-variation-settings: 'wdth' var(--display-wdth);
        font-weight: 700; font-size: var(--h2); letter-spacing: -.01em; }
 .tname { font-family: var(--font-display); font-variation-settings: 'wdth' var(--display-wdth);
@@ -363,7 +369,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   padding: 0 2px 0 0; cursor: pointer; max-width: 150px; }
 .pick select:focus { outline: none; }
 .pick.static { font: 400 12.5px var(--font-body); color: var(--ink-2); cursor: default; }
-.pick.assign .label { color: var(--ink-3); }
+
 
 /* ── ticket history ───────────────────────────────────────────────────────── */
 .hist-toggle { margin-left: auto; border: 0; background: none; color: var(--accent);
@@ -678,3 +684,17 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   border-radius: var(--radius); padding: 7px 9px; cursor: pointer; font-size: var(--text-sm); }
 .tseq-offer:hover:not(:disabled) { border-color: var(--ink); }
 .tseq-offer i { font-style: normal; font: 400 10.5px var(--font-mono); color: var(--ink-3); margin-left: 6px; }
+
+/* ── ticket overflow menu ─────────────────────────────────────────────────── */
+.tmenu-wrap { position: relative; flex: none; }
+.tmenu-btn { border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius);
+  height: var(--control-h-sm); width: 30px; cursor: pointer; color: var(--ink-2);
+  font-size: 15px; line-height: 1; }
+.tmenu-btn:hover { border-color: var(--ink-3); color: var(--ink); }
+.tmenu { position: absolute; top: calc(100% + 5px); right: 0; z-index: 30; min-width: 190px;
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow-float); padding: 4px; display: flex; flex-direction: column; }
+.tmenu button { text-align: left; border: 0; background: none; cursor: pointer;
+  padding: 7px 9px; border-radius: var(--radius); font-size: var(--text-sm); color: var(--ink); }
+.tmenu button:hover { background: var(--paper-2); }
+.tmenu button.danger { color: var(--danger); }

@@ -530,7 +530,12 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
         <div className="thead">
           <span className="label">Ticket</span>
           <span className="tno">{l.ticket_no}</span>
-          <span style={{ marginLeft: 'auto' }} />
+        </div>
+
+        {/* The controls get the pane's whole width on their own line. Sharing a row with the
+            ticket number left three dropdowns fighting over about 300px, and every one of
+            them was truncated to something like "Unassigne…". */}
+        <div className="tbar">
 
           {/* A live chat's stage belongs to the chat session, not to a rep: the session
               writes 'live' while someone is connected and hands it back when it ends, so
@@ -558,8 +563,7 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
 
           <TicketSequences leadId={l.id} />
 
-          <label className="pick assign">
-            <span className="label">Assign</span>
+          <label className="pick" title="Who owns this ticket">
             <select value={l.assignee_id ?? ''}
                     onChange={(e) => onPatch({ assignee_id: e.target.value || null })}>
               <option value="">Unassigned</option>
@@ -568,10 +572,11 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
           </label>
           {isChat && !live && <button className="btn-primary" onClick={takeover}>Take over chat</button>}
           {live && <span className="tag live">You are live</span>}
-          <button className="btn-ghost" onClick={() => onArchive(!l.archived_at)}>
-            {l.archived_at ? 'Restore' : 'Archive'}
-          </button>
-          <button className="btn-ghost danger" onClick={onDelete}>Delete</button>
+
+          {/* Archive and Delete are rare and one of them is irreversible. They were sitting
+              at the same weight as the pickers a rep uses all day, and pushed the row into a
+              second line where Delete ended up alone under the ticket number. */}
+          <TicketMenu archived={!!l.archived_at} onArchive={onArchive} onDelete={onDelete} />
         </div>
 
         <h1 className="tname">{l.company_name || who}</h1>
@@ -728,5 +733,46 @@ function Files({ leadId, files }: { leadId: string; files: Attachment[] }) {
         ))}
       </ul>
     </>
+  );
+}
+
+
+/**
+ * The rarely-used end of the ticket header.
+ *
+ * Archive and Delete are not things a rep reaches for often, and one of them cannot be
+ * undone. Given permanent space they competed with the pickers used all day and forced the
+ * row to wrap; behind a menu they are still one click away and no longer in the way.
+ */
+function TicketMenu({ archived, onArchive, onDelete }: {
+  archived: boolean; onArchive: (on: boolean) => void; onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+  }, [open]);
+
+  return (
+    <div className="tmenu-wrap" ref={box}>
+      <button className="tmenu-btn" aria-label="More actions" aria-expanded={open}
+              onClick={() => setOpen(!open)}>⋯</button>
+      {open && (
+        <div className="tmenu">
+          <button onClick={() => { setOpen(false); onArchive(!archived); }}>
+            {archived ? 'Restore to the queue' : 'Archive'}
+          </button>
+          <button className="danger" onClick={() => { setOpen(false); onDelete(); }}>
+            Delete permanently
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

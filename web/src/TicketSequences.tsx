@@ -94,15 +94,19 @@ export function TicketSequences({ leadId }: { leadId: string }) {
   return (
     <div className="tseq-wrap" ref={box}>
       <button className="pick tseq-btn" onClick={() => setOpen(!open)} disabled={nothingToOffer}
-              title={nothingToOffer ? 'No campaign is switched on that a rep can start by hand' : undefined}>
+              title={nothingToOffer
+                ? 'No campaign is switched on that a rep can start by hand'
+                : 'Campaigns this ticket is on'}>
         {lead
           ? <>
               <i className="dot" style={{ background: STATE_COLOR[lead.state] }} />
               <span className="tseq-name">{lead.name}</span>
               <span className="tseq-step">{lead.next_step}/{lead.steps}</span>
             </>
-          : <><span className="label">Campaign</span>
-             <span className="tseq-none-lbl">{loaded ? 'none' : '…'}</span></>}
+          // "No campaign" rather than a CAMPAIGN label beside "none": the row has three
+          // pickers and a label on each spent most of its width saying what the value
+          // already says.
+          : <span className="tseq-none-lbl">{loaded ? 'No campaign' : 'Campaign…'}</span>}
         <span className="tseq-caret">▾</span>
       </button>
 

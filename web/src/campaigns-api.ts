@@ -9,7 +9,7 @@ export interface Sequence {
 export interface Step {
   id: string; position: number; kind: 'email' | 'sms' | 'wait' | 'task';
   subject: string | null; body: string; attach_quote: boolean;
-  branches: unknown[]; delay_hours: number;
+  branches: Branch[]; delay_hours: number;
 }
 
 export interface Preview {
@@ -23,6 +23,33 @@ export const TOKENS = [
   'first_name', 'company', 'qty', 'product', 'size', 'stock',
   'deadline', 'quote_amount', 'quote_link', 'ticket_no', 'rep_name', 'rep_phone',
 ] as const;
+
+export interface Branch {
+  if: string; value?: number; then: string;
+  config?: { subject?: string; step?: number; user_id?: string; text?: string; tag?: string };
+}
+
+/** Mirrors CONDITIONS / ACTIONS in src/lib/drip.ts — the engine is the authority. */
+export const CONDITIONS: { id: string; label: string; needs?: 'number' }[] = [
+  { id: 'replied', label: 'Replied' },
+  { id: 'opened_no_reply', label: 'Opened, no reply' },
+  { id: 'not_opened', label: 'Not opened' },
+  { id: 'clicked', label: 'Clicked a link' },
+  { id: 'bounced', label: 'Bounced' },
+  { id: 'sms_delivered', label: 'SMS delivered' },
+  { id: 'health_below', label: 'Health below', needs: 'number' },
+];
+
+export const ACTIONS: { id: string; label: string; needs?: 'subject' | 'step' | 'user' | 'text' | 'tag' }[] = [
+  { id: 'continue', label: 'Continue' },
+  { id: 'stop', label: 'Stop sequence' },
+  { id: 'resend', label: 'Resend, new subject', needs: 'subject' },
+  { id: 'skip_to', label: 'Skip to step', needs: 'step' },
+  { id: 'switch_sms', label: 'Send as SMS instead' },
+  { id: 'assign', label: 'Assign to', needs: 'user' },
+  { id: 'task', label: 'Create a task', needs: 'text' },
+  { id: 'tag', label: 'Tag the company', needs: 'tag' },
+];
 
 export const KINDS: { id: Step['kind']; label: string }[] = [
   { id: 'email', label: 'Email' }, { id: 'sms', label: 'SMS' },
@@ -64,7 +91,7 @@ export const campaigns = {
     call<{ active: boolean }>(`/api/sequences/${id}/live`, { method: 'POST', body: JSON.stringify({ active }) }),
   addStep: (id: string) =>
     call<{ id: string }>(`/api/sequences/${id}/steps`, { method: 'POST', body: JSON.stringify({}) }),
-  saveStep: (id: string, stepId: string, patch: Partial<Step> & { delay_hours?: number }) =>
+  saveStep: (id: string, stepId: string, patch: Partial<Step> & { delay_hours?: number; branches?: Branch[] }) =>
     call<{ ok: true }>(`/api/sequences/${id}/steps/${stepId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteStep: (id: string, stepId: string) =>
     call<{ ok: true }>(`/api/sequences/${id}/steps/${stepId}`, { method: 'DELETE' }),

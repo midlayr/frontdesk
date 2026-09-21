@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Branches } from './Branches';
 import {
   KINDS, TOKENS, TRIGGER_LABEL, campaigns, hours,
   type Preview, type Sequence, type Step,
@@ -131,15 +132,15 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
 
         {step && seqId
           ? <StepEditor key={step.id} seqId={seqId} step={step} readOnly={!isAdmin}
-                        onSaved={() => open(seqId)} />
+                        stepCount={steps.length} onSaved={() => open(seqId)} />
           : <div className="fb-empty">{error || 'Pick a campaign, then a step.'}</div>}
       </div>
     </div>
   );
 }
 
-function StepEditor({ seqId, step, readOnly, onSaved }: {
-  seqId: string; step: Step; readOnly: boolean; onSaved: () => void;
+function StepEditor({ seqId, step, stepCount, readOnly, onSaved }: {
+  seqId: string; step: Step; stepCount: number; readOnly: boolean; onSaved: () => void;
 }) {
   const [draft, setDraft] = useState<Step>(step);
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -271,6 +272,9 @@ function StepEditor({ seqId, step, readOnly, onSaved }: {
         )}
 
         {error && <p className="team-err">{error}</p>}
+
+        <Branches seqId={seqId} stepId={step.id} stepCount={stepCount} position={step.position}
+                  branches={step.branches ?? []} readOnly={readOnly} onSaved={onSaved} />
       </div>
 
       {/* ── what the customer gets ── */}

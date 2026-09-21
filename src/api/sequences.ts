@@ -133,12 +133,27 @@ sequences.post('/:id/live', async (c) => {
     const [{ n }] = await tx<{ n: number }[]>`
       SELECT count(*)::int AS n FROM sequence_steps WHERE sequence_id = ${id}`;
     if (want.active && !n) return 'no-steps' as const;
+
+    // Counting steps is not enough: a step added and never written would send an empty
+    // email to a customer, and the sequence would look like it was working.
+    if (want.active) {
+      const blank = await tx<{ position: number }[]>`
+        SELECT position FROM sequence_steps
+         WHERE sequence_id = ${id} AND kind IN ('email','sms','task')
+           AND btrim(COALESCE(body, '')) = ''
+         ORDER BY position`;
+      if (blank.length) return { blank: blank.map((b) => b.position) };
+    }
     const [row] = await tx<{ active: boolean }[]>`
       UPDATE sequences SET active = ${!!want.active} WHERE id = ${id} AND org_id = ${org.id}
       RETURNING active`;
     return row ?? null;
   });
   if (out === 'no-steps') return c.json({ error: 'write a step before turning it on' }, 400);
+  if (out && 'blank' in out) {
+    const which = out.blank.map((p) => `step ${p}`).join(' and ');
+    return c.json({ error: `${which} has nothing to send — write it or remove it` }, 400);
+  }
   return out ? c.json({ ok: true, active: out.active }) : c.json({ error: 'not found' }, 404);
 });
 

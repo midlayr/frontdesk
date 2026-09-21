@@ -12,6 +12,7 @@ import { mailgunEvents, twilioStatus } from './hooks/delivery';
 import { transcribe } from './jobs/transcribe';
 import { extractSpecs } from './jobs/extract-specs';
 import { runDrips, sweepQuotedNoReply } from './jobs/drip';
+import { rollUp } from './jobs/sequence-stats';
 import { leads } from './api/leads';
 import { internal } from './api/internal';
 import { widget } from './api/widget';
@@ -579,6 +580,16 @@ export default {
     ctx.waitUntil(runDrips(env).then(
       (t) => console.log(`drip: ${t.sent} sent, ${t.held} held, ${t.stopped} stopped`),
       (err) => console.error('drip run failed', err)));
+    // Once a night rather than every five minutes: the rollup reads the whole history of
+    // every sequence, and nothing on the Performance tab changes minute to minute. The cron
+    // fires every five minutes, so the hour is checked here.
+    if (new Date().getUTCHours() === 7 && new Date().getUTCMinutes() < 5) {
+      ctx.waitUntil((async () => {
+        const sql = connect(env);
+        try { console.log(`stats: rolled up ${await rollUp(env, sql)} sequences`); }
+        finally { await sql.end(); }
+      })().catch((err) => console.error('stats rollup failed', err)));
+    }
     // leads WHERE status IN ('new','needs_info') AND created_at < now-2h → SLA nudge to InboxRoom
   },
 } satisfies ExportedHandler<Env, Job>;

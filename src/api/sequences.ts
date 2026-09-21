@@ -5,6 +5,7 @@ import type { Env, Org } from '../env';
 import { withOrg, type Sql } from '../db';
 import { CONDITIONS, ACTIONS, fill, normalise, validate, type Branch } from '../lib/drip';
 import { TRIGGERS, enroll } from '../lib/enroll';
+import { SPANS, compute, store, type Span } from '../jobs/sequence-stats';
 
 type Vars = { org: Org; sql: Sql; userId: string; role: 'sales' | 'admin' };
 
@@ -337,6 +338,45 @@ sequences.patch('/:id/enrollments', async (c) => {
     return rows.length;
   });
   return c.json({ ok: true, changed: n });
+});
+
+/**
+ * Performance for one span.
+ *
+ * Serves the stored rollup, and computes one if the nightly job has not run for this
+ * sequence yet — using the same aggregation, so a tab opened on day one shows the same
+ * numbers the rollup will. Without that the screen would be empty until midnight and look
+ * broken rather than new.
+ */
+sequences.get('/:id/stats', async (c) => {
+  const org = c.get('org');
+  const id = c.req.param('id');
+  const span = (SPANS as readonly string[]).includes(c.req.query('span') ?? '')
+    ? c.req.query('span') as Span : '30d';
+
+  const out = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [seq] = await tx<{ id: string }[]>`
+      SELECT id FROM sequences WHERE id = ${id} AND org_id = ${org.id}`;
+    if (!seq) return null;
+
+    let rows = await tx`
+      SELECT step_id, span, enrolled, sent, opened, clicked, replied, won, revenue, read, computed_at
+        FROM sequence_stats WHERE sequence_id = ${id} AND span = ${span}`;
+
+    if (!rows.length) {
+      const fresh = await compute(tx, id, span);
+      await store(tx, org.id, id, fresh);
+      rows = await tx`
+        SELECT step_id, span, enrolled, sent, opened, clicked, replied, won, revenue, read, computed_at
+          FROM sequence_stats WHERE sequence_id = ${id} AND span = ${span}`;
+    }
+
+    const steps = await tx`
+      SELECT id, position, kind, subject FROM sequence_steps
+       WHERE sequence_id = ${id} ORDER BY position`;
+    return { span, stats: rows, steps };
+  });
+  return out ? c.json(out) : c.json({ error: 'not found' }, 404);
 });
 
 /** Manual enrolment — the trigger a rep uses from a ticket. */

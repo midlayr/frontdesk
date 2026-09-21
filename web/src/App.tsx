@@ -3,6 +3,7 @@ import { api, applyBrand, orgSlug, userId, type Attachment, type Lead, type Mess
 import { FlowBuilder } from './FlowBuilder';
 import { Campaigns } from './Campaigns';
 import { History } from './History';
+import { TicketSequences } from './TicketSequences';
 import { Settings } from './Settings';
 
 const VIEWS = ['All', 'New', 'Mine', 'Rush', 'Working', 'Quoted', 'Won', 'Lost', 'Spam', 'Archived'] as const;
@@ -632,6 +633,8 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
         </div>
 
         <Files leadId={l.id} files={d.attachments ?? []} />
+
+        <TicketSequences leadId={l.id} />
 
         <History leadId={l.id} users={users} />
         {error && <p className="err">{error}</p>}

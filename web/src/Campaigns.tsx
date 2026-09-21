@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Branches } from './Branches';
+import { Enrolled } from './Enrolled';
 import { NewSequence } from './NewSequence';
+import { Performance } from './Performance';
 import {
   KINDS, TOKENS, TRIGGER_LABEL, campaigns, hours,
   type Preview, type Sequence, type Step,
@@ -27,6 +29,7 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<'steps' | 'enrolled' | 'performance'>('steps');
   const isAdmin = me?.role === 'admin';
 
   const reload = useCallback(() => campaigns.list().then(setList).catch((e) => setError(String(e))), []);
@@ -102,6 +105,13 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
             {TRIGGER_LABEL[sequence.trigger] ?? sequence.trigger} · {sequence.channel}
           </span>
         )}
+        {sequence && (
+          <span className="fb-view">
+            <button data-on={tab === 'steps'} onClick={() => setTab('steps')}>Steps</button>
+            <button data-on={tab === 'enrolled'} onClick={() => setTab('enrolled')}>Enrolled</button>
+            <button data-on={tab === 'performance'} onClick={() => setTab('performance')}>Performance</button>
+          </span>
+        )}
         <span style={{ marginLeft: 'auto' }} />
         {sequence && isAdmin && (
           <button className={`fb-publish${sequence.active ? '' : ' dirty'}`} onClick={toggleLive}>
@@ -159,11 +169,21 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
           )}
         </div>
 
-        {step && seqId
+        {seqId && tab === 'enrolled' && (
+          <div className="camp-wide">
+            <Enrolled seqId={seqId} readOnly={!isAdmin}
+                      onOpenLead={(leadId) => { location.href = `/?lead=${leadId}`; }} />
+          </div>
+        )}
+        {seqId && tab === 'performance' && (
+          <div className="camp-wide"><Performance seqId={seqId} /></div>
+        )}
+
+        {tab === 'steps' && (step && seqId
           ? <StepEditor key={step.id} seqId={seqId} step={step} readOnly={!isAdmin}
                         stepCount={steps.length} onSaved={() => open(seqId)}
                         onDelete={() => removeStep(step)} />
-          : <div className="fb-empty">{error || 'Pick a campaign, then a step.'}</div>}
+          : <div className="fb-empty">{error || 'Pick a campaign, then a step.'}</div>)}
       </div>
     </div>
   );

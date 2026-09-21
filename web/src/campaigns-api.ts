@@ -19,6 +19,23 @@ export interface Preview {
 }
 
 /** The merge tokens a step body may use, in the order the wireframe lists them. */
+export interface Enrollment {
+  id: string; state: string; held_reason: string | null; next_send_at: string | null;
+  next_step: number; last_sent_at: string | null;
+  lead_id: string; ticket_no: string; lead_status: string; who: string | null; steps: number;
+}
+
+export const STATE_LABEL: Record<string, string> = {
+  active: 'Active', held: 'Held', paused: 'Paused', replied: 'Replied',
+  completed: 'Done', opted_out: 'Opted out', removed: 'Removed',
+};
+
+export const STATE_COLOR: Record<string, string> = {
+  active: 'var(--ok)', held: 'var(--warn)', paused: 'var(--ink-3)',
+  replied: 'var(--accent)', completed: 'var(--ink-3)',
+  opted_out: 'var(--danger)', removed: 'var(--ink-3)',
+};
+
 export const TOKENS = [
   'first_name', 'company', 'qty', 'product', 'size', 'stock',
   'deadline', 'quote_amount', 'quote_link', 'ticket_no', 'rep_name', 'rep_phone',
@@ -102,6 +119,39 @@ export const campaigns = {
       method: 'POST', body: JSON.stringify({ leadId }),
     }),
 };
+
+export interface StatRow {
+  step_id: string | null; span: string; enrolled: number; sent: number; opened: number;
+  clicked: number; replied: number; won: number; revenue: string; read: string | null;
+  computed_at: string;
+}
+
+export const stats = {
+  get: (id: string, span: string) =>
+    call<{ span: string; stats: StatRow[]; steps: { id: string; position: number; kind: string; subject: string | null }[] }>(
+      `/api/sequences/${id}/stats?span=${span}`),
+};
+
+export const enrollments = {
+  list: (id: string, state?: string) =>
+    call<{ enrollments: Enrollment[] }>(
+      `/api/sequences/${id}/enrollments${state ? `?state=${state}` : ''}`).then((r) => r.enrollments),
+  bulk: (id: string, ids: string[], state: 'active' | 'paused' | 'removed') =>
+    call<{ changed: number }>(`/api/sequences/${id}/enrollments`, {
+      method: 'PATCH', body: JSON.stringify({ ids, state }),
+    }),
+};
+
+/** "in 2 days", "overdue", "—". A drip's next touch is the column reps actually scan. */
+export function when(iso: string | null): string {
+  if (!iso) return '—';
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms < -60_000) return 'overdue';
+  const h = Math.round(ms / 3_600_000);
+  if (h < 1) return 'within the hour';
+  if (h < 48) return `in ${h}h`;
+  return `in ${Math.round(h / 24)} days`;
+}
 
 export const hours = (h: number) =>
   h === 0 ? 'immediately' : h < 24 ? `${h}h later` : `day ${Math.round(h / 24) + 1}`;

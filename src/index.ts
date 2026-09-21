@@ -10,6 +10,7 @@ import { handleEmail } from './hooks/email';
 import { mailgunInbound } from './hooks/mailgun';
 import { transcribe } from './jobs/transcribe';
 import { extractSpecs } from './jobs/extract-specs';
+import { runDrips } from './jobs/drip';
 import { leads } from './api/leads';
 import { internal } from './api/internal';
 import { widget } from './api/widget';
@@ -557,8 +558,13 @@ export default {
     }
   },
 
-  async scheduled(_controller: ScheduledController, _env: Env): Promise<void> {
-    // enrollments WHERE state='active' AND next_send_at <= now → JOBS.drip_send
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    // Drips run straight from the cron rather than through the queue: the work is one row at
+    // a time against Postgres, and a queue between the two would only add a way for a step
+    // to be delivered twice.
+    ctx.waitUntil(runDrips(env).then(
+      (t) => console.log(`drip: ${t.sent} sent, ${t.held} held, ${t.stopped} stopped`),
+      (err) => console.error('drip run failed', err)));
     // leads WHERE status IN ('new','needs_info') AND created_at < now-2h → SLA nudge to InboxRoom
   },
 } satisfies ExportedHandler<Env, Job>;

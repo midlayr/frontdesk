@@ -16,6 +16,7 @@ import { leads } from './api/leads';
 import { internal } from './api/internal';
 import { widget } from './api/widget';
 import { flows } from './api/flows';
+import { sequences } from './api/sequences';
 import { settings } from './api/settings';
 import { CHAT_JS } from './widget-asset';
 import { MEDIA_TTL_MS, mintTicket, readTicket } from './ws-ticket';
@@ -464,6 +465,7 @@ app.use('/api/settings/*', async (c, next) => {
 });
 
 app.route('/api/flows', flows);
+app.route('/api/sequences', sequences);
 app.route('/api/settings', settings);
 
 /** Realtime queue updates: one InboxRoom per tenant, every open rep tab subscribed. */

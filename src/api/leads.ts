@@ -6,6 +6,7 @@ import { withOrg, type Sql } from '../db';
 import { sendSms } from '../lib/twilio';
 import { messagingFor, render } from '../lib/messaging';
 import { sendEmail } from '../lib/mailgun';
+import { enrollLead } from './sequences';
 
 type Vars = { org: Org; sql: Sql; userId: string };
 
@@ -135,6 +136,28 @@ const Patch = z.object({
  * here because a raw user id in a timeline is unreadable, and LEFT JOIN keeps the 'system'
  * rows (inbound message, extraction) which match no user.
  */
+/** Put this ticket on a campaign — the manual trigger, from the ticket panel. */
+leads.post('/:id/enroll', async (c) => {
+  const body = await c.req.json().catch(() => null) as { sequence_id?: string } | null;
+  if (!body?.sequence_id) return c.json({ error: 'sequence_id required' }, 400);
+  const { status, body: out } = await enrollLead(
+    c.get('sql'), c.get('org'), c.req.param('id'), body.sequence_id);
+  return c.json(out, status as 200);
+});
+
+/** What this ticket is currently on, for the Sequences card. */
+leads.get('/:id/enrollments', async (c) => {
+  const org = c.get('org');
+  const rows = await withOrg(c.get('sql'), org.id, (tx) => tx`
+    SELECT e.id, e.state, e.held_reason, e.next_send_at, e.next_step,
+           s.id AS sequence_id, s.name, s.active,
+           (SELECT count(*)::int FROM sequence_steps st WHERE st.sequence_id = s.id) AS steps
+      FROM enrollments e JOIN sequences s ON s.id = e.sequence_id
+     WHERE e.lead_id = ${c.req.param('id')} AND s.org_id = ${org.id}
+     ORDER BY e.created_at DESC`);
+  return c.json({ enrollments: rows });
+});
+
 leads.get('/:id/activity', async (c) => {
   const org = c.get('org');
   const id = c.req.param('id');

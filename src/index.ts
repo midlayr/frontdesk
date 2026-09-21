@@ -11,7 +11,7 @@ import { mailgunInbound } from './hooks/mailgun';
 import { mailgunEvents, twilioStatus } from './hooks/delivery';
 import { transcribe } from './jobs/transcribe';
 import { extractSpecs } from './jobs/extract-specs';
-import { runDrips } from './jobs/drip';
+import { runDrips, sweepQuotedNoReply } from './jobs/drip';
 import { leads } from './api/leads';
 import { internal } from './api/internal';
 import { widget } from './api/widget';
@@ -568,6 +568,12 @@ export default {
     // Drips run straight from the cron rather than through the queue: the work is one row at
     // a time against Postgres, and a queue between the two would only add a way for a step
     // to be delivered twice.
+    // Sweep for newly-eligible leads before sending, so a ticket that crossed the threshold
+    // since the last run gets its first step on this pass rather than five minutes later.
+    ctx.waitUntil((async () => {
+      const sql = connect(env);
+      try { await sweepQuotedNoReply(env, sql); } finally { await sql.end(); }
+    })().catch((err) => console.error('quoted_no_reply sweep failed', err)));
     ctx.waitUntil(runDrips(env).then(
       (t) => console.log(`drip: ${t.sent} sent, ${t.held} held, ${t.stopped} stopped`),
       (err) => console.error('drip run failed', err)));

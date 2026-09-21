@@ -3,6 +3,7 @@ import type { Env } from '../env';
 import { connect, withOrg, type Sql, type Tx } from '../db';
 import { sendSms } from '../lib/twilio';
 import { sendEmail } from '../lib/mailgun';
+import { enroll } from '../lib/enroll';
 import {
   DEFAULT_WINDOW, evaluate, fill, heldReason, nextOpen, stopReason,
   type Branch, type LastSend, type SendWindow, type Standing,
@@ -292,3 +293,35 @@ const note = (tx: Tx, d: Due, kind: string, detail: Record<string, unknown>) =>
   tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
      VALUES (${ulid()}, ${d.org_id}, ${d.lead_id}, ${'sequence:' + d.sequence_id}, ${kind},
              ${tx.json(detail as never)})`;
+
+/**
+ * The quoted-no-reply trigger.
+ *
+ * A cron sweep rather than an event, because the thing that fires it is the *absence* of a
+ * message — there is no moment to hook. Guarded by the same unique index as every other
+ * enrolment, so running it every five minutes cannot pile people onto the sequence twice.
+ */
+export async function sweepQuotedNoReply(env: Env, sql: Sql): Promise<number> {
+  const seqs = await sql<{ id: string; org_id: string; trigger_config: { days?: number } }[]>`
+    SELECT id, org_id, trigger_config FROM sequences
+     WHERE active AND trigger = 'quoted_no_reply'`;
+
+  let started = 0;
+  for (const s of seqs) {
+    const days = Number(s.trigger_config?.days ?? 2);
+    started += await withOrg(sql, s.org_id, async (tx) => {
+      const leads = await tx<{ id: string }[]>`
+        SELECT l.id FROM leads l
+         WHERE l.org_id = ${s.org_id} AND l.status = 'quoted' AND l.archived_at IS NULL
+           AND COALESCE(l.quoted_at, l.updated_at) < now() - make_interval(days => ${days})
+           AND NOT EXISTS (SELECT 1 FROM messages m
+                            WHERE m.lead_id = l.id AND m.direction = 'in'
+                              AND m.sent_at > COALESCE(l.quoted_at, l.updated_at))
+         LIMIT 100`;
+      let n = 0;
+      for (const l of leads) if ((await enroll(tx, s.org_id, l.id, s.id)).ok) n++;
+      return n;
+    });
+  }
+  return started;
+}

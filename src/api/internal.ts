@@ -3,6 +3,7 @@ import { ulid } from 'ulid';
 import type { Env, Job } from '../env';
 import { withOrg, type Sql, type Tx } from '../db';
 import { ticketPrefix } from '../org';
+import { onLeadCreated } from '../lib/enroll';
 
 /**
  * Routes the Durable Objects call back into, because a DO has no Hyperdrive binding of its
@@ -125,6 +126,8 @@ internal.post('/leads/from-email', async (c) => {
     await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
              VALUES (${ulid()}, ${body.orgId}, ${leadId}, 'system', 'lead_created',
                      ${tx.json({ channel: 'email', ticket_no: ticketNo, from: email })})`;
+
+    await onLeadCreated(tx, body.orgId, leadId);
 
     return { id: leadId, ticket_no: ticketNo };
   });

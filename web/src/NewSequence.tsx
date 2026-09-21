@@ -15,8 +15,8 @@ const TRIGGERS: { id: string; label: string; note: string; needsDays?: boolean; 
   { id: 'lead_created', label: 'A lead arrives', note: 'any channel · starts at once' },
   { id: 'quoted_no_reply', label: 'Quoted, no reply', note: 'after N days', needsDays: true },
   { id: 'manual', label: 'Manual', note: 'a rep enrolls from a ticket' },
-  { id: 'reorder_due', label: 'Reorder due', note: 'needs the Pipeline radar', soon: true },
-  { id: 'lapsed', label: 'Lapsed customer', note: 'needs the Pipeline radar', soon: true },
+  { id: 'reorder_due', label: 'Reorder due', note: 'past their usual gap between orders' },
+  { id: 'lapsed', label: 'Lapsed customer', note: 'no order in a long while' },
   { id: 'list', label: 'Uploaded list', note: 'needs list import', soon: true },
 ];
 

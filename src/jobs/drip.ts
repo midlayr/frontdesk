@@ -237,7 +237,11 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
     if (kind === 'sms') {
       if (!d.phone || !org.comms.sms_number) { await hold(tx, d, 'missing:{phone}'); return 'held'; }
       // The opt-out line is not optional and not the author's to remove.
-      const sent = await sendSms(env, org.comms.sms_number, d.phone, `${body.text}\n\nReply STOP to opt out.`);
+      // Delivery receipts come back to /hooks/twilio/status, which is what makes the
+      // sms_delivered branch condition answerable at all.
+      const sent = await sendSms(
+        env, org.comms.sms_number, d.phone, `${body.text}\n\nReply STOP to opt out.`,
+        `${env.PUBLIC_ORIGIN ?? ''}/hooks/twilio/status` || undefined);
       providerId = sent.sid;
     } else {
       if (!d.email) { await hold(tx, d, 'missing:{email}'); return 'held'; }

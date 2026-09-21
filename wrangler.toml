@@ -74,6 +74,10 @@ AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 # own address is only usable as From once their domain is verified there too.
 # Set MAILGUN_BASE_URL = "https://api.eu.mailgun.net" for an EU account.
 MAILGUN_DOMAIN = "midlayr.com"
+
+# Where Twilio posts delivery receipts for drip sends. A cron-triggered job has no request
+# to read its own hostname from, so it has to be told.
+PUBLIC_ORIGIN = "https://dumont-frontdesk.matt-dee.workers.dev"
 # secrets (wrangler secret put): DATABASE_URL (local dev only; prod uses Hyperdrive),
 #   TWILIO_AUTH_TOKEN, TWILIO_SID, SESSION_SECRET,
 #   MAILGUN_API_KEY      — sending

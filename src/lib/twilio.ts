@@ -37,14 +37,27 @@ export interface SentSms {
 }
 
 /** Send an SMS from the tenant's own number. `from` always comes from org.comms.sms_number. */
-export async function sendSms(env: Env, from: string, to: string, body: string): Promise<SentSms> {
+/**
+ * Send a text.
+ *
+ * statusCallback is passed per message rather than configured on the number, because the
+ * number belongs to a Messaging Service shared with other registrations — setting it there
+ * would point somebody else's delivery receipts at this Worker. Per message, only our own
+ * sends report back.
+ */
+export async function sendSms(
+  env: Env, from: string, to: string, body: string, statusCallback?: string,
+): Promise<SentSms> {
   const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_SID}/Messages.json`, {
     method: 'POST',
     headers: {
       authorization: 'Basic ' + btoa(`${env.TWILIO_SID}:${env.TWILIO_AUTH_TOKEN}`),
       'content-type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams({ From: from, To: to, Body: body }),
+    body: new URLSearchParams({
+      From: from, To: to, Body: body,
+      ...(statusCallback ? { StatusCallback: statusCallback } : {}),
+    }),
   });
 
   const json = (await res.json()) as { sid?: string; status?: string; message?: string; code?: number };

@@ -21,6 +21,9 @@ export interface Env {
   PLATFORM_DOMAIN: string;
   AI_MODEL?: string;
   WIDGET_ORIGIN: string;
+  /** Where providers call us back. Needed because a Worker cannot know its own hostname
+   *  from a cron-triggered job, which is where drips are sent from. */
+  PUBLIC_ORIGIN?: string;
 }
 
 // Every job carries orgId: the consumer has no request to resolve a tenant from.

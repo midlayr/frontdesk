@@ -13,6 +13,7 @@ import { transcribe } from './jobs/transcribe';
 import { extractSpecs } from './jobs/extract-specs';
 import { runDrips, sweepQuotedNoReply } from './jobs/drip';
 import { rollUp } from './jobs/sequence-stats';
+import { runRadar } from './jobs/radar';
 import { leads } from './api/leads';
 import { internal } from './api/internal';
 import { widget } from './api/widget';
@@ -586,9 +587,14 @@ export default {
     if (new Date().getUTCHours() === 7 && new Date().getUTCMinutes() < 5) {
       ctx.waitUntil((async () => {
         const sql = connect(env);
-        try { console.log(`stats: rolled up ${await rollUp(env, sql)} sequences`); }
-        finally { await sql.end(); }
-      })().catch((err) => console.error('stats rollup failed', err)));
+        try {
+          // Radar first: a company flagged tonight should be chased tonight, and the rollup
+          // then counts the enrolment it created.
+          const r = await runRadar(env, sql);
+          console.log(`radar: ${r.scanned} companies, ${r.flagged} flagged, ${r.enrolled} chased`);
+          console.log(`stats: rolled up ${await rollUp(env, sql)} sequences`);
+        } finally { await sql.end(); }
+      })().catch((err) => console.error('nightly jobs failed', err)));
     }
     // leads WHERE status IN ('new','needs_info') AND created_at < now-2h → SLA nudge to InboxRoom
   },

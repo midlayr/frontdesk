@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Branches } from './Branches';
+import { NewSequence } from './NewSequence';
 import {
   KINDS, TOKENS, TRIGGER_LABEL, campaigns, hours,
   type Preview, type Sequence, type Step,
@@ -24,6 +25,8 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
   const [sequence, setSequence] = useState<Sequence | null>(null);
   const [stepId, setStepId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [busy, setBusy] = useState(false);
   const isAdmin = me?.role === 'admin';
 
   const reload = useCallback(() => campaigns.list().then(setList).catch((e) => setError(String(e))), []);
@@ -37,21 +40,39 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
     setStepId((prev) => (d.steps.some((s) => s.id === prev) ? prev : d.steps[0]?.id ?? null));
   }, []);
 
-  async function newSequence() {
-    const name = prompt('Name this campaign', 'Quote follow-up');
-    if (!name?.trim()) return;
+  /**
+   * Shown the moment the server confirms it, from the row the create returns.
+   *
+   * Fetching the sequence again first leaves the list stale for two round trips, which is
+   * long enough to click twice, or to delete the step the screen is still showing.
+   */
+  async function addStep() {
+    if (!seqId || busy) return;
+    setBusy(true); setError('');
     try {
-      const { id } = await campaigns.create({ name: name.trim(), trigger: 'manual', channel: 'email' });
-      await reload();
-      await open(id);
-    } catch (e) { setError(String(e)); }
+      const { step } = await campaigns.addStep(seqId);
+      setSteps((prev) => [...prev, step]);
+      setStepId(step.id);
+      reload();                       // the rail's step count, in the background
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
   }
 
-  async function addStep() {
-    if (!seqId) return;
-    const { id } = await campaigns.addStep(seqId);
-    await open(seqId);
-    setStepId(id);
+  async function removeStep(step: Step) {
+    if (!seqId || busy) return;
+    const what = step.subject?.trim() || step.body.split('\n')[0].trim() || 'this empty step';
+    if (!confirm(`Delete step ${step.position} — “${what}”?\n\nThe steps after it move up. Anyone part-way through the sequence carries on from wherever they are.`)) return;
+    setBusy(true); setError('');
+    try {
+      await campaigns.deleteStep(seqId, step.id);
+      // Gone from the list at once, then reconciled — the server renumbers what is left.
+      const order = steps.filter((s) => s.id !== step.id);
+      setSteps(order);
+      setStepId(order[Math.min(step.position - 1, order.length - 1)]?.id ?? null);
+      await open(seqId);
+      reload();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); }
   }
 
   async function toggleLive() {
@@ -67,6 +88,10 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
 
   return (
     <div className="fb">
+      {creating && (
+        <NewSequence onClose={() => setCreating(false)}
+                     onCreated={async (id) => { setCreating(false); await reload(); await open(id); }} />
+      )}
       <header className="fb-head">
         <div>
           <span className="label">Campaigns</span>
@@ -90,7 +115,7 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
         <div className="camp-rail">
           <div className="camp-rail-head">
             <span className="label">Campaigns</span>
-            {isAdmin && <button className="camp-new" onClick={newSequence}>+ New</button>}
+            {isAdmin && <button className="camp-new" onClick={() => setCreating(true)}>+ New</button>}
           </div>
           {list.map((s) => (
             <button key={s.id} className="camp-item" data-on={s.id === seqId} onClick={() => open(s.id)}>
@@ -125,22 +150,28 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
                   </span>
                 </button>
               ))}
-              {isAdmin && <button className="fb-add" onClick={addStep}>+ Add a step</button>}
+              {isAdmin && (
+                <button className="fb-add" onClick={addStep} disabled={busy}>
+                  {busy ? 'Working…' : '+ Add a step'}
+                </button>
+              )}
             </>
           )}
         </div>
 
         {step && seqId
           ? <StepEditor key={step.id} seqId={seqId} step={step} readOnly={!isAdmin}
-                        stepCount={steps.length} onSaved={() => open(seqId)} />
+                        stepCount={steps.length} onSaved={() => open(seqId)}
+                        onDelete={() => removeStep(step)} />
           : <div className="fb-empty">{error || 'Pick a campaign, then a step.'}</div>}
       </div>
     </div>
   );
 }
 
-function StepEditor({ seqId, step, stepCount, readOnly, onSaved }: {
-  seqId: string; step: Step; stepCount: number; readOnly: boolean; onSaved: () => void;
+function StepEditor({ seqId, step, stepCount, readOnly, onSaved, onDelete }: {
+  seqId: string; step: Step; stepCount: number; readOnly: boolean;
+  onSaved: () => void; onDelete: () => void;
 }) {
   const [draft, setDraft] = useState<Step>(step);
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -209,8 +240,13 @@ function StepEditor({ seqId, step, stepCount, readOnly, onSaved }: {
           <span className="label">
             Step {String(step.position).padStart(2, '0')} · {draft.kind.toUpperCase()} · {hours(draft.delay_hours)}
           </span>
-          <span className="fb-save">
-            {unknown.length ? '' : saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Saved' : ''}
+          <span className="camp-head-right">
+            <span className="fb-save">
+              {unknown.length ? '' : saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Saved' : ''}
+            </span>
+            {!readOnly && (
+              <button className="camp-del" onClick={onDelete}>Delete step</button>
+            )}
           </span>
         </div>
 

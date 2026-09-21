@@ -171,11 +171,17 @@ sequences.post('/:id/steps', async (c) => {
       SELECT COALESCE(max(position), 0) + 1 AS next FROM sequence_steps WHERE sequence_id = ${id}`;
     const stepId = ulid();
     const hours = parsed.data.delay_hours ?? (next === 1 ? 0 : 48);
-    await tx`INSERT INTO sequence_steps (id, sequence_id, position, delay, kind, subject, body, branches)
-             VALUES (${stepId}, ${id}, ${next}, make_interval(hours => ${hours}),
-                     ${parsed.data.kind ?? 'email'}, ${parsed.data.subject ?? null},
-                     ${parsed.data.body ?? ''}, ${tx.json(normalise([]) as never)})`;
-    return { id: stepId, position: next };
+    // Returns the whole row, not just an id. The client would otherwise have to fetch the
+    // sequence again to show what it just created, and during those two round trips the list
+    // is stale — which is long enough for someone to click again, or to act on the wrong step.
+    const [row] = await tx`
+      INSERT INTO sequence_steps (id, sequence_id, position, delay, kind, subject, body, branches)
+      VALUES (${stepId}, ${id}, ${next}, make_interval(hours => ${hours}),
+              ${parsed.data.kind ?? 'email'}, ${parsed.data.subject ?? null},
+              ${parsed.data.body ?? ''}, ${tx.json(normalise([]) as never)})
+      RETURNING id, position, kind, subject, body, attach_quote, branches,
+                EXTRACT(epoch FROM delay) / 3600 AS delay_hours`;
+    return { step: row };
   });
   return created ? c.json({ ok: true, ...created }, 201) : c.json({ error: 'not found' }, 404);
 });

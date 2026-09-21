@@ -89,8 +89,10 @@ export const campaigns = {
     call<{ id: string }>('/api/sequences', { method: 'POST', body: JSON.stringify(body) }),
   live: (id: string, active: boolean) =>
     call<{ active: boolean }>(`/api/sequences/${id}/live`, { method: 'POST', body: JSON.stringify({ active }) }),
-  addStep: (id: string) =>
-    call<{ id: string }>(`/api/sequences/${id}/steps`, { method: 'POST', body: JSON.stringify({}) }),
+  addStep: async (id: string) => {
+    const r = await call<{ step: Step }>(`/api/sequences/${id}/steps`, { method: 'POST', body: JSON.stringify({}) });
+    return { ...r, step: { ...r.step, delay_hours: Math.round(Number(r.step.delay_hours)) } };
+  },
   saveStep: (id: string, stepId: string, patch: Partial<Step> & { delay_hours?: number; branches?: Branch[] }) =>
     call<{ ok: true }>(`/api/sequences/${id}/steps/${stepId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteStep: (id: string, stepId: string) =>

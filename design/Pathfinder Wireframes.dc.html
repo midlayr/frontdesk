@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#f0eee9;font-family:'Architects Daughter',system-ui,sans-serif;color:#1a1a1a}a{color:#0B7FA8}a:hover{color:#075E7C}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px 'IBM Plex Mono',monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 15px/1.2 'Architects Daughter',sans-serif}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px 'IBM Plex Mono',monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 13px/1.3 'Architects Daughter',sans-serif;color:rgba(0,0,0,.65)}.dv-card{max-width:100%;background:#fff;border:1.5px solid #1a1a1a;border-radius:3px;overflow:hidden}.dv-opt:target .dv-oid{background:#0B7FA8;color:#fff}.dv-next{margin:22px 0 0;font:13px/1.5 'Architects Daughter',sans-serif;color:rgba(0,0,0,.5)}
+.wf{padding:14px;display:flex;flex-direction:column;gap:8px}.bx{border:1.5px solid #1a1a1a;border-radius:2px;background:#fff}.bxd{border:1.5px dashed #888;border-radius:2px}.ln{height:7px;background:#cfcdc7;border-radius:3px}.lns{height:5px;background:#e3e1dc;border-radius:3px}.t{font-size:12px;line-height:1.3}.ts{font-size:10.5px;color:#666;line-height:1.3}.mono{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#555}.acc{background:#0B7FA8;color:#fff}.row{display:flex;gap:8px;align-items:center}.pill{border:1.5px solid #1a1a1a;border-radius:2px;padding:1px 6px;font-size:10.5px;white-space:nowrap}.build{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid rgba(0,0,0,.12);border-radius:4px;background:#fff;font:11.5px/1.5 'IBM Plex Mono',monospace;color:#333}.build b{color:#0B7FA8;font-weight:500}.build ul{margin:4px 0 0;padding-left:14px}.ann{color:#B4690E;font-size:11px}.ok{color:#1F7A4D}.warn{color:#B4690E}.bad{color:#B4261B}
+.hs{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;border:2px solid #1F7A4D;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500}</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Pathfinder — pipeline intelligence. New "Pipeline" nav item. Health score = recency · deadline · value · our reply speed · repeat · enrichment.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Pipeline board — stages, health on every card</div>
+<div class="dv-card" style="width:620px"><div class="wf" style="padding:0">
+<div style="display:flex;gap:14px;align-items:center;padding:10px 14px;border-bottom:1.5px solid #1a1a1a"><span class="t">▣ Inbox</span><span class="t" style="font-weight:600;border-bottom:2px solid #0B7FA8">Pipeline</span><span class="t">Campaigns</span><span class="mono" style="margin-left:auto">$48,200 OPEN · 23 DEALS</span><span class="pill">board | list</span></div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 14px;min-height:300px">
+<div style="display:flex;flex-direction:column;gap:6px"><div class="mono">NEW · 9</div>
+<div class="bx" style="padding:7px"><div class="row" style="justify-content:space-between"><span class="t">Harbor Dental</span><span class="hs">82</span></div><div class="ts">500 postcards · Fri</div><div class="ts">↳ needs stock</div></div>
+<div class="bx" style="padding:7px"><div class="row" style="justify-content:space-between"><span class="t">Lakeside Church</span><span class="hs" style="border-color:#B4690E">51</span></div><div class="ts">booklet · qty? · —</div></div>
+<div class="bxd" style="padding:7px;color:#888"><div class="ts">+ 7 more</div></div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div class="mono">QUOTED · 8</div>
+<div class="bx" style="padding:7px"><div class="row" style="justify-content:space-between"><span class="t">Ridge Realty</span><span class="hs">74</span></div><div class="ts">$1,840 · sent 2h ago</div><div class="ts ok">drip: follow-up in 22h</div></div>
+<div class="bx" style="padding:7px;border-color:#B4261B"><div class="row" style="justify-content:space-between"><span class="t">Valley Auto Group</span><span class="hs" style="border-color:#B4261B">28</span></div><div class="ts">$6,200 · sent 9 days</div><div class="ts bad">no reply · going cold</div></div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div class="mono">WON · 4</div>
+<div class="bx" style="padding:7px;background:#f5f4f1"><div class="t">Fresno Unified</div><div class="ts">$12,400 · in production</div></div>
+<div class="bx" style="padding:7px;background:#f5f4f1"><div class="t">Sierra Vineyards</div><div class="ts">$3,100 · shipped</div></div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div class="mono">LOST · 2</div>
+<div class="bx" style="padding:7px;color:#888"><div class="t">Kern Medical</div><div class="ts">price · went to Vistaprint</div></div></div>
+</div>
+<div class="ann" style="padding:0 14px 10px">↑ drag between columns = status change · card border goes red when score &lt; 35 · value appears once quoted</div>
+</div></div>
+<div class="build" style="width:620px"><b>build</b><ul><li>leads.status drives columns: new|needs_info → NEW, quoted → QUOTED, won, lost. replied stays in NEW (rep replied, waiting on customer)</li><li>add leads.quote_amount, leads.won_at, leads.lost_reason</li><li>drag → PATCH /leads/:id {status}; activity logged</li><li>health_score computed by score_intent job; recomputed nightly + on every event</li></ul></div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Health score — the "why" popover</div>
+<div class="dv-card" style="width:300px"><div class="wf">
+<div class="row" style="justify-content:space-between"><span class="t">Ridge Realty</span><span class="hs" style="width:40px;height:40px;font-size:14px">74</span></div>
+<div class="mono">WHY</div>
+<div class="row" style="justify-content:space-between"><span class="ts">Last contact</span><span class="pill ok">2h ago  +20</span></div>
+<div class="row" style="justify-content:space-between"><span class="ts">Deadline</span><span class="pill">Mon  +15</span></div>
+<div class="row" style="justify-content:space-between"><span class="ts">Quote value</span><span class="pill">$1,840  +10</span></div>
+<div class="row" style="justify-content:space-between"><span class="ts">Our first reply</span><span class="pill ok">11 min  +14</span></div>
+<div class="row" style="justify-content:space-between"><span class="ts">Repeat customer</span><span class="pill" style="border-color:#aaa;color:#888">no  +0</span></div>
+<div class="row" style="justify-content:space-between"><span class="ts">Company fit</span><span class="pill ok">real estate · 12 staff  +15</span></div>
+<div class="bx" style="padding:6px;background:#f5f4f1"><div class="ts"><b>Next best move:</b> call before Monday — realty offices decide Fridays.</div></div>
+</div></div>
+<div class="build" style="width:300px"><b>build</b><ul><li>6 factors, each 0–20, sum = 0–100 (cap 98)</li><li>stored in companies.health_json + leads.intent_score; explanation text from LLM, factors deterministic</li><li>thresholds: ≥70 green · 40–69 amber · &lt;40 red</li></ul></div></div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Company profile — enrichment + history</div>
+<div class="dv-card" style="width:420px"><div class="wf">
+<div class="row" style="justify-content:space-between"><div><div class="t" style="font-size:15px">Ridge Realty</div><div class="ts">ridgerealtyfresno.com · Fresno, CA</div></div><span class="hs" style="width:40px;height:40px;font-size:14px">74</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+<div class="bx" style="padding:6px"><div class="mono">INDUSTRY</div><div class="ts">Real estate</div></div>
+<div class="bx" style="padding:6px"><div class="mono">SIZE</div><div class="ts">11–50</div></div>
+<div class="bx" style="padding:6px"><div class="mono">LIFETIME</div><div class="ts">$0 · prospect</div></div>
+</div>
+<div class="row"><span class="mono">ENRICHED 2h AGO · CLEARBIT</span><span class="ts" style="margin-left:auto">↻ refresh</span></div>
+<div class="mono" style="margin-top:4px">CONTACTS · 2</div>
+<div class="row" style="justify-content:space-between"><span class="ts">Maria Ochoa · Office mgr</span><span class="ts">☎ ✉</span></div>
+<div class="row" style="justify-content:space-between"><span class="ts">Tom Ridge · Broker/owner</span><span class="ts">✉</span></div>
+<div class="mono" style="margin-top:4px">TIMELINE</div>
+<div style="border-left:2px solid #e3e1dc;padding-left:10px;display:flex;flex-direction:column;gap:5px">
+<div class="ts"><b>Today</b> quote $1,840 sent · 2,500 tri-folds</div>
+<div class="ts"><b>Today</b> ☎ voicemail → DL-2047</div>
+<div class="ts"><b>Mar</b> 🎤 note: "wants gloss, asked about EDDM"</div>
+<div class="ts" style="color:#999">Jan · web visit, no contact</div>
+</div>
+<div class="row"><div class="bx acc" style="padding:4px 10px"><span class="ts" style="color:#fff">🎤 Add note</span></div><div class="bx" style="padding:4px 10px"><span class="ts">Enroll in drip</span></div></div>
+</div></div>
+<div class="build" style="width:420px"><b>build</b><ul><li>companies + contacts + all leads for company + activity, one query</li><li>enrich job: domain → Clearbit/Apollo → companies.enrichment_json; cache 30d</li><li>add companies.lifetime_value (sum won quote_amount), last_order_at</li></ul></div></div>
+
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Audible note — hold to talk, on any lead or company</div>
+<div class="dv-card" style="width:300px"><div class="wf">
+<div class="bx acc" style="padding:12px;display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:50%;background:#fff;display:grid;place-items:center"><span style="color:#0B7FA8">🎤</span></div><div><div class="t" style="color:#fff">Recording · 0:14</div><div class="ts" style="color:#cfe8f2">release to save</div></div></div>
+<div class="ann">↓ 3 sec later</div>
+<div class="bx" style="padding:8px"><div class="row" style="justify-content:space-between"><span class="mono">🎤 NOTE · DANNY · JUST NOW</span><span class="ts">▸ 0:14</span></div><div class="ts" style="margin-top:4px">"Maria wants gloss front, matte back, and asked if we do EDDM. Follow up Monday."</div>
+<div class="row" style="margin-top:6px;flex-wrap:wrap"><span class="pill">finish: gloss/matte</span><span class="pill warn">task: follow up Mon</span><span class="pill">interest: EDDM</span></div></div>
+<div class="ann">↑ transcript editable · chips are extracted: specs patch the lead, tasks create reminders</div>
+</div></div>
+<div class="build" style="width:300px"><b>build</b><ul><li>MediaRecorder → R2 org/&lt;id&gt;/notes/ → JOBS.transcribe (Whisper) → JOBS.extract_note</li><li>new table notes(id, org_id, lead_id?, company_id?, author, audio_r2_key, transcript, extracted_json)</li><li>extract_note: specs → PATCH lead · "follow up X" → tasks table</li></ul></div></div>
+
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>List upload — map, dedupe, enrich, enroll</div>
+<div class="dv-card" style="width:460px"><div class="wf">
+<div class="row"><span class="pill acc" style="border-color:#0B7FA8">1 Upload</span><span class="ts">→</span><span class="pill">2 Map</span><span class="ts">→</span><span class="pill">3 Review</span><span class="ts">→</span><span class="pill">4 Enrich &amp; enroll</span></div>
+<div class="bxd" style="padding:18px;text-align:center"><div class="t">Drop CSV or XLSX</div><div class="ts">or paste from monday.com</div></div>
+<div class="mono">STEP 2 · MAP COLUMNS</div>
+<div style="display:grid;grid-template-columns:1fr 20px 1fr;gap:4px;align-items:center">
+<span class="ts">"Business Name"</span><span class="ts">→</span><span class="pill">company.name</span>
+<span class="ts">"Contact"</span><span class="ts">→</span><span class="pill">contact.name</span>
+<span class="ts">"Cell"</span><span class="ts">→</span><span class="pill">contact.phone</span>
+<span class="ts">"Last Job"</span><span class="ts">→</span><span class="pill bxd" style="border-style:dashed;color:#888">skip ▾</span>
+</div>
+<div class="mono">STEP 3 · REVIEW</div>
+<div class="row"><span class="pill ok">412 new</span><span class="pill warn">38 already in system · merge</span><span class="pill bad">6 bad phone</span></div>
+<div class="mono">STEP 4</div>
+<div class="row"><span class="ts">☑ Enrich all (~$4.10)</span><span class="ts">☑ Enroll in "Cold intro" drip</span><span class="ts">☐ Tag: spring-mailer</span></div>
+<div class="bx acc" style="padding:6px;text-align:center"><span class="t" style="color:#fff">Import 412 · enrich · enroll</span></div>
+</div></div>
+<div class="build" style="width:460px"><b>build</b><ul><li>list_imports table exists; add mapping UI + review counts</li><li>dedupe on phone/email/domain within org</li><li>JOBS.import_rows (batches of 100) → JOBS.enrich per company → optional enrollments insert</li><li>progress via InboxRoom DO push</li></ul></div></div>
+
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Radar — lapsed customers &amp; reorder windows</div>
+<div class="dv-card" style="width:380px"><div class="wf">
+<div class="row" style="justify-content:space-between"><span class="mono">RADAR · THIS WEEK</span><span class="pill">auto-drip: on</span></div>
+<div class="bx" style="padding:7px"><div class="row" style="justify-content:space-between"><span class="t">Sierra Vineyards</span><span class="pill warn">reorder due</span></div><div class="ts">wine labels every 90d · last: 87 days ago · $3,100 avg</div><div class="ts ok">→ "Reorder" drip sends Thu unless you call first</div></div>
+<div class="bx" style="padding:7px"><div class="row" style="justify-content:space-between"><span class="t">Central Valley Dental</span><span class="pill bad">lapsed</span></div><div class="ts">3 orders 2025 · nothing in 210 days · $8,400 lifetime</div></div>
+<div class="bx" style="padding:7px"><div class="row" style="justify-content:space-between"><span class="t">Fresno Unified</span><span class="pill">season</span></div><div class="ts">back-to-school run every Aug · start outreach Jun</div></div>
+<div class="ann">↑ cadence learned from won leads per company; rep can override interval</div>
+</div></div>
+<div class="build" style="width:380px"><b>build</b><ul><li>nightly job: per company, gaps between won_at → median interval; flag when now − last_order_at ≥ 0.9 × interval</li><li>lapsed = ≥ 2× interval or 180d, whichever first</li><li>companies.reorder_interval_days (learned or set) · trigger 'reorder_due' for sequences</li></ul></div></div>
+
+</div>
+<p class="dv-next">Nav: Inbox · <b>Pipeline</b> (board, radar tab) · Campaigns · Settings. Company profile opens as a drawer from any card or ticket. Try next: "prototype <a class="dv-oid" href="#1a">1a</a> + <a class="dv-oid" href="#1b">1b</a>" · "schema for notes + tasks" · "list view of the board".</p>
+</section>
+
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,600;125,700&family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#14161A;color:#14161A;font-family:'Inter Tight',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#0B7FA8;text-decoration:none}a:hover{color:#075E7C;text-decoration:underline}
+input,textarea,button{font-family:inherit;color:inherit}
+:focus-visible{outline:2px solid #0B7FA8;outline-offset:2px}
+[data-scroll]{overflow-y:auto;overflow-x:hidden}
+[data-scroll]::-webkit-scrollbar{width:8px}[data-scroll]::-webkit-scrollbar-thumb{background:#E3E1DC}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(31,122,77,.5)}70%{box-shadow:0 0 0 6px rgba(31,122,77,0)}}
+</style>
+</helmet>
+
+<div style="height:100vh;display:grid;grid-template-rows:44px 1fr;font-size:14px">
+
+  <div style="display:flex;align-items:center;gap:16px;padding:0 20px;color:#FBFAF8">
+    <span style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:13px;letter-spacing:.08em;text-transform:uppercase">Midlayr Chat · Live takeover demo</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#9AA0A8">{{ statusLine }}</span>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button onClick="{{ autoplay }}" style="border:1px solid #3A3F47;background:transparent;color:#FBFAF8;border-radius:2px;height:28px;padding:0 12px;font-size:12.5px;cursor:pointer">{{ autoLabel }}</button>
+      <button onClick="{{ reset }}" style="border:1px solid #3A3F47;background:transparent;color:#FBFAF8;border-radius:2px;height:28px;padding:0 12px;font-size:12.5px;cursor:pointer">Reset</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:12px;padding:0 12px 12px;min-height:0">
+
+    <!-- ===== VISITOR: dumontprinting.com ===== -->
+    <div style="display:flex;flex-direction:column;min-height:0;background:#F2F1EE;border-radius:4px;overflow:hidden;position:relative">
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#E9E7E2;border-bottom:1px solid #DCD9D2">
+        <div style="display:flex;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:#D0CCC4"></span><span style="width:10px;height:10px;border-radius:50%;background:#D0CCC4"></span><span style="width:10px;height:10px;border-radius:50%;background:#D0CCC4"></span></div>
+        <div style="flex:1;background:#FBFAF8;border:1px solid #DCD9D2;border-radius:2px;height:24px;display:flex;align-items:center;padding:0 10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5C6169">dumontprinting.com</div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#9AA0A8">VISITOR</span>
+      </div>
+      <div style="flex:1;position:relative;min-height:0">
+        <div style="position:absolute;inset:0;padding:24px 28px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#FBFAF8;border:1px solid #E3E1DC;padding:12px 16px">
+            <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:20px;width:auto;display:block" />
+            <div style="display:flex;gap:20px;font-size:12.5px;color:#5C6169"><span>Services</span><span>Portfolio</span><span>Quote</span></div>
+          </div>
+          <div style="flex:1;background:#FBFAF8;border:1px solid #E3E1DC;padding:32px;display:flex;flex-direction:column;justify-content:center">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:#9AA0A8">FRESNO · SINCE 1974</div>
+            <h1 style="margin:12px 0 0;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:30px;line-height:1.05;letter-spacing:-.02em;max-width:18ch">Commercial printing under one roof.</h1>
+          </div>
+        </div>
+
+        <div style="position:absolute;right:20px;bottom:20px;width:min(340px,calc(100% - 40px));height:min(480px,calc(100% - 40px));display:flex;flex-direction:column;background:#FBFAF8;border:1px solid #E3E1DC;box-shadow:0 12px 32px rgba(20,22,26,.16)">
+          <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #E3E1DC;background:#14161A;color:#FBFAF8">
+            <span style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase">Dumont Printing</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;color:{{ vLiveColor }}">{{ vLiveLabel }}</span>
+          </div>
+          <div data-scroll ref="{{ vScroll }}" style="flex:1;padding:12px;display:flex;flex-direction:column;gap:9px;min-height:0">
+            <sc-for list="{{ vTurns }}" as="c" hint-placeholder-count="2">
+              <div style="align-self:{{ c.align }};max-width:88%;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.border }};padding:8px 10px">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:{{ c.whoColor }}">{{ c.who }}</div>
+                <div style="margin-top:3px;font-size:13px;line-height:1.45">{{ c.text }}</div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ vTyping }}" hint-placeholder-val="{{ false }}">
+              <div style="align-self:flex-start;background:#F2F1EE;border:1px solid #E3E1DC;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8;animation:blink 1.2s infinite">{{ vTypingWho }} is typing…</div>
+            </sc-if>
+            <sc-if value="{{ handoffBanner }}" hint-placeholder-val="{{ false }}">
+              <div style="align-self:stretch;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:#1F7A4D;padding:4px 0">— {{ repName }} joined the conversation —</div>
+            </sc-if>
+          </div>
+          <div style="border-top:1px solid #E3E1DC;padding:10px 12px">
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:{{ vChipsGap }}">
+              <sc-for list="{{ vChips }}" as="chip" hint-placeholder-count="0">
+                <button onClick="{{ chip.onClick }}" style="border:1px solid #0B7FA8;background:#E6F2F7;color:#075E7C;border-radius:2px;padding:5px 10px;font-size:12.5px;white-space:nowrap;cursor:pointer">{{ chip.label }}</button>
+              </sc-for>
+            </div>
+            <form onSubmit="{{ vSend }}" style="display:flex;align-items:center;gap:8px;border:1px solid #E3E1DC;border-radius:2px;padding:0 10px;height:34px">
+              <input value="{{ vDraft }}" onChange="{{ onVDraft }}" placeholder="{{ vPlaceholder }}" style="flex:1;border:0;outline:0;background:transparent;font-size:13px;min-width:0" />
+              <button type="submit" style="border:0;background:#14161A;color:#FBFAF8;border-radius:2px;width:24px;height:24px;font-size:12px;cursor:pointer">↵</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== REP: Dumont Front Desk ===== -->
+    <div style="display:flex;flex-direction:column;min-height:0;background:#FBFAF8;border-radius:4px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:14px;padding:0 16px;height:44px;border-bottom:1px solid #E3E1DC">
+        <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:18px;width:auto;display:block" />
+        <span style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding-left:10px;border-left:1px solid #E3E1DC">Front Desk</span>
+        <span style="font-size:13px;color:#14161A;font-weight:600;border-bottom:2px solid #0B7FA8;padding:12px 0">Inbox</span>
+        <span style="font-size:13px;color:#5C6169">Campaigns</span>
+        <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#9AA0A8">REP · DANNY O.</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:minmax(220px,.9fr) minmax(0,1.4fr);min-height:0;flex:1">
+        <!-- queue -->
+        <div data-scroll style="border-right:1px solid #E3E1DC;background:#F2F1EE;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:0">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:0 2px 4px"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;color:#5C6169">QUEUE · {{ queueCount }} OPEN</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9AA0A8">deadline ▾</span></div>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+            <div onClick="{{ r.onClick }}" style="position:relative;background:{{ r.bg }};border:1px solid {{ r.border }};padding:9px 10px 9px 13px;cursor:pointer">
+              <span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{{ r.bar }}"></span>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8;margin-right:6px">{{ r.glyph }}</span>{{ r.name }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:{{ r.tagColor }};white-space:nowrap;animation:{{ r.anim }}">{{ r.tag }}</span>
+              </div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">
+                <sc-for list="{{ r.chips }}" as="ch" hint-placeholder-count="2">
+                  <span style="border:1px {{ ch.style }} {{ ch.border }};color:{{ ch.color }};padding:1px 6px;font-size:11px;font-family:'IBM Plex Mono',monospace">{{ ch.t }}</span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <!-- ticket -->
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <sc-if value="{{ chatSelected }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:14px 18px 10px;border-bottom:1px solid #E3E1DC">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169">CHAT · dumontprinting.com · {{ ticketLabel }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:{{ rLiveColor }}">{{ rLiveLabel }}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:6px">
+                <div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:20px;letter-spacing:-.02em">{{ visitorTitle }}</div>
+                <div style="text-align:right"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:#9AA0A8">INTENT</div><div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:16px;color:{{ intentColor }}">{{ intentLabel }}</div></div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:10px">
+                <sc-for list="{{ specCells }}" as="f" hint-placeholder-count="4">
+                  <div style="border:1px {{ f.borderStyle }} {{ f.border }};padding:5px 8px">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:#9AA0A8">{{ f.label }}</div>
+                    <div style="margin-top:2px;font-size:12.5px;font-weight:{{ f.weight }};color:{{ f.color }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.value }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div data-scroll ref="{{ rScroll }}" style="flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-height:0;background:#FBFAF8">
+              <sc-for list="{{ rTurns }}" as="c" hint-placeholder-count="2">
+                <div style="align-self:{{ c.align }};max-width:78%;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.border }};padding:8px 10px">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:{{ c.whoColor }}">{{ c.who }}</div>
+                  <div style="margin-top:3px;font-size:13px;line-height:1.45">{{ c.text }}</div>
+                </div>
+              </sc-for>
+              <sc-if value="{{ rTyping }}" hint-placeholder-val="{{ false }}">
+                <div style="align-self:flex-end;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8;animation:blink 1.2s infinite">visitor is typing…</div>
+              </sc-if>
+            </div>
+
+            <div style="border-top:1px solid #E3E1DC;padding:12px 18px 14px;background:#F2F1EE">
+              <sc-if value="{{ notLive }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                  <div style="font-size:12.5px;color:#5C6169;line-height:1.45">Bot is collecting specs. {{ takeoverHint }}</div>
+                  <button onClick="{{ takeOver }}" style="border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;height:34px;padding:0 16px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer">Take over chat</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                  <sc-for list="{{ templates }}" as="t" hint-placeholder-count="3">
+                    <button onClick="{{ t.onClick }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;padding:4px 10px;font-size:12px;white-space:nowrap;cursor:pointer">{{ t.label }}</button>
+                  </sc-for>
+                </div>
+                <form onSubmit="{{ rSend }}" style="display:flex;gap:8px;align-items:flex-end">
+                  <textarea value="{{ rDraft }}" onChange="{{ onRDraft }}" onKeyDown="{{ rKey }}" rows="2" placeholder="Reply as Danny · ⌘↵ to send" style="flex:1;border:1px solid #E3E1DC;border-radius:2px;padding:8px 10px;font-size:13px;line-height:1.45;resize:none;background:#FBFAF8;min-width:0"></textarea>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <button type="submit" style="border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;height:32px;padding:0 14px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer">Send</button>
+                    <button type="button" onClick="{{ closeTicket }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:28px;padding:0 10px;font-size:12px;white-space:nowrap;cursor:pointer">{{ closeLabel }}</button>
+                  </div>
+                </form>
+              </sc-if>
+            </div>
+          </sc-if>
+          <sc-if value="{{ otherSelected }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:grid;place-items:center;color:#9AA0A8;font-size:13px;text-align:center;padding:24px">{{ otherName }} — voicemail ticket.<br />Select the live chat row to follow the demo.</div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:860}}">
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.vScroll = React.createRef(); this.rScroll = React.createRef();
+    this.flow = [
+      { prompt: 'Hi — what are you looking to print?', field: 'product', chips: ['Postcards', 'Booklets', 'Business cards', 'Banners'] },
+      { prompt: 'About how many?', field: 'qty', chips: ['250', '500', '1,000', '2,500+'] },
+      { prompt: 'When do you need them in hand?', field: 'deadline', chips: ['This week', 'Two weeks', 'Flexible'] },
+      { prompt: 'Where should we send the quote? Email or phone works.', field: 'contact', chips: [] },
+    ];
+    this.state = this.fresh();
+  }
+  fresh() {
+    return { turns: [], spec: {}, step: 0, live: false, done: false, typing: null, vDraft: '', rDraft: '', sel: 'chat', auto: false, ticket: 'DL-2051', joined: false, closed: false, others: [
+      { id: 'a', glyph: '☎', name: 'Harbor Dental', tag: 'RUSH · FRI', tagColor: '#B4690E', chips: [['500', 1], ['4×6 postcard', 1], ['14pt', 1], ['stock?', 0]] },
+      { id: 'b', glyph: '☎', name: 'Ridge Realty', tag: 'MON', tagColor: '#5C6169', chips: [['2,500', 1], ['tri-fold', 1], ['gloss', 1]] },
+      { id: 'c', glyph: '✉', name: 'Lakeside Church', tag: '—', tagColor: '#9AA0A8', chips: [['booklet', 1], ['qty?', 0], ['pages?', 0]] },
+    ] };
+  }
+  componentDidMount() { this.say(this.flow[0].prompt, 'bot'); }
+  componentDidUpdate() { for (const r of [this.vScroll, this.rScroll]) if (r.current) r.current.scrollTop = r.current.scrollHeight; }
+  componentWillUnmount() { this.clear(); }
+  clear() { (this._ts || []).forEach(clearTimeout); this._ts = []; }
+  later(fn, ms) { (this._ts = this._ts || []).push(setTimeout(fn, ms)); }
+  say(text, who, delay = 700) {
+    this.setState({ typing: who });
+    this.later(() => this.setState(s => ({ typing: null, turns: [...s.turns, { who, text }] })), delay);
+  }
+  visitorSays(text) {
+    const s = this.state; if (!text.trim()) return;
+    const turns = [...s.turns, { who: 'you', text }];
+    if (s.live) { this.setState({ turns, vDraft: '' }); return; }
+    const cur = this.flow[s.step]; const spec = { ...s.spec };
+    if (cur) spec[cur.field] = text;
+    const wantsPerson = /person|human|someone|call|talk|rush|today|urgent/i.test(text);
+    const next = s.step + 1;
+    this.setState({ turns, spec, vDraft: '', step: next });
+    if (wantsPerson) { this.say("Got it — I'm bringing in an estimator now.", 'bot', 500); this.later(() => this.takeOver(), 1600); return; }
+    if (this.flow[next]) this.say(this.flow[next].prompt, 'bot');
+    else { this.setState({ done: true }); this.say('Thanks — your request is in. An estimator will have a price back to you today.', 'bot'); }
+  }
+  takeOver() {
+    if (this.state.live) return;
+    const sp = this.state.spec;
+    this.setState({ live: true, joined: true, sel: 'chat' });
+    this.later(() => this.setState(s => ({ turns: [...s.turns, { who: 'rep', text: `Hi, this is Danny at Dumont. I've got ${sp.qty ? sp.qty + ' ' : ''}${sp.product ? sp.product.toLowerCase() : 'your job'}${sp.deadline ? ', ' + sp.deadline.toLowerCase() : ''} so far. What stock were you picturing?` }] })), 900);
+  }
+  repSays(text) { if (!text.trim()) return; this.setState(s => ({ turns: [...s.turns, { who: 'rep', text }], rDraft: '' })); if (this.state.auto) this.later(() => this.autoVisitor(), 1800); }
+  autoVisitor() { const s = this.state; const last = s.turns[s.turns.length - 1]; if (!last || last.who !== 'rep') return; const reply = /stock|paper/i.test(last.text) ? 'Something heavy with a gloss front, matte back if you have it.' : /file|art/i.test(last.text) ? 'Yes, I have a PDF ready.' : 'Sounds good, thanks Danny.'; this.setState({ typing: 'you' }); this.later(() => this.setState(st => ({ typing: null, turns: [...st.turns, { who: 'you', text: reply }] })), 1200); }
+  runAuto() {
+    this.clear(); const st = this.fresh(); st.auto = true; this.setState(st);
+    const script = [[600, () => this.say(this.flow[0].prompt, 'bot')], [2200, () => this.visitorSays('Postcards')], [4200, () => this.visitorSays('500')], [6400, () => this.visitorSays('Need them by Friday, can I talk to someone?')]];
+    script.forEach(([t, fn]) => this.later(fn, t));
+  }
+  intent() { const s = this.state; const k = Object.keys(s.spec).length; const near = /week|today|friday|rush/i.test(s.spec.deadline || ''); const score = Math.min(98, 15 + k * 20 + (near ? 15 : 0) + (s.live ? 10 : 0)); return score >= 75 ? ['High', '#1F7A4D'] : score >= 45 ? ['Warm', '#B4690E'] : ['Browsing', '#9AA0A8']; }
+  renderVals() {
+    const s = this.state; const cur = !s.live && !s.done ? this.flow[s.step] : null;
+    const style = (t) => t.who === 'you' ? { align: 'flex-end', bg: '#0B7FA8', fg: '#FBFAF8', border: '#075E7C', whoColor: '#CFE8F2' } : t.who === 'rep' ? { align: 'flex-start', bg: '#FBFAF8', fg: '#14161A', border: '#1F7A4D', whoColor: '#1F7A4D' } : { align: 'flex-start', bg: '#F2F1EE', fg: '#14161A', border: '#E3E1DC', whoColor: '#9AA0A8' };
+    const vTurns = s.turns.map(t => ({ text: t.text, who: t.who === 'you' ? 'YOU' : t.who === 'rep' ? 'DANNY · DUMONT' : 'DUMONT', ...style(t) }));
+    // rep view flips sides: visitor left, Dumont (bot+rep) right
+    const rTurns = s.turns.map(t => t.who === 'you' ? { text: t.text, who: 'VISITOR', align: 'flex-start', bg: '#F2F1EE', fg: '#14161A', border: '#E3E1DC', whoColor: '#5C6169' } : t.who === 'rep' ? { text: t.text, who: 'DANNY', align: 'flex-end', bg: '#0B7FA8', fg: '#FBFAF8', border: '#075E7C', whoColor: '#CFE8F2' } : { text: t.text, who: 'BOT', align: 'flex-end', bg: '#FBFAF8', fg: '#5C6169', border: '#E3E1DC', whoColor: '#9AA0A8' });
+    const [intentLabel, intentColor] = this.intent();
+    const fields = [['product', 'PRODUCT'], ['qty', 'QTY'], ['deadline', 'DUE'], ['contact', 'CONTACT']];
+    const specCells = fields.map(([f, label]) => { const v = s.spec[f]; return { label, value: v || '—', border: v ? '#14161A' : '#E3E1DC', borderStyle: v ? 'solid' : 'dashed', weight: v ? 600 : 400, color: v ? '#14161A' : '#9AA0A8' }; });
+    const chatChips = fields.filter(([f]) => s.spec[f]).map(([f]) => ({ t: s.spec[f], style: 'solid', border: '#14161A', color: '#14161A' })).concat(fields.filter(([f]) => !s.spec[f]).slice(0, 2).map(([f]) => ({ t: f + '?', style: 'dashed', border: '#9AA0A8', color: '#9AA0A8' })));
+    const chatRow = s.closed ? null : { id: 'chat', glyph: '▣', name: s.spec.contact || 'Website visitor', tag: s.live ? '● LIVE' : s.done ? 'NEW' : '● CHATTING', tagColor: s.live ? '#1F7A4D' : s.done ? '#0B7FA8' : '#1F7A4D', anim: s.live ? 'none' : 'blink 1.6s infinite', bar: s.live ? '#1F7A4D' : '#0B7FA8', bg: s.sel === 'chat' ? '#FBFAF8' : '#F7F6F3', border: s.sel === 'chat' ? '#14161A' : '#E3E1DC', chips: chatChips, onClick: () => this.setState({ sel: 'chat' }) };
+    const others = s.others.map(o => ({ id: o.id, glyph: o.glyph, name: o.name, tag: o.tag, tagColor: o.tagColor, anim: 'none', bar: s.sel === o.id ? '#14161A' : 'transparent', bg: s.sel === o.id ? '#FBFAF8' : '#F7F6F3', border: s.sel === o.id ? '#14161A' : '#E3E1DC', chips: o.chips.map(([t, ok]) => ({ t, style: ok ? 'solid' : 'dashed', border: ok ? '#14161A' : '#9AA0A8', color: ok ? '#14161A' : '#9AA0A8' })), onClick: () => this.setState({ sel: o.id }) }));
+    const rows = chatRow ? [chatRow, ...others] : others;
+    const sendRep = () => this.repSays(s.rDraft);
+    return {
+      statusLine: s.live ? 'LIVE · DANNY ON THE THREAD · ChatSession DO → both sockets' : s.done ? `TICKET ${s.ticket} CREATED · bot finished` : `BOT · STEP ${Math.min(s.step + 1, this.flow.length)} OF ${this.flow.length} · InboxRoom pushes the row live`,
+      autoplay: () => this.runAuto(), autoLabel: s.auto ? 'Autoplay running' : '▶ Autoplay scenario', reset: () => { this.clear(); this.setState(this.fresh()); this.later(() => this.say(this.flow[0].prompt, 'bot'), 300); },
+      vScroll: this.vScroll, rScroll: this.rScroll,
+      vTurns, vTyping: s.typing === 'bot' || s.typing === 'rep', vTypingWho: s.typing === 'rep' ? 'Danny' : 'Dumont',
+      vLiveColor: s.live ? '#4FC28A' : '#9AA0A8', vLiveLabel: s.live ? '● live with Danny' : '· quotes', handoffBanner: s.joined, repName: 'Danny',
+      vChips: (cur ? cur.chips : []).map(label => ({ label, onClick: () => this.visitorSays(label) })), vChipsGap: cur && cur.chips.length ? '8px' : '0',
+      vDraft: s.vDraft, onVDraft: e => this.setState({ vDraft: e.target.value }), vSend: e => { e.preventDefault(); this.visitorSays(s.vDraft); }, vPlaceholder: s.live ? 'Reply to Danny' : 'Type your answer',
+      queueCount: rows.length + 11, rows,
+      chatSelected: s.sel === 'chat' && !s.closed, otherSelected: s.sel !== 'chat' || s.closed, otherName: (s.others.find(o => o.id === s.sel) || {}).name || 'Ticket',
+      ticketLabel: s.ticket, visitorTitle: s.spec.contact || 'Website visitor · Fresno, CA', intentLabel, intentColor, specCells,
+      rTurns, rTyping: s.typing === 'you', rLiveColor: s.live ? '#1F7A4D' : '#9AA0A8', rLiveLabel: s.live ? '● YOU ARE LIVE' : s.done ? 'BOT FINISHED' : '● BOT ACTIVE',
+      notLive: !s.live, isLive: s.live, takeoverHint: intentLabel === 'High' ? 'High intent — jump in now.' : 'Step in any time; the visitor sees you join.', takeOver: () => this.takeOver(),
+      templates: [['Stock?', 'What stock and finish were you picturing?'], ['Artwork', 'Do you have print-ready artwork, or do you need design help?'], ['Quote today', "I'll have a price to you within the hour."]].map(([label, text]) => ({ label, onClick: () => this.setState({ rDraft: text }) })),
+      rDraft: s.rDraft, onRDraft: e => this.setState({ rDraft: e.target.value }), rSend: e => { e.preventDefault(); sendRep(); }, rKey: e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); sendRep(); } },
+      closeTicket: () => this.setState({ closed: true, sel: 'a' }), closeLabel: 'Mark quoted',
+    };
+  }
+}
+</script>
+</body>
+</html>

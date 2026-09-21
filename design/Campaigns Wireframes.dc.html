@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#f0eee9;font-family:'Architects Daughter',system-ui,sans-serif;color:#1a1a1a}a{color:#0B7FA8}a:hover{color:#075E7C}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px 'IBM Plex Mono',monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 15px/1.2 'Architects Daughter',sans-serif}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px 'IBM Plex Mono',monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 13px/1.3 'Architects Daughter',sans-serif;color:rgba(0,0,0,.65)}.dv-card{max-width:100%;background:#fff;border:1.5px solid #1a1a1a;border-radius:3px;overflow:hidden}.dv-opt:target .dv-oid{background:#0B7FA8;color:#fff}.dv-next{margin:22px 0 0;font:13px/1.5 'Architects Daughter',sans-serif;color:rgba(0,0,0,.5)}
+.wf{padding:14px;display:flex;flex-direction:column;gap:8px}.bx{border:1.5px solid #1a1a1a;border-radius:2px;background:#fff}.bxd{border:1.5px dashed #888;border-radius:2px}.ln{height:7px;background:#cfcdc7;border-radius:3px}.lns{height:5px;background:#e3e1dc;border-radius:3px}.t{font-size:12px;line-height:1.3}.ts{font-size:10.5px;color:#666;line-height:1.3}.mono{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#555}.acc{background:#0B7FA8;color:#fff}.row{display:flex;gap:8px;align-items:center}.pill{border:1.5px solid #1a1a1a;border-radius:2px;padding:1px 6px;font-size:10.5px;white-space:nowrap}.build{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid rgba(0,0,0,.12);border-radius:4px;background:#fff;font:11.5px/1.5 'IBM Plex Mono',monospace;color:#333}.build b{color:#0B7FA8;font-weight:500}.build ul{margin:4px 0 0;padding-left:14px}.ann{color:#B4690E;font-size:11px}.ok{color:#1F7A4D}.warn{color:#B4690E}.bad{color:#B4261B}
+.bar{height:10px;background:#e3e1dc;border-radius:2px;overflow:hidden}.bar i{display:block;height:100%;background:#0B7FA8}</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Campaigns — what's missing behind the existing sequence list + detail (see Leads Inbox › Campaigns). Editing, branching, who's in it, and whether it works.</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>New sequence — trigger picker</div>
+<div class="dv-card" style="width:380px"><div class="wf">
+<div class="t" style="font-size:15px">New sequence</div>
+<div class="bx" style="height:26px;padding:0 8px;display:flex;align-items:center"><span class="ts">Name · e.g. Quote follow-up</span></div>
+<div class="mono">STARTS WHEN</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+<div class="bx" style="padding:7px;border-color:#0B7FA8"><div class="t">A lead arrives</div><div class="ts">any channel · instant auto-reply</div></div>
+<div class="bx" style="padding:7px"><div class="t">Quoted, no reply</div><div class="ts">after N days</div></div>
+<div class="bx" style="padding:7px"><div class="t">Reorder due</div><div class="ts">from Pipeline radar</div></div>
+<div class="bx" style="padding:7px"><div class="t">Lapsed customer</div><div class="ts">no order in N days</div></div>
+<div class="bx" style="padding:7px"><div class="t">Uploaded list</div><div class="ts">one-time · pick a list</div></div>
+<div class="bx" style="padding:7px"><div class="t">Manual</div><div class="ts">rep enrolls from a ticket</div></div>
+</div>
+<div class="mono">CHANNEL</div>
+<div class="row"><span class="pill acc" style="border-color:#0B7FA8">Email</span><span class="pill">SMS</span><span class="pill">Email → SMS if no open</span></div>
+<div class="mono">STOPS ON <span style="color:#999">(always)</span></div>
+<div class="ts">Any reply · opt-out · status → Won or Lost · rep takes over</div>
+<div class="bx acc" style="padding:6px;text-align:center"><span class="t" style="color:#fff">Create → add first step</span></div>
+</div></div>
+<div class="build" style="width:380px"><b>build</b><ul><li>sequences.trigger enum: lead_created · quoted_no_reply · reorder_due · lapsed · list · manual</li><li>trigger_config jsonb: {days, list_id, channels[]}</li><li>stop conditions are platform rules, not editable</li></ul></div></div>
+
+<div class="dv-opt" id="1b"><div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Step editor — email with merge tokens + preview</div>
+<div class="dv-card" style="width:560px"><div class="wf" style="padding:0">
+<div style="display:grid;grid-template-columns:1fr 1fr;min-height:300px">
+<div style="padding:12px;border-right:1.5px solid #1a1a1a;display:flex;flex-direction:column;gap:7px">
+<div class="row" style="justify-content:space-between"><span class="mono">STEP 2 · EMAIL · DAY 2</span><span class="ts">⋯</span></div>
+<div class="mono">SUBJECT</div>
+<div class="bx" style="height:24px;padding:0 8px;display:flex;align-items:center"><span class="t">Checking in on your {product} quote</span></div>
+<div class="mono">BODY</div>
+<div class="bx" style="padding:8px;min-height:110px"><div class="t">Hi {first_name},</div><div class="t" style="margin-top:4px">Wanted to make sure the quote for {qty} {product} landed. Anything you'd change on stock or timing?</div><div class="t" style="margin-top:4px">{rep_name}</div></div>
+<div class="row" style="flex-wrap:wrap"><span class="pill">{first_name}</span><span class="pill">{company}</span><span class="pill">{qty}</span><span class="pill">{product}</span><span class="pill">{quote_amount}</span><span class="pill">{quote_link}</span><span class="pill">{rep_name}</span></div>
+<div class="ann">↑ click to insert · unknown token = send blocked</div>
+<div class="row"><span class="ts">☑ Attach quote PDF</span><span class="ts">☑ Send as {rep_name}</span></div>
+</div>
+<div style="padding:12px;background:#f5f4f1;display:flex;flex-direction:column;gap:7px">
+<div class="row" style="justify-content:space-between"><span class="mono">PREVIEW · RIDGE REALTY</span><span class="pill">⇄ another lead</span></div>
+<div class="bx" style="padding:10px;display:flex;flex-direction:column;gap:5px"><div class="ts">From: Susan R. · quotes@dumontprinting.com</div><div class="t" style="font-weight:600">Checking in on your tri-fold quote</div><div class="lns" style="width:60%"></div><div class="t">Hi Maria,</div><div class="t">Wanted to make sure the quote for 2,500 tri-fold brochures landed. Anything you'd change on stock or timing?</div><div class="t">Susan</div><div class="ts" style="margin-top:6px;color:#999">Dumont Printing · 1234 N Blackstone · Reply STOP to opt out</div></div>
+<div class="ts">footer + opt-out from org.comms · not editable here</div>
+</div>
+</div>
+</div></div>
+<div class="build" style="width:560px"><b>build</b><ul><li>sequence_steps: add kind (email|sms|wait|task), attach_quote bool, send_as ('rep'|'org')</li><li>tokens resolved at send time from lead + contact + company + assignee; missing → hold enrollment, flag in list</li><li>preview endpoint: POST /sequences/:id/steps/:id/preview {leadId}</li></ul></div></div>
+
+<div class="dv-opt" id="1c"><div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Branch editor — IF / THEN on a step</div>
+<div class="dv-card" style="width:400px"><div class="wf">
+<div class="row" style="justify-content:space-between"><span class="mono">AFTER STEP 2 · CHECK AT DAY 5</span><span class="ts">⋯</span></div>
+<div class="bx" style="padding:8px;background:#f5f4f1"><div class="row"><span class="mono">IF</span><span class="pill">Replied ▾</span><span class="mono">→</span><span class="pill">Stop sequence ▾</span></div><div class="ts" style="margin-top:3px">platform rule · locked</div></div>
+<div class="bx" style="padding:8px"><div class="row"><span class="mono">IF</span><span class="pill">Opened, no reply ▾</span><span class="mono">→</span><span class="pill">Continue ▾</span></div></div>
+<div class="bx" style="padding:8px"><div class="row"><span class="mono">IF</span><span class="pill">Not opened ▾</span><span class="mono">→</span><span class="pill">Resend, new subject ▾</span></div><div class="bx" style="margin-top:6px;height:22px;padding:0 6px;display:flex;align-items:center"><span class="ts">Still thinking about the {product}?</span></div></div>
+<div class="bx" style="padding:8px"><div class="row"><span class="mono">IF</span><span class="pill">Clicked quote ▾</span><span class="mono">→</span><span class="pill">Assign to estimator + task ▾</span></div></div>
+<div class="bxd" style="padding:6px;text-align:center"><span class="ts">+ branch</span></div>
+<div class="mono" style="margin-top:4px">CONDITIONS: replied · opened · not opened · clicked · bounced · SMS delivered · health &lt; N</div>
+<div class="mono">ACTIONS: continue · stop · resend · skip to step N · switch to SMS · assign · create task · tag</div>
+</div></div>
+<div class="build" style="width:400px"><b>build</b><ul><li>sequence_steps.branches jsonb [{if, then, config}] evaluated by cron at step due time</li><li>needs opens/clicks: Resend webhooks → messages.opened_at/clicked_at; SMS delivered from Twilio status callback</li><li>first branch always the locked "replied → stop"</li></ul></div></div>
+
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Enrolled — who's in it, where they are</div>
+<div class="dv-card" style="width:480px"><div class="wf">
+<div class="row" style="justify-content:space-between"><span class="mono">QUOTE FOLLOW-UP · ENROLLED · 31</span><div class="row"><span class="pill acc" style="border-color:#0B7FA8">Active 19</span><span class="pill">Replied 8</span><span class="pill">Held 2</span><span class="pill">Done 2</span></div></div>
+<div style="display:grid;grid-template-columns:1.3fr 1fr .8fr 1fr;gap:4px;align-items:center">
+<span class="mono">LEAD</span><span class="mono">STEP</span><span class="mono">NEXT</span><span class="mono">STATE</span>
+<span class="t">Ridge Realty · DL-2047</span><span class="ts">2 of 4 · opened</span><span class="ts">Day 5 · Thu</span><span class="pill ok">active</span>
+<span class="t">Valley Auto · DL-2031</span><span class="ts">3 of 4 · not opened</span><span class="ts">Day 10 · Mon</span><span class="pill ok">active</span>
+<span class="t">Lakeside Church · DL-2040</span><span class="ts">1 of 4</span><span class="ts">—</span><span class="pill warn">held · no {qty}</span>
+<span class="t">Harbor Dental · DL-2046</span><span class="ts">2 of 4</span><span class="ts">stopped</span><span class="pill">replied ✓</span>
+<span class="t">Kern Medical · DL-2022</span><span class="ts">4 of 4</span><span class="ts">—</span><span class="pill" style="color:#888;border-color:#aaa">done · no reply</span>
+</div>
+<div class="ann">↑ row click → ticket · held = merge token missing, rep fixes spec and it resumes · bulk: pause / remove selected</div>
+</div></div>
+<div class="build" style="width:480px"><b>build</b><ul><li>enrollments already has state, next_step, next_send_at; add held_reason</li><li>GET /sequences/:id/enrollments?state= · PATCH bulk {state}</li><li>enrollment auto-resumes when lead PATCH fills the missing token</li></ul></div></div>
+
+<div class="dv-opt" id="1e"><div class="dv-olabel"><a class="dv-oid" href="#1e">1e</a>Performance — funnel per step, revenue attributed</div>
+<div class="dv-card" style="width:460px"><div class="wf">
+<div class="row" style="justify-content:space-between"><span class="mono">QUOTE FOLLOW-UP · LAST 90 DAYS</span><span class="pill">30d | 90d | all</span></div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+<div class="bx" style="padding:6px"><div class="mono">ENROLLED</div><div class="t" style="font-size:16px">88</div></div>
+<div class="bx" style="padding:6px"><div class="mono">REPLIED</div><div class="t" style="font-size:16px">19 <span class="ts">22%</span></div></div>
+<div class="bx" style="padding:6px;border-color:#1F7A4D"><div class="mono ok">WON AFTER</div><div class="t ok" style="font-size:16px">7</div></div>
+<div class="bx" style="padding:6px;border-color:#1F7A4D"><div class="mono ok">REVENUE</div><div class="t ok" style="font-size:16px">$14,900</div></div>
+</div>
+<div class="mono" style="margin-top:4px">BY STEP</div>
+<div class="row"><span class="ts" style="width:120px">Day 2 · Checking in</span><div class="bar" style="flex:1"><i style="width:58%"></i></div><span class="ts" style="width:90px">58% open · 11 rep.</span></div>
+<div class="row"><span class="ts" style="width:120px">Day 5 · Anything changed?</span><div class="bar" style="flex:1"><i style="width:56%"></i></div><span class="ts" style="width:90px">56% open · 6 rep.</span></div>
+<div class="row"><span class="ts" style="width:120px">Day 10 · Last call</span><div class="bar" style="flex:1"><i style="width:31%"></i></div><span class="ts" style="width:90px">31% open · 2 rep.</span></div>
+<div class="bx" style="padding:7px;background:#f5f4f1"><div class="ts"><b>Read:</b> most replies come from step 1. Step 3 barely opens — try SMS for the last touch, or drop it.</div></div>
+<div class="ts">Won after = lead status → won within 30d of a sequence send</div>
+</div></div>
+<div class="build" style="width:460px"><b>build</b><ul><li>materialized nightly: sequence_stats(sequence_id, step_id, window, sent, opened, clicked, replied, won, revenue)</li><li>attribution: leads.won_at − last sequence send ≤ 30d</li><li>"Read" = one LLM sentence over the step table; cached per day</li></ul></div></div>
+
+<div class="dv-opt" id="1f"><div class="dv-olabel"><a class="dv-oid" href="#1f">1f</a>Enroll from a ticket + what the lead sees</div>
+<div class="dv-card" style="width:300px"><div class="wf">
+<div class="mono">ON THE TICKET · DL-2047</div>
+<div class="bx" style="padding:8px"><div class="row" style="justify-content:space-between"><span class="t">Sequences</span><span class="pill">+ Enroll ▾</span></div><div class="ts" style="margin-top:4px">● Quote follow-up · step 2 of 4 · next Thu</div><div class="row" style="margin-top:4px"><span class="pill">Pause</span><span class="pill">Remove</span></div></div>
+<div class="ann">↓ in the message thread, drip sends look like this</div>
+<div class="bx" style="padding:7px;border-style:dashed;border-color:#0B7FA8"><div class="mono" style="color:#0B7FA8">⟳ QUOTE FOLLOW-UP · DAY 2 · AUTO</div><div class="ts" style="margin-top:3px">Checking in on your tri-fold quote… <span class="ok">opened 2h ago</span></div></div>
+<div class="bx" style="padding:7px"><div class="mono">MARIA · REPLY</div><div class="ts" style="margin-top:3px">Yes — can you do gloss on the outside?</div></div>
+<div class="ts ok">→ sequence stopped · lead back to New · assigned to Susan</div>
+</div></div>
+<div class="build" style="width:300px"><b>build</b><ul><li>ticket panel: GET /leads/:id/enrollments · POST enroll {sequence_id}</li><li>drip sends are messages rows author='sequence:&lt;id&gt;' — render dashed accent</li><li>reply-in handler: stop enrollments, status→new, assign last rep</li></ul></div></div>
+
+</div>
+<p class="dv-next">Existing hi-fi covers: sequence list, detail header (trigger / audience / window / stops on), read-only steps with stats, CSV drop. Try next: "prototype <a class="dv-oid" href="#1b">1b</a> + <a class="dv-oid" href="#1c">1c</a> inside the Leads Inbox" · "handoff 4 for Claude Code" · "SMS step variant".</p>
+</section>
+
+</x-dc>
+</body>
+</html>

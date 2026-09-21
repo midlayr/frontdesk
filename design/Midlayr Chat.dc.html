@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,600;125,700&family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#FBFAF8;color:#14161A;font-family:'Inter Tight',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#0B7FA8;text-decoration:none}a:hover{color:#075E7C;text-decoration:underline}
+input,textarea,select,button{font-family:inherit;color:inherit}
+:focus-visible{outline:2px solid #0B7FA8;outline-offset:2px}
+[data-scroll]{overflow-y:auto;overflow-x:hidden}
+[data-scroll]::-webkit-scrollbar{width:10px}[data-scroll]::-webkit-scrollbar-thumb{background:#E3E1DC}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+</style>
+</helmet>
+
+<div style="height:100vh;display:grid;grid-template-rows:56px 1fr;background:#FBFAF8;font-size:14px">
+
+  <header style="display:flex;align-items:center;gap:20px;padding:0 24px;border-bottom:1px solid #E3E1DC;background:#FBFAF8">
+    <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:22px;width:auto;object-fit:contain;display:block" />
+    <div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding-left:10px;border-left:1px solid #E3E1DC">Midlayr Chat</div>
+    <div style="display:flex;align-items:stretch;gap:18px;height:56px;margin-left:12px">
+      <sc-for list="{{ tabs }}" as="tab" hint-placeholder-count="3">
+        <button onClick="{{ tab.onClick }}" style="background:transparent;border:0;border-bottom:{{ tab.border }};padding:0 2px;font-size:13.5px;white-space:nowrap;cursor:pointer;color:{{ tab.color }};font-weight:{{ tab.weight }}">{{ tab.label }}</button>
+      </sc-for>
+    </div>
+    <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#5C6169;white-space:nowrap">{{ statusLine }}</span>
+    <button onClick="{{ resetChat }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:28px;padding:0 12px;font-size:12.5px;white-space:nowrap;cursor:pointer">Reset conversation</button>
+  </header>
+
+  <sc-if value="{{ isSite }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;min-height:0">
+
+      <div style="position:relative;background:#F2F1EE;overflow:hidden">
+        <div style="position:absolute;inset:0;padding:32px 48px;display:flex;flex-direction:column;gap:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#FBFAF8;border:1px solid #E3E1DC;padding:14px 20px">
+            <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:24px;width:auto;object-fit:contain;display:block" />
+            <div style="display:flex;gap:26px;font-size:13.5px;color:#5C6169"><span>Services</span><span>Portfolio</span><span>Request a quote</span><span>Contact</span></div>
+          </div>
+          <div style="flex:1;display:grid;gap:20px;min-height:0;grid-template-columns:1.1fr .9fr">
+            <div style="background:#FBFAF8;border:1px solid #E3E1DC;padding:40px 44px;display:flex;flex-direction:column;justify-content:center">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#9AA0A8">DUMONTPRINTING.COM · HOME</div>
+              <h1 style="margin:16px 0 0;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:40px;line-height:1.05;letter-spacing:-.02em;max-width:22ch">Commercial printing in Fresno since 1974.</h1>
+              <p style="margin:16px 0 0;max-width:44ch;font-size:15px;line-height:1.55;color:#5C6169;text-wrap:pretty">Booklets, mailers, labels, menus, banners. Sheetfed and digital under one roof.</p>
+            </div>
+            <div style="background:repeating-linear-gradient(135deg,#E9E7E2 0 12px,#F2F1EE 12px 24px);border:1px solid #E3E1DC;display:grid;place-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;color:#9AA0A8">PRESS FLOOR PHOTO</span></div>
+          </div>
+        </div>
+
+        <sc-if value="{{ chatClosed }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;right:28px;bottom:28px;display:flex;flex-direction:column;align-items:flex-end;gap:10px">
+            <sc-if value="{{ showNudge }}" hint-placeholder-val="{{ true }}">
+              <div style="background:#FBFAF8;border:1px solid #E3E1DC;padding:10px 14px;font-size:13.5px;box-shadow:0 8px 24px rgba(20,22,26,.10);max-width:260px;line-height:1.45">{{ nudgeText }}</div>
+            </sc-if>
+            <button onClick="{{ openChat }}" style="border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;padding:12px 18px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 8px 24px rgba(20,22,26,.14)">{{ launcherLabel }}</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ chatOpen }}" hint-placeholder-val="{{ true }}">
+          <div style="position:absolute;right:28px;bottom:28px;width:min(380px,calc(100% - 56px));height:min(560px,calc(100% - 56px));display:flex;flex-direction:column;background:#FBFAF8;border:1px solid #E3E1DC;box-shadow:0 12px 32px rgba(20,22,26,.16)">
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #E3E1DC;background:#14161A;color:#FBFAF8">
+              <span style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase">Dumont Printing</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:{{ liveColor }}">{{ liveLabel }}</span>
+              <button onClick="{{ closeChat }}" style="margin-left:auto;background:transparent;border:0;color:#9AA0A8;font-size:14px;cursor:pointer">✕</button>
+            </div>
+            <div data-scroll ref="{{ scrollRef }}" style="flex:1;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:0">
+              <sc-for list="{{ turns }}" as="c" hint-placeholder-count="2">
+                <div style="align-self:{{ c.align }};max-width:86%;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.border }};padding:9px 11px">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:{{ c.whoColor }}">{{ c.who }}</div>
+                  <div style="margin-top:4px;font-size:13.5px;line-height:1.5">{{ c.text }}</div>
+                </div>
+              </sc-for>
+              <sc-if value="{{ typing }}" hint-placeholder-val="{{ false }}">
+                <div style="align-self:flex-start;background:#F2F1EE;border:1px solid #E3E1DC;padding:9px 11px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9AA0A8;animation:blink 1.2s infinite">{{ typingWho }} is typing…</div>
+              </sc-if>
+              <sc-if value="{{ ticketMade }}" hint-placeholder-val="{{ false }}">
+                <div style="align-self:stretch;border:1px solid #1F7A4D;padding:9px 11px;background:#FBFAF8">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#1F7A4D">TICKET {{ ticketId }} CREATED · CB</div>
+                  <div style="margin-top:4px;font-size:13px;color:#5C6169">{{ ticketSummary }}</div>
+                </div>
+              </sc-if>
+            </div>
+            <div style="border-top:1px solid #E3E1DC;padding:10px 14px 12px">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:{{ chipsGap }}">
+                <sc-for list="{{ chips }}" as="chip" hint-placeholder-count="0">
+                  <button onClick="{{ chip.onClick }}" style="border:1px solid #0B7FA8;background:#E6F2F7;color:#075E7C;border-radius:2px;padding:6px 11px;font-size:13px;white-space:nowrap;cursor:pointer">{{ chip.label }}</button>
+                </sc-for>
+              </div>
+              <form onSubmit="{{ onSend }}" style="display:flex;align-items:center;gap:8px;border:1px solid #E3E1DC;border-radius:2px;padding:0 10px;height:36px">
+                <input value="{{ draft }}" onChange="{{ onDraft }}" placeholder="{{ inputPlaceholder }}" style="flex:1;border:0;outline:0;background:transparent;font-size:13.5px;min-width:0" />
+                <button type="submit" style="border:0;background:#14161A;color:#FBFAF8;border-radius:2px;width:26px;height:26px;font-size:13px;cursor:pointer">↵</button>
+              </form>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <aside data-scroll style="border-left:1px solid #E3E1DC;background:#FBFAF8;padding:20px;display:flex;flex-direction:column;gap:18px;min-height:0">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">PROSPECT INTELLIGENCE · REP VIEW</div>
+          <div style="margin-top:6px;font-size:12.5px;color:#5C6169;line-height:1.45">What Midlayr knows about this visitor as they type. Feeds the job ticket.</div>
+        </div>
+        <div style="border:1px solid #E3E1DC;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">INTENT</span><span style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:22px;letter-spacing:-.02em;color:{{ intentColor }}">{{ intentLabel }}</span></div>
+          <div style="height:4px;background:#E3E1DC"><div style="height:4px;background:{{ intentColor }};width:{{ intentPct }}"></div></div>
+          <div style="font-size:12px;color:#5C6169">{{ intentWhy }}</div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8;margin-bottom:8px">CAPTURED SPECS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <sc-for list="{{ specCells }}" as="f" hint-placeholder-count="6">
+              <div style="border:1px {{ f.borderStyle }} {{ f.border }};padding:7px 9px;min-height:50px">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#9AA0A8">{{ f.label }}</div>
+                <div style="margin-top:3px;font-size:13.5px;font-weight:{{ f.weight }};color:{{ f.color }}">{{ f.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8;margin-bottom:8px">VISITOR</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+            <sc-for list="{{ visitorFacts }}" as="v" hint-placeholder-count="4">
+              <div style="display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #E3E1DC;padding-bottom:6px"><span style="color:#5C6169">{{ v.k }}</span><span style="text-align:right">{{ v.v }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8;margin-bottom:8px">SUGGESTED NEXT</div>
+          <div style="border:1px solid #E3E1DC;background:#F2F1EE;padding:10px 12px;font-size:13px;line-height:1.5">{{ nextAction }}</div>
+        </div>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <button onClick="{{ takeOver }}" style="flex:1;border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;height:34px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer">{{ takeOverLabel }}</button>
+          <a href="Dumont Leads Inbox.dc.html" style="display:grid;place-items:center;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:34px;padding:0 12px;font-size:13px;color:#14161A">Open ticket</a>
+        </div>
+      </aside>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isFlow }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:300px minmax(0,1fr) 420px;min-height:0">
+
+      <div data-scroll style="border-right:1px solid #E3E1DC;background:#F2F1EE;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:0">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">FLOW · QUOTE INTAKE</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8">{{ stepCount }}</span></div>
+        <sc-for list="{{ stepRows }}" as="st" hint-placeholder-count="5">
+          <div onClick="{{ st.onClick }}" style="position:relative;background:#FBFAF8;border:1px solid {{ st.border }};padding:10px 12px 10px 14px;cursor:pointer">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:{{ st.bar }}"></span>
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:{{ st.kindColor }}">{{ st.kindLabel }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8">{{ st.n }}</span></div>
+            <div style="margin-top:5px;font-size:13.5px;line-height:1.4;font-weight:500">{{ st.title }}</div>
+            <div style="margin-top:3px;font-size:12px;color:#5C6169">{{ st.sub }}</div>
+          </div>
+        </sc-for>
+        <button onClick="{{ addStep }}" style="border:1px dashed #9AA0A8;background:transparent;border-radius:2px;height:38px;font-size:13px;color:#5C6169;cursor:pointer">+ Add a question</button>
+        <div style="margin-top:auto;font-size:12px;color:#5C6169;line-height:1.5">Reps edit this. No code. Changes go live on save.</div>
+      </div>
+
+      <div data-scroll style="padding:28px 32px;min-height:0">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">STEP {{ selN }} · {{ selKindLabel }}</div>
+        <h2 style="margin:10px 0 0;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:24px;letter-spacing:-.02em;line-height:1.1">{{ selTitle }}</h2>
+
+        <sc-if value="{{ selIsAsk }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top:24px;display:flex;flex-direction:column;gap:18px;max-width:560px">
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">WHAT THE BOT SAYS</span>
+              <textarea value="{{ selPrompt }}" onChange="{{ onSelPrompt }}" rows="2" style="border:1px solid #E3E1DC;border-radius:2px;padding:10px 12px;font-size:14px;line-height:1.5;resize:vertical;background:#FBFAF8"></textarea>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">SAVES TO TICKET FIELD</span>
+              <select value="{{ selField }}" onChange="{{ onSelField }}" style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 12px;font-size:14px;background:#FBFAF8;max-width:260px">
+                <option value="product">Product</option><option value="qty">Quantity</option><option value="size">Size</option><option value="stock">Stock</option><option value="deadline">Deadline</option><option value="contact">Contact</option><option value="notes">Notes (free text)</option>
+              </select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">QUICK REPLIES · COMMA SEPARATED</span>
+              <input value="{{ selChips }}" onChange="{{ onSelChips }}" placeholder="Leave empty for free text only" style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 12px;font-size:14px;background:#FBFAF8" />
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13.5px"><input type="checkbox" checked="{{ selSkippable }}" onChange="{{ onSelSkippable }}" /> Visitor can skip this question</label>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ selIsRule }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:24px;display:flex;flex-direction:column;gap:18px;max-width:560px">
+            <p style="margin:0;font-size:14px;line-height:1.55;color:#5C6169">Checked on every visitor message. When it matches, the bot stops asking and hands the thread to a live rep with the specs captured so far.</p>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">HAND OFF WHEN MESSAGE CONTAINS</span>
+              <input value="{{ ruleWords }}" onChange="{{ onRuleWords }}" style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 12px;font-size:14px;background:#FBFAF8" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">HANDOFF MESSAGE</span>
+              <textarea value="{{ handoffText }}" onChange="{{ onHandoffText }}" rows="2" style="border:1px solid #E3E1DC;border-radius:2px;padding:10px 12px;font-size:14px;line-height:1.5;resize:vertical;background:#FBFAF8"></textarea>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">ROUTE TO</span>
+              <select value="{{ routeTo }}" onChange="{{ onRouteTo }}" style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 12px;font-size:14px;background:#FBFAF8;max-width:260px">
+                <option value="next">Next available rep</option><option value="danny">Danny O.</option><option value="susan">Susan R.</option>
+              </select>
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:13.5px"><input type="checkbox" checked="{{ afterHours }}" onChange="{{ onAfterHours }}" /> After hours: keep collecting, create ticket, promise a morning callback</label>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ selIsTicket }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:24px;display:flex;flex-direction:column;gap:18px;max-width:560px">
+            <p style="margin:0;font-size:14px;line-height:1.55;color:#5C6169">Runs when the questions are done. Creates the job ticket in the inbox with every captured field, tags the channel as chat, and shows the visitor a confirmation.</p>
+            <label style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">CONFIRMATION TO VISITOR</span>
+              <textarea value="{{ ticketText }}" onChange="{{ onTicketText }}" rows="2" style="border:1px solid #E3E1DC;border-radius:2px;padding:10px 12px;font-size:14px;line-height:1.5;resize:vertical;background:#FBFAF8"></textarea>
+            </label>
+            <div style="border:1px solid #E3E1DC;padding:12px 14px;font-size:13px;line-height:1.6;color:#5C6169">Also: starts the <strong style="color:#14161A">Quote follow-up</strong> drip if no reply in 24h · syncs to monday.com</div>
+          </div>
+        </sc-if>
+
+        <div style="margin-top:32px;display:flex;gap:8px;max-width:560px">
+          <button onClick="{{ moveUp }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:32px;padding:0 12px;font-size:13px;cursor:pointer">↑ Move up</button>
+          <button onClick="{{ moveDown }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:32px;padding:0 12px;font-size:13px;cursor:pointer">↓ Move down</button>
+          <sc-if value="{{ selIsAsk }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ deleteStep }}" style="margin-left:auto;border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:32px;padding:0 12px;font-size:13px;color:#B4261B;cursor:pointer">Delete step</button>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="border-left:1px solid #E3E1DC;background:#F2F1EE;padding:20px;display:flex;flex-direction:column;gap:12px;min-height:0">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">LIVE PREVIEW</span><button onClick="{{ resetChat }}" style="border:0;background:transparent;font-size:12.5px;color:#0B7FA8;cursor:pointer;padding:0">Restart</button></div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:#FBFAF8;border:1px solid #E3E1DC;box-shadow:0 12px 32px rgba(20,22,26,.10)">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #E3E1DC;background:#14161A;color:#FBFAF8">
+            <span style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase">Dumont Printing</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.04em;color:{{ liveColor }}">{{ liveLabel }}</span>
+          </div>
+          <div data-scroll ref="{{ scrollRef2 }}" style="flex:1;padding:14px;display:flex;flex-direction:column;gap:10px;min-height:0">
+            <sc-for list="{{ turns }}" as="c" hint-placeholder-count="2">
+              <div style="align-self:{{ c.align }};max-width:86%;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.border }};padding:9px 11px">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:{{ c.whoColor }}">{{ c.who }}</div>
+                <div style="margin-top:4px;font-size:13.5px;line-height:1.5">{{ c.text }}</div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ typing }}" hint-placeholder-val="{{ false }}">
+              <div style="align-self:flex-start;background:#F2F1EE;border:1px solid #E3E1DC;padding:9px 11px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9AA0A8;animation:blink 1.2s infinite">{{ typingWho }} is typing…</div>
+            </sc-if>
+            <sc-if value="{{ ticketMade }}" hint-placeholder-val="{{ false }}">
+              <div style="align-self:stretch;border:1px solid #1F7A4D;padding:9px 11px;background:#FBFAF8">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#1F7A4D">TICKET {{ ticketId }} CREATED · CB</div>
+                <div style="margin-top:4px;font-size:13px;color:#5C6169">{{ ticketSummary }}</div>
+              </div>
+            </sc-if>
+          </div>
+          <div style="border-top:1px solid #E3E1DC;padding:10px 14px 12px">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:{{ chipsGap }}">
+              <sc-for list="{{ chips }}" as="chip" hint-placeholder-count="0">
+                <button onClick="{{ chip.onClick }}" style="border:1px solid #0B7FA8;background:#E6F2F7;color:#075E7C;border-radius:2px;padding:6px 11px;font-size:13px;white-space:nowrap;cursor:pointer">{{ chip.label }}</button>
+              </sc-for>
+            </div>
+            <form onSubmit="{{ onSend }}" style="display:flex;align-items:center;gap:8px;border:1px solid #E3E1DC;border-radius:2px;padding:0 10px;height:36px">
+              <input value="{{ draft }}" onChange="{{ onDraft }}" placeholder="{{ inputPlaceholder }}" style="flex:1;border:0;outline:0;background:transparent;font-size:13.5px;min-width:0" />
+              <button type="submit" style="border:0;background:#14161A;color:#FBFAF8;border-radius:2px;width:26px;height:26px;font-size:13px;cursor:pointer">↵</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isInstall }}" hint-placeholder-val="{{ false }}">
+    <div data-scroll style="padding:36px 48px;min-height:0;background:#F2F1EE">
+      <div style="max-width:960px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:28px;align-items:start">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">INSTALL · ONE SCRIPT TAG</div>
+            <h2 style="margin:10px 0 0;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:26px;letter-spacing:-.02em;line-height:1.1">Paste before the closing body tag on dumontprinting.com.</h2>
+          </div>
+          <div style="background:#14161A;color:#FBFAF8;padding:18px 20px;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-all;border:1px solid #14161A">{{ snippet }}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button onClick="{{ copySnippet }}" style="border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;height:34px;padding:0 14px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer">{{ copyLabel }}</button><button style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:34px;padding:0 14px;font-size:13px;white-space:nowrap;cursor:pointer">Email to web vendor</button></div>
+          <div style="background:#FBFAF8;border:1px solid #E3E1DC;padding:16px 18px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">STATUS</div>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;font-size:13.5px">
+              <sc-for list="{{ installChecks }}" as="ck" hint-placeholder-count="4">
+                <div style="display:flex;gap:10px;align-items:flex-start;line-height:1.4"><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;color:{{ ck.color }}">{{ ck.mark }}</span><span style="color:{{ ck.textColor }}">{{ ck.text }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        <div style="background:#FBFAF8;border:1px solid #E3E1DC;padding:20px 22px;display:flex;flex-direction:column;gap:16px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">WIDGET SETTINGS</div>
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">LAUNCHER LABEL</span><input value="{{ launcherLabel }}" onChange="{{ onLauncher }}" style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 12px;font-size:14px;background:#FBFAF8" /></label>
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">NUDGE AFTER 8 SECONDS</span><input value="{{ nudgeText }}" onChange="{{ onNudge }}" style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 12px;font-size:14px;background:#FBFAF8" /></label>
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">ALLOWED DOMAINS</span><input value="{{ domains }}" onChange="{{ onDomains }}" style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 12px;font-size:14px;background:#FBFAF8" /></label>
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">BUSINESS HOURS · PT</span><input value="{{ hours }}" onChange="{{ onHours }}" style="border:1px solid #E3E1DC;border-radius:2px;padding:9px 12px;font-size:14px;background:#FBFAF8" /></label>
+          <div style="font-size:12.5px;color:#5C6169;line-height:1.5">Brand color and logo come from Settings → Brand. Outside hours the bot collects and promises a morning callback.</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.scrollRef = React.createRef(); this.scrollRef2 = React.createRef();
+    this.state = {
+      view: 'site', chatOpen: true, nudge: true, draft: '', typing: null, live: false, ticket: null, copied: false,
+      steps: [
+        { id: 1, kind: 'ask', prompt: 'Hi — what are you looking to print?', field: 'product', chips: 'Postcards, Booklets, Business cards, Banners, Something else', skippable: false },
+        { id: 2, kind: 'ask', prompt: 'About how many?', field: 'qty', chips: '250, 500, 1000, 2500+', skippable: false },
+        { id: 3, kind: 'ask', prompt: 'When do you need them in hand?', field: 'deadline', chips: 'This week, Two weeks, Flexible', skippable: true },
+        { id: 4, kind: 'ask', prompt: 'Where should we send the quote? Email or phone works.', field: 'contact', chips: '', skippable: false },
+        { id: 5, kind: 'rule', words: 'person, call me, talk to, rush, today, urgent', handoff: "Got it — I'm bringing in an estimator now. Give me a second.", route: 'next', afterHours: true },
+        { id: 6, kind: 'ticket', text: 'Thanks — your request is in. An estimator will have a price back to you today.' },
+      ],
+      sel: 1, stepIdx: 0, spec: {}, turns: [], launcher: 'Get a quote', nudgeText: "Need a price? Tell me what you're printing.", domains: 'dumontprinting.com, www.dumontprinting.com', hours: 'Mon–Fri 7:30–5:00',
+      startedAt: Date.now(),
+    };
+  }
+  componentDidMount() { this.begin(); }
+  componentDidUpdate() { for (const r of [this.scrollRef, this.scrollRef2]) if (r.current) r.current.scrollTop = r.current.scrollHeight; }
+  asks() { return this.state.steps.filter(s => s.kind === 'ask'); }
+  rule() { return this.state.steps.find(s => s.kind === 'rule'); }
+  ticketStep() { return this.state.steps.find(s => s.kind === 'ticket'); }
+  begin() {
+    const a = this.asks()[0];
+    clearTimeout(this._t); clearTimeout(this._t2); clearTimeout(this._t3);
+    this.setState({ turns: [], spec: {}, stepIdx: 0, live: false, ticket: null, typing: null, draft: '', startedAt: Date.now() });
+    if (a) this.botSay(a.prompt);
+  }
+  botSay(text, who = 'bot', delay = 600) {
+    clearTimeout(this._t);
+    this.setState({ typing: who === 'bot' ? 'Dumont' : 'Danny' });
+    this._t = setTimeout(() => this.setState(s => ({ typing: null, turns: [...s.turns, { who, text }] })), delay);
+  }
+  handle(text) {
+    const s = this.state; if (!text.trim()) return;
+    const turns = [...s.turns, { who: 'you', text }];
+    if (s.live) { this.setState({ turns, draft: '' }); this.botSay(this.repReply(text), 'rep', 1400); return; }
+    if (s.ticket) { this.setState({ turns, draft: '' }); this.botSay('Added to your ticket. Anything else?'); return; }
+    const rule = this.rule(); const low = text.toLowerCase();
+    const hit = rule && rule.words.split(',').map(w => w.trim().toLowerCase()).filter(Boolean).some(w => low.includes(w));
+    const asks = this.asks(); const cur = asks[s.stepIdx]; const spec = { ...s.spec };
+    if (cur) spec[cur.field] = this.extract(cur.field, text);
+    if (hit) {
+      this.setState({ turns, spec, draft: '', live: true });
+      this.botSay(rule.handoff, 'bot', 500);
+      this._t2 = setTimeout(() => this.botSay(`Hi, this is Danny at Dumont. I see you're after ${spec.qty ? spec.qty + ' ' : ''}${spec.product ? spec.product.toLowerCase() : 'a print job'}${spec.deadline && spec.deadline !== '—' ? ', ' + spec.deadline.toLowerCase() : ''}. What stock were you thinking?`, 'rep', 1800), 1400);
+      return;
+    }
+    const next = s.stepIdx + 1;
+    this.setState({ turns, spec, draft: '', stepIdx: next });
+    if (asks[next]) this.botSay(asks[next].prompt);
+    else this.finish(spec);
+  }
+  repReply(text) { const l = text.toLowerCase(); if (/\d/.test(l) || /pt|gloss|matte|cover|uncoated/.test(l)) return "Perfect. I'll price that two ways and send it over within the hour."; return 'Got it. Anything else on the job before I write it up?'; }
+  finish() {
+    const t = this.ticketStep(); const id = 'DL-' + (2050 + Math.floor(Math.random() * 40));
+    this.botSay(t ? t.text : 'Thanks — your request is in.');
+    this._t3 = setTimeout(() => this.setState({ ticket: id }), 900);
+  }
+  extract(field, text) {
+    const t = text.trim();
+    if (field === 'qty') { const m = t.replace(/,/g, '').match(/\d+\+?/); return m ? m[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') : t; }
+    if (field === 'product') { const m = t.match(/postcard|booklet|business card|banner|flyer|brochure|menu|label|mailer|poster/i); if (!m) return t; const w = m[0].toLowerCase(); return w[0].toUpperCase() + w.slice(1) + (w.endsWith('s') ? '' : 's'); }
+    return t;
+  }
+  intent() {
+    const s = this.state; const k = Object.keys(s.spec).filter(x => s.spec[x] && s.spec[x] !== '—').length; const dl = (s.spec.deadline || '').toLowerCase();
+    const near = /week|today|rush|urgent|friday|monday/.test(dl);
+    const score = Math.min(98, 15 + k * 18 + (s.spec.contact ? 15 : 0) + (near ? 15 : 0) + (s.live ? 10 : 0));
+    const label = score >= 75 ? 'High' : score >= 45 ? 'Warm' : 'Browsing';
+    const color = score >= 75 ? '#1F7A4D' : score >= 45 ? '#B4690E' : '#9AA0A8';
+    const why = k === 0 ? 'Landed from Google · no specs yet' : `${k} spec${k > 1 ? 's' : ''} given${s.spec.contact ? ' · contact shared' : ''}${near ? ' · near-term deadline' : ''}`;
+    return { score, label, color, why };
+  }
+  renderVals() {
+    const s = this.state; const set = (k) => (e) => this.setState({ [k]: e.target.value });
+    const asks = this.asks(); const cur = !s.live && !s.ticket ? asks[s.stepIdx] : null;
+    const chipList = cur && cur.chips ? cur.chips.split(',').map(c => c.trim()).filter(Boolean) : [];
+    const chips = chipList.map(label => ({ label, onClick: () => this.handle(label) }));
+    if (cur && cur.skippable) chips.push({ label: 'Skip', onClick: () => this.handle('—') });
+    const sel = s.steps.find(x => x.id === s.sel) || s.steps[0]; const selIdx = s.steps.indexOf(sel);
+    const upd = (patch) => this.setState({ steps: s.steps.map(x => x.id === sel.id ? { ...x, ...patch } : x) });
+    const kindMeta = { ask: ['QUESTION', '#0B7FA8'], rule: ['HANDOFF RULE', '#B4690E'], ticket: ['CREATE TICKET', '#1F7A4D'] };
+    const fieldLabel = { product: 'Product', qty: 'Quantity', size: 'Size', stock: 'Stock', deadline: 'Deadline', contact: 'Contact', notes: 'Notes' };
+    const it = this.intent();
+    const specFields = ['product', 'qty', 'size', 'stock', 'deadline', 'contact'];
+    const mins = Math.max(1, Math.round((Date.now() - s.startedAt) / 60000));
+    const move = (d) => { const i = selIdx, j = i + d; if (j < 0 || j >= s.steps.length) return; const st = [...s.steps]; [st[i], st[j]] = [st[j], st[i]]; this.setState({ steps: st }); };
+    const lt = String.fromCharCode(60);
+    const snippet = lt + 'script src="https://cdn.midlayr.com/chat.js"\n  data-org="dumont"\n  data-flow="quote-intake"\n  data-label="' + s.launcher + '" async>' + lt + '/script>';
+    return {
+      tabs: [['site', 'Visitor · dumontprinting.com'], ['flow', 'Flow builder'], ['install', 'Install']].map(([k, label]) => { const on = s.view === k; return { label, onClick: () => this.setState({ view: k }), color: on ? '#14161A' : '#5C6169', weight: on ? 600 : 400, border: on ? '2px solid #0B7FA8' : '2px solid transparent' }; }),
+      isSite: s.view === 'site', isFlow: s.view === 'flow', isInstall: s.view === 'install',
+      statusLine: s.live ? 'LIVE · DANNY O. ON THE THREAD' : s.ticket ? `TICKET ${s.ticket} IN INBOX` : `BOT · STEP ${Math.min(s.stepIdx + 1, asks.length)} OF ${asks.length}`,
+      resetChat: () => this.begin(),
+      chatOpen: s.chatOpen, chatClosed: !s.chatOpen, showNudge: s.nudge, nudgeText: s.nudgeText, launcherLabel: s.launcher,
+      openChat: () => this.setState({ chatOpen: true }), closeChat: () => this.setState({ chatOpen: false }),
+      liveColor: s.live ? '#4FC28A' : '#9AA0A8', liveLabel: s.live ? '● live with Danny' : '· quotes',
+      scrollRef: this.scrollRef, scrollRef2: this.scrollRef2,
+      turns: s.turns.map(t => t.who === 'you' ? { text: t.text, who: 'YOU', align: 'flex-end', bg: '#0B7FA8', fg: '#FBFAF8', border: '#075E7C', whoColor: '#CFE8F2' } : t.who === 'rep' ? { text: t.text, who: 'DANNY · DUMONT', align: 'flex-start', bg: '#FBFAF8', fg: '#14161A', border: '#1F7A4D', whoColor: '#1F7A4D' } : { text: t.text, who: 'DUMONT', align: 'flex-start', bg: '#F2F1EE', fg: '#14161A', border: '#E3E1DC', whoColor: '#9AA0A8' }),
+      typing: !!s.typing, typingWho: s.typing || '',
+      ticketMade: !!s.ticket, ticketId: s.ticket || '', ticketSummary: `Landed in the inbox with ${specFields.filter(f => s.spec[f] && s.spec[f] !== '—').map(f => fieldLabel[f].toLowerCase()).join(', ') || 'the conversation'} filled in.`,
+      chips, chipsGap: chips.length ? '10px' : '0',
+      draft: s.draft, onDraft: set('draft'), onSend: (e) => { e.preventDefault(); this.handle(s.draft); },
+      inputPlaceholder: s.live ? 'Reply to Danny' : s.ticket ? 'Add anything else' : 'Type your answer',
+      intentLabel: it.label, intentColor: it.color, intentPct: it.score + '%', intentWhy: it.why,
+      specCells: specFields.map(f => { const v = s.spec[f]; const has = v && v !== '—'; return { label: fieldLabel[f].toUpperCase(), value: has ? v : (v === '—' ? 'skipped' : '—'), border: has ? '#14161A' : '#E3E1DC', borderStyle: has ? 'solid' : 'dashed', weight: has ? 600 : 400, color: has ? '#14161A' : '#9AA0A8' }; }),
+      visitorFacts: [{ k: 'Source', v: 'Google · "postcard printing fresno"' }, { k: 'Page', v: '/ (home)' }, { k: 'Time on site', v: mins + ' min' }, { k: 'Returning', v: 'No · first visit' }, { k: 'Device', v: 'Desktop · Fresno, CA' }],
+      nextAction: s.live ? "You're on the thread. Ask for stock and finish, then quote from the ticket." : s.ticket ? `Ticket ${s.ticket} is in the queue. Quote follow-up drip starts in 24h if untouched.` : it.score >= 75 ? 'High intent. Jump in now — a live reply here closes faster than a callback.' : 'Let the bot finish. Step in if they ask for a person.',
+      takeOver: () => { if (s.live) return; this.setState({ live: true }); this.botSay("Hi, Danny from Dumont here — I've got your details so far. What stock and finish were you picturing?", 'rep', 1200); },
+      takeOverLabel: s.live ? 'On the thread' : 'Take over chat',
+      stepCount: `${asks.length} QUESTIONS`,
+      stepRows: s.steps.map((st, i) => { const on = st.id === sel.id; const [kl, kc] = kindMeta[st.kind]; return { n: String(i + 1).padStart(2, '0'), kindLabel: kl, kindColor: kc, title: st.kind === 'ask' ? st.prompt : st.kind === 'rule' ? 'Hand off to a rep' : 'Create job ticket', sub: st.kind === 'ask' ? '→ ' + fieldLabel[st.field] + (st.chips ? ' · ' + st.chips.split(',').filter(Boolean).length + ' quick replies' : ' · free text') : st.kind === 'rule' ? 'when: ' + st.words : 'ends the flow', border: on ? '#14161A' : '#E3E1DC', bar: on ? kc : 'transparent', onClick: () => this.setState({ sel: st.id }) }; }),
+      addStep: () => { const id = Math.max(...s.steps.map(x => x.id)) + 1; const st = [...s.steps]; const at = s.steps.findIndex(x => x.kind !== 'ask'); st.splice(at < 0 ? st.length : at, 0, { id, kind: 'ask', prompt: 'New question', field: 'notes', chips: '', skippable: true }); this.setState({ steps: st, sel: id }); },
+      selN: String(selIdx + 1).padStart(2, '0'), selKindLabel: kindMeta[sel.kind][0], selTitle: sel.kind === 'ask' ? 'Ask the visitor' : sel.kind === 'rule' ? 'When to bring in a person' : 'Finish and create the ticket',
+      selIsAsk: sel.kind === 'ask', selIsRule: sel.kind === 'rule', selIsTicket: sel.kind === 'ticket',
+      selPrompt: sel.prompt || '', onSelPrompt: (e) => upd({ prompt: e.target.value }),
+      selField: sel.field || 'notes', onSelField: (e) => upd({ field: e.target.value }),
+      selChips: sel.chips || '', onSelChips: (e) => upd({ chips: e.target.value }),
+      selSkippable: !!sel.skippable, onSelSkippable: (e) => upd({ skippable: e.target.checked }),
+      ruleWords: sel.words || '', onRuleWords: (e) => upd({ words: e.target.value }),
+      handoffText: sel.handoff || '', onHandoffText: (e) => upd({ handoff: e.target.value }),
+      routeTo: sel.route || 'next', onRouteTo: (e) => upd({ route: e.target.value }),
+      afterHours: !!sel.afterHours, onAfterHours: (e) => upd({ afterHours: e.target.checked }),
+      ticketText: sel.text || '', onTicketText: (e) => upd({ text: e.target.value }),
+      moveUp: () => move(-1), moveDown: () => move(1),
+      deleteStep: () => { if (asks.length <= 1) return; const st = s.steps.filter(x => x.id !== sel.id); this.setState({ steps: st, sel: st[0].id }); },
+      snippet, copyLabel: s.copied ? 'Copied' : 'Copy snippet',
+      copySnippet: () => { try { navigator.clipboard.writeText(snippet); } catch (e) {} this.setState({ copied: true }); setTimeout(() => this.setState({ copied: false }), 1500); },
+      installChecks: [{ mark: '✓', color: '#1F7A4D', textColor: '#14161A', text: 'Script reachable · cdn.midlayr.com' }, { mark: '✓', color: '#1F7A4D', textColor: '#14161A', text: 'Flow "quote-intake" published' }, { mark: '○', color: '#B4690E', textColor: '#5C6169', text: 'Not yet detected on dumontprinting.com — paste and reload' }, { mark: '○', color: '#9AA0A8', textColor: '#5C6169', text: 'Brand color pending from Settings → Brand' }],
+      onLauncher: set('launcher'), onNudge: set('nudgeText'), domains: s.domains, onDomains: set('domains'), hours: s.hours, onHours: set('hours'),
+    };
+  }
+}
+</script>
+</body>
+</html>

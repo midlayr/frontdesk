@@ -556,6 +556,8 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
             </label>
           )}
 
+          <TicketSequences leadId={l.id} />
+
           <label className="pick assign">
             <span className="label">Assign</span>
             <select value={l.assignee_id ?? ''}
@@ -633,8 +635,6 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
         </div>
 
         <Files leadId={l.id} files={d.attachments ?? []} />
-
-        <TicketSequences leadId={l.id} />
 
         <History leadId={l.id} users={users} />
         {error && <p className="err">{error}</p>}

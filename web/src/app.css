@@ -647,23 +647,34 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   padding-left: 10px; }
 .perf-read b { font-weight: 600; }
 
-/* ── sequences on a ticket ────────────────────────────────────────────────── */
-.tseq-none { margin: 0 0 6px; font-size: var(--text-sm); color: var(--ink-3); }
-.tseq-pick { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
-.tseq-pick button { text-align: left; border: 1px solid var(--line); background: var(--paper);
-  border-radius: var(--radius); padding: 7px 10px; cursor: pointer; font-size: var(--text-sm); }
-.tseq-pick button:hover:not(:disabled) { border-color: var(--ink); }
-.tseq-pick i { font-style: normal; font: 400 10.5px var(--font-mono); color: var(--ink-3); margin-left: 6px; }
+/* ── campaign control in the ticket header ───────────────────────────────── */
+.tseq-wrap { position: relative; }
+.tseq-btn { max-width: 230px; }
+.tseq-btn:disabled { opacity: .6; cursor: default; }
+.tseq-name { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tseq-step { font: 400 10.5px var(--font-mono); color: var(--ink-3); }
+.tseq-none-lbl { font-size: 12.5px; color: var(--ink-3); }
+.tseq-caret { font-size: 9px; color: var(--ink-3); }
 
-.tseq { border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper);
-  padding: 9px 11px; margin-bottom: 6px; display: flex; flex-direction: column; gap: 3px; }
-.tseq-top { display: flex; align-items: center; gap: 7px; }
-.tseq-top .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.tseq-top b { font-size: var(--text-md); font-weight: 500; }
+.tseq-pop { position: absolute; top: calc(100% + 5px); right: 0; z-index: 30;
+  min-width: 280px; max-width: 340px; background: var(--paper);
+  border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-float);
+  padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; }
+.tseq-row { display: flex; flex-direction: column; gap: 3px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--line); }
+.tseq-row:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.tseq-row-top { display: flex; align-items: center; gap: 7px; }
+.tseq-row-top .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.tseq-row-top b { font-size: var(--text-md); font-weight: 500; }
 .tseq-state { margin-left: auto; font: 500 9.5px var(--font-mono); letter-spacing: .08em;
   text-transform: uppercase; color: var(--ink-3); }
-.tseq-sub { font: 400 10.5px var(--font-mono); color: var(--ink-3); line-height: 1.45; }
-.tseq-acts { display: flex; gap: 12px; margin-top: 3px; }
+.tseq-sub { margin: 0; font: 400 10.5px var(--font-mono); color: var(--ink-3); line-height: 1.45; }
+.tseq-acts { display: flex; gap: 12px; margin-top: 2px; }
 .tseq-acts button { border: 0; background: none; color: var(--accent); cursor: pointer;
   font: 400 11.5px var(--font-body); text-decoration: underline; padding: 0; }
 .tseq-acts button.danger { color: var(--danger); }
+.tseq-add-lbl { margin-top: 2px; }
+.tseq-offer { text-align: left; border: 1px solid var(--line); background: var(--paper);
+  border-radius: var(--radius); padding: 7px 9px; cursor: pointer; font-size: var(--text-sm); }
+.tseq-offer:hover:not(:disabled) { border-color: var(--ink); }
+.tseq-offer i { font-style: normal; font: 400 10.5px var(--font-mono); color: var(--ink-3); margin-left: 6px; }

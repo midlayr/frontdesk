@@ -530,12 +530,12 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
         <div className="thead">
           <span className="label">Ticket</span>
           <span className="tno">{l.ticket_no}</span>
-        </div>
 
-        {/* The controls get the pane's whole width on their own line. Sharing a row with the
-            ticket number left three dropdowns fighting over about 300px, and every one of
-            them was truncated to something like "Unassigne…". */}
-        <div className="tbar">
+          {/* Grouped and right-aligned rather than spread across the row: on a wide pane a
+              lone ⋯ pinned to the far edge left a gap the width of the pane between it and
+              everything else. The group wraps as a unit when there is no room, so nothing is
+              ever truncated. */}
+          <div className="tctl">
 
           {/* A live chat's stage belongs to the chat session, not to a rep: the session
               writes 'live' while someone is connected and hands it back when it ends, so
@@ -577,6 +577,7 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
               at the same weight as the pickers a rep uses all day, and pushed the row into a
               second line where Delete ended up alone under the ticket number. */}
           <TicketMenu archived={!!l.archived_at} onArchive={onArchive} onDelete={onDelete} />
+          </div>
         </div>
 
         <h1 className="tname">{l.company_name || who}</h1>

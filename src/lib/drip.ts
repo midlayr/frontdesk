@@ -169,3 +169,113 @@ export function heldFields(reason: string | null): string[] {
   if (!reason?.startsWith('missing:')) return [];
   return [...reason.slice(8).matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
 }
+
+/* ── branches ─────────────────────────────────────────────────────────────── */
+
+export const CONDITIONS = [
+  'replied', 'opened_no_reply', 'not_opened', 'clicked', 'bounced', 'sms_delivered', 'health_below',
+] as const;
+export const ACTIONS = [
+  'continue', 'stop', 'resend', 'skip_to', 'switch_sms', 'assign', 'task', 'tag',
+] as const;
+
+export type Condition = (typeof CONDITIONS)[number];
+export type Action = (typeof ACTIONS)[number];
+
+export interface Branch {
+  if: Condition;
+  /** Only `health_below` uses it. */
+  value?: number;
+  then: Action;
+  config?: { subject?: string; step?: number; user_id?: string; text?: string; tag?: string };
+}
+
+/**
+ * The branch every sequence starts with, and which cannot be edited or moved.
+ *
+ * It is a platform rule rather than an author's choice: a drip that keeps arriving after a
+ * customer has answered is the single thing most likely to make a shop look like it is not
+ * listening, and it should not be possible to build one by mistake.
+ */
+export const LOCKED_FIRST: Branch = { if: 'replied', then: 'stop' };
+
+export const isLockedFirst = (b: Branch | undefined): boolean =>
+  !!b && b.if === 'replied' && b.then === 'stop';
+
+/** Put the locked branch back at the front, wherever the caller left it. */
+export function normalise(branches: Branch[]): Branch[] {
+  const rest = branches.filter((b) => !isLockedFirst(b));
+  return [LOCKED_FIRST, ...rest];
+}
+
+/**
+ * Why a set of branches cannot be saved, or null when it can.
+ *
+ * Returned as a message rather than thrown: this runs on the API's validation path and the
+ * editor shows the reason next to the offending row.
+ */
+export function validate(branches: Branch[], stepCount: number): string | null {
+  if (!branches.length) return 'the first branch must be “replied → stop”';
+  if (!isLockedFirst(branches[0])) return 'the first branch must be “replied → stop”';
+
+  for (const [i, b] of branches.entries()) {
+    const where = `branch ${i + 1}`;
+    if (!CONDITIONS.includes(b.if)) return `${where}: unknown condition ${b.if}`;
+    if (!ACTIONS.includes(b.then)) return `${where}: unknown action ${b.then}`;
+    if (b.if === 'health_below' && !Number.isFinite(b.value)) return `${where}: health needs a number`;
+    if (b.then === 'skip_to') {
+      const to = b.config?.step;
+      if (!Number.isInteger(to) || (to as number) < 1) return `${where}: skip needs a step number`;
+      if ((to as number) > stepCount) return `${where}: there is no step ${to}`;
+    }
+    if (b.then === 'assign' && !b.config?.user_id) return `${where}: assign needs somebody to assign to`;
+    if (b.then === 'task' && !b.config?.text?.trim()) return `${where}: a task needs wording`;
+    if (b.then === 'resend' && !b.config?.subject?.trim()) return `${where}: a resend needs a new subject`;
+  }
+
+  // A duplicate condition is not an error, but the second can never run, and silently doing
+  // nothing is worse than being told.
+  const seen = new Set<string>();
+  for (const b of branches) {
+    const key = `${b.if}:${b.value ?? ''}`;
+    if (seen.has(key)) return `“${b.if}” is tested twice — only the first can ever match`;
+    seen.add(key);
+  }
+  return null;
+}
+
+/** What the last drip on this enrollment did, as far as the provider has told us. */
+export interface LastSend {
+  opened: boolean;
+  clicked: boolean;
+  bounced: boolean;
+  delivered: boolean;
+  /** An inbound message since that send. */
+  replied: boolean;
+  /** leads.intent_score, when there is one. */
+  health: number | null;
+}
+
+/**
+ * Which branch fires. First match wins, which is what makes the locked reply rule effective.
+ *
+ * `opened_no_reply` and `not_opened` are deliberately blind when no provider event has ever
+ * arrived — a plain-text send with no tracking, or a webhook not yet wired, reports neither
+ * opened nor clicked, and treating that as "not opened" would fire a resend at everybody.
+ */
+export function evaluate(branches: Branch[], last: LastSend, tracked = true): Branch | null {
+  for (const b of branches) {
+    switch (b.if) {
+      case 'replied': if (last.replied) return b; break;
+      case 'clicked': if (last.clicked) return b; break;
+      case 'bounced': if (last.bounced) return b; break;
+      case 'sms_delivered': if (last.delivered) return b; break;
+      case 'opened_no_reply': if (tracked && last.opened && !last.replied) return b; break;
+      case 'not_opened': if (tracked && !last.opened) return b; break;
+      case 'health_below':
+        if (last.health !== null && Number.isFinite(b.value) && last.health < (b.value as number)) return b;
+        break;
+    }
+  }
+  return null;
+}

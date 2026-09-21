@@ -4,8 +4,8 @@ import { connect, withOrg, type Sql, type Tx } from '../db';
 import { sendSms } from '../lib/twilio';
 import { sendEmail } from '../lib/mailgun';
 import {
-  DEFAULT_WINDOW, fill, heldReason, nextOpen, stopReason,
-  type SendWindow, type Standing,
+  DEFAULT_WINDOW, evaluate, fill, heldReason, nextOpen, stopReason,
+  type Branch, type LastSend, type SendWindow, type Standing,
 } from '../lib/drip';
 
 /**
@@ -22,6 +22,9 @@ interface Due {
   org_id: string; started_at: string; last_sent_at: string | null; next_step: number;
   send_window: SendWindow | null; send_as: string; seq_name: string;
   step_id: string; kind: string; position: number; subject: string | null; body: string;
+  /** The branches on the step we last sent — evaluated now that this one is due. */
+  prev_branches: Branch[] | null; prev_subject: string | null; prev_body: string | null;
+  intent_score: number | null;
   lead_status: string; archived: boolean; ticket_no: string;
   qty: number | null; product: string | null; size: string | null; stock: string | null;
   deadline_at: string | null; quote_amount: string | null;
@@ -61,6 +64,8 @@ function load(tx: Tx, orgId: string): Promise<Due[]> {
            e.started_at, e.last_sent_at, e.next_step,
            s.send_window, s.send_as, s.name AS seq_name,
            st.id AS step_id, st.kind, st.position, st.subject, st.body,
+           prev.branches AS prev_branches, prev.subject AS prev_subject, prev.body AS prev_body,
+           l.intent_score,
            l.status AS lead_status, (l.archived_at IS NOT NULL) AS archived, l.ticket_no,
            l.qty, l.product, l.size, l.stock, l.deadline_at, l.quote_amount,
            split_part(COALESCE(c.name, ''), ' ', 1) AS first_name,
@@ -71,6 +76,10 @@ function load(tx: Tx, orgId: string): Promise<Due[]> {
       JOIN leads l      ON l.id = e.lead_id
       JOIN contacts c   ON c.id = e.contact_id
       JOIN sequence_steps st ON st.sequence_id = s.id AND st.position = e.next_step
+ LEFT JOIN LATERAL (
+        SELECT p.branches, p.subject, p.body FROM sequence_steps p
+         WHERE p.sequence_id = s.id AND p.position < st.position
+         ORDER BY p.position DESC LIMIT 1) prev ON true
  LEFT JOIN companies co ON co.id = l.company_id
  LEFT JOIN users u      ON u.id = l.assignee_id
      WHERE e.state = 'active' AND e.next_send_at <= now() AND s.active AND s.org_id = ${orgId}
@@ -120,9 +129,84 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
       return 'held';
     }
 
+    /**
+     * Branches are evaluated here, not after the previous send: the question "did they open
+     * it?" has no answer the moment the mail leaves, and the honest time to ask is when the
+     * follow-up falls due. The reply case is already covered above by the stop checks, so by
+     * this point only the delivery outcomes are left to test.
+     */
+    let kind = d.kind, body0 = d.body, subject0 = d.subject;
+    if (d.prev_branches?.length) {
+      const [last] = await tx<{
+        opened: boolean; clicked: boolean; bounced: boolean; delivered: boolean;
+      }[]>`
+        SELECT opened_at IS NOT NULL AS opened, clicked_at IS NOT NULL AS clicked,
+               bounced_at IS NOT NULL AS bounced, delivered_at IS NOT NULL AS delivered
+          FROM messages
+         WHERE enrollment_id = ${d.enrollment_id} AND direction = 'out'
+         ORDER BY sent_at DESC LIMIT 1`;
+
+      // No delivery event has ever been recorded for this tenant's mail — no webhook yet, or
+      // tracking off. Open-based branches stay silent rather than firing at everyone.
+      const [{ tracked }] = await tx<{ tracked: boolean }[]>`
+        SELECT EXISTS (SELECT 1 FROM messages m
+                        JOIN leads l2 ON l2.id = m.lead_id
+                       WHERE l2.org_id = ${d.org_id} AND m.opened_at IS NOT NULL) AS tracked`;
+
+      const outcome: LastSend = {
+        opened: !!last?.opened, clicked: !!last?.clicked, bounced: !!last?.bounced,
+        delivered: !!last?.delivered, replied: false, health: d.intent_score,
+      };
+      const hit = evaluate(d.prev_branches, outcome, tracked);
+
+      if (hit) {
+        await note(tx, d, 'branch_fired', { if: hit.if, then: hit.then, at_step: d.position });
+        switch (hit.then) {
+          case 'stop':
+            await tx`UPDATE enrollments SET state = 'completed' WHERE id = ${d.enrollment_id}`;
+            return 'stopped';
+          case 'skip_to': {
+            const [to] = await tx<{ id: string; position: number; due: string }[]>`
+              SELECT id, position, (now() + delay) AS due FROM sequence_steps
+               WHERE sequence_id = ${d.sequence_id} AND position = ${hit.config?.step ?? 0}`;
+            if (to) {
+              await tx`UPDATE enrollments
+                          SET next_step = ${to.position}, current_step_id = ${to.id},
+                              next_send_at = now()
+                        WHERE id = ${d.enrollment_id}`;
+              return 'held';   // picked up on the next pass, at the step it jumped to
+            }
+            break;
+          }
+          case 'resend':
+            // The previous step's words again, under a subject the author chose for the
+            // second attempt — a resend is a second attempt, not a new message.
+            body0 = d.prev_body ?? body0;
+            subject0 = hit.config?.subject ?? subject0;
+            break;
+          case 'switch_sms': kind = 'sms'; break;
+          case 'assign':
+            await tx`UPDATE leads SET assignee_id = ${hit.config?.user_id ?? null} WHERE id = ${d.lead_id}`;
+            break;
+          case 'task':
+            await tx`INSERT INTO tasks (id, org_id, lead_id, assignee_id, text, source)
+                     SELECT ${ulid()}, ${d.org_id}, ${d.lead_id}, l.assignee_id,
+                            ${hit.config?.text ?? 'Follow up'}, ${'sequence:' + d.sequence_id}
+                       FROM leads l WHERE l.id = ${d.lead_id}`;
+            break;
+          case 'tag':
+            await tx`UPDATE companies SET enrichment = COALESCE(enrichment, '{}'::jsonb)
+                       || jsonb_build_object('tag', ${hit.config?.tag ?? ''})
+                      WHERE id = (SELECT company_id FROM leads WHERE id = ${d.lead_id})`;
+            break;
+          case 'continue': break;
+        }
+      }
+    }
+
     // A wait step is only a delay; a task step leaves work for a human. Neither sends.
-    if (d.kind === 'wait') { await advance(tx, d); return 'sent'; }
-    if (d.kind === 'task') {
+    if (kind === 'wait') { await advance(tx, d); return 'sent'; }
+    if (kind === 'task') {
       await tx`INSERT INTO tasks (id, org_id, lead_id, assignee_id, text, source)
                SELECT ${ulid()}, ${d.org_id}, ${d.lead_id}, l.assignee_id, ${d.body}, ${'sequence:' + d.sequence_id}
                  FROM leads l WHERE l.id = ${d.lead_id}`;
@@ -137,8 +221,8 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
       quote_link: null, ticket_no: d.ticket_no,
       rep_name: d.rep_name, rep_phone: d.rep_phone,
     };
-    const body = fill(d.body, values);
-    const subject = fill(d.subject ?? '', values);
+    const body = fill(body0, values);
+    const subject = fill(subject0 ?? '', values);
     const missing = [...new Set([...body.missing, ...subject.missing])];
     if (missing.length) {
       await hold(tx, d, heldReason(missing));
@@ -149,7 +233,7 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
       SELECT name, comms FROM orgs WHERE id = ${d.org_id}`;
 
     let providerId: string | null = null;
-    if (d.kind === 'sms') {
+    if (kind === 'sms') {
       if (!d.phone || !org.comms.sms_number) { await hold(tx, d, 'missing:{phone}'); return 'held'; }
       // The opt-out line is not optional and not the author's to remove.
       const sent = await sendSms(env, org.comms.sms_number, d.phone, `${body.text}\n\nReply STOP to opt out.`);
@@ -170,10 +254,10 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
 
     await tx`INSERT INTO messages (id, lead_id, channel, direction, author, body, provider_id,
                                    enrollment_id, step_id)
-             VALUES (${ulid()}, ${d.lead_id}, ${d.kind === 'sms' ? 'sms' : 'email'}, 'out',
+             VALUES (${ulid()}, ${d.lead_id}, ${kind === 'sms' ? 'sms' : 'email'}, 'out',
                      ${'sequence:' + d.sequence_id}, ${body.text}, ${providerId},
                      ${d.enrollment_id}, ${d.step_id})`;
-    await note(tx, d, 'drip_sent', { step: d.position, kind: d.kind, provider_id: providerId });
+    await note(tx, d, 'drip_sent', { step: d.position, kind, provider_id: providerId });
     await advance(tx, d);
     return 'sent';
   });

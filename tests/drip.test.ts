@@ -1,6 +1,7 @@
 import {
-  DEFAULT_WINDOW, fill, heldFields, heldReason, isOpen, localParts, nextOpen, stopReason,
-  type SendWindow, type Standing,
+  DEFAULT_WINDOW, LOCKED_FIRST, evaluate, fill, heldFields, heldReason, isOpen, localParts,
+  nextOpen, normalise, stopReason, validate,
+  type Branch, type LastSend, type SendWindow, type Standing,
 } from '../src/lib/drip';
 
 let pass = 0, fail = 0;
@@ -107,6 +108,89 @@ eq('reads the fields back', heldFields('missing:{qty} {stock}'), ['qty', 'stock'
 eq('a non-held reason has no fields', heldFields('bounced'), []);
 eq('null is safe', heldFields(null), []);
 eq('round trip', heldFields(heldReason(['product', 'deadline'])), ['product', 'deadline']);
+
+console.log('branches · which one fires');
+{
+  const none: LastSend = { opened: false, clicked: false, bounced: false, delivered: false, replied: false, health: null };
+  const bs: Branch[] = [
+    LOCKED_FIRST,
+    { if: 'clicked', then: 'assign', config: { user_id: 'u1' } },
+    { if: 'opened_no_reply', then: 'continue' },
+    { if: 'not_opened', then: 'resend', config: { subject: 'Still thinking?' } },
+  ];
+  eq('a reply wins over everything after it',
+     evaluate(bs, { ...none, replied: true, clicked: true })?.then, 'stop');
+  eq('clicked fires when there is no reply',
+     evaluate(bs, { ...none, clicked: true, opened: true })?.then, 'assign');
+  eq('opened without a reply continues',
+     evaluate(bs, { ...none, opened: true })?.then, 'continue');
+  eq('not opened resends', evaluate(bs, none)?.then, 'resend');
+  eq('first match wins, not the most specific',
+     evaluate([{ if: 'not_opened', then: 'stop' }, { if: 'not_opened', then: 'continue' }], none)?.then, 'stop');
+  eq('nothing matches when no branch applies',
+     evaluate([{ if: 'bounced', then: 'stop' }], none), null);
+}
+
+console.log('branches · untracked sends are not treated as unopened');
+{
+  const none: LastSend = { opened: false, clicked: false, bounced: false, delivered: false, replied: false, health: null };
+  const bs: Branch[] = [LOCKED_FIRST, { if: 'not_opened', then: 'resend', config: { subject: 'x' } }];
+  eq('with tracking, no open means resend', evaluate(bs, none, true)?.then, 'resend');
+  eq('without tracking, it does not fire at everybody', evaluate(bs, none, false), null);
+  eq('a real reply still stops an untracked send',
+     evaluate(bs, { ...none, replied: true }, false)?.then, 'stop');
+}
+
+console.log('branches · health');
+{
+  const base: LastSend = { opened: false, clicked: false, bounced: false, delivered: false, replied: false, health: 30 };
+  const bs: Branch[] = [LOCKED_FIRST, { if: 'health_below', value: 40, then: 'stop' }];
+  eq('below the threshold fires', evaluate(bs, base)?.then, 'stop');
+  eq('at the threshold does not', evaluate(bs, { ...base, health: 40 }), null);
+  eq('above it does not', evaluate(bs, { ...base, health: 55 }), null);
+  eq('no score at all does not fire', evaluate(bs, { ...base, health: null }), null);
+}
+
+console.log('branches · the locked first rule');
+eq('normalise puts it back at the front',
+   normalise([{ if: 'clicked', then: 'stop' }, LOCKED_FIRST]).map((b) => b.if), ['replied', 'clicked']);
+eq('normalise adds it when absent',
+   normalise([{ if: 'clicked', then: 'stop' }]).map((b) => b.if), ['replied', 'clicked']);
+eq('normalise does not duplicate it',
+   normalise([LOCKED_FIRST, LOCKED_FIRST]).length, 1);
+
+console.log('branches · what the API refuses');
+eq('empty', validate([], 3), 'the first branch must be “replied → stop”');
+eq('first branch not the locked one',
+   validate([{ if: 'clicked', then: 'stop' }], 3), 'the first branch must be “replied → stop”');
+eq('replied but not stopping',
+   validate([{ if: 'replied', then: 'continue' }], 3), 'the first branch must be “replied → stop”');
+eq('a valid set passes',
+   validate([LOCKED_FIRST, { if: 'clicked', then: 'continue' }], 3), null);
+eq('skip to a step that does not exist',
+   validate([LOCKED_FIRST, { if: 'clicked', then: 'skip_to', config: { step: 9 } }], 3),
+   'branch 2: there is no step 9');
+eq('skip with no step at all',
+   validate([LOCKED_FIRST, { if: 'clicked', then: 'skip_to' }], 3), 'branch 2: skip needs a step number');
+eq('assign with nobody to assign to',
+   validate([LOCKED_FIRST, { if: 'clicked', then: 'assign' }], 3),
+   'branch 2: assign needs somebody to assign to');
+eq('a task with no wording',
+   validate([LOCKED_FIRST, { if: 'clicked', then: 'task', config: { text: '  ' } }], 3),
+   'branch 2: a task needs wording');
+eq('a resend with no new subject',
+   validate([LOCKED_FIRST, { if: 'not_opened', then: 'resend' }], 3),
+   'branch 2: a resend needs a new subject');
+eq('health with no number',
+   validate([LOCKED_FIRST, { if: 'health_below', then: 'stop' }], 3),
+   'branch 2: health needs a number');
+eq('an unreachable duplicate is refused',
+   validate([LOCKED_FIRST, { if: 'clicked', then: 'stop' }, { if: 'clicked', then: 'continue' }], 3),
+   '“clicked” is tested twice — only the first can ever match');
+eq('the same condition at different thresholds is fine',
+   validate([LOCKED_FIRST,
+             { if: 'health_below', value: 20, then: 'stop' },
+             { if: 'health_below', value: 50, then: 'continue' }], 3), null);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

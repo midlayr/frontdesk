@@ -480,3 +480,64 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 
 .appear-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .appear-live { font: 400 11px var(--font-mono); color: var(--ink-3); }
+
+/* ── campaigns ────────────────────────────────────────────────────────────── */
+.camp { display: grid; grid-template-columns: 280px minmax(0, 1fr) 380px; min-height: 0; }
+.camp-rail { border-right: 1px solid var(--line); background: var(--paper-2);
+  padding: 14px 12px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+.camp-rail-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.camp-new { border: 0; background: none; color: var(--accent); cursor: pointer;
+  font: 400 12px var(--font-body); text-decoration: underline; }
+.camp-empty { font-size: var(--text-sm); color: var(--ink-3); margin: 6px 0; }
+
+.camp-item, .camp-step { display: flex; flex-direction: column; gap: 3px; text-align: left;
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 8px 10px; cursor: pointer; }
+.camp-item[data-on='true'], .camp-step[data-on='true'] { border-color: var(--ink); }
+.camp-item-top { display: flex; align-items: center; gap: 7px; font-size: var(--text-md); font-weight: 500; }
+.camp-item-top .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.camp-item-sub, .camp-step-top { font: 400 10.5px var(--font-mono); color: var(--ink-3); }
+.camp-step-top { display: flex; gap: 8px; align-items: baseline; }
+.camp-kind { color: var(--accent); letter-spacing: .08em; }
+.camp-when { margin-left: auto; }
+.camp-step-title { font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.camp-edit { padding: 20px 24px; overflow: auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 13px; }
+.camp-edit-head { display: flex; justify-content: space-between; align-items: baseline; }
+.camp-kinds { width: fit-content; }
+.camp-delay { display: flex; align-items: center; gap: 8px; }
+.camp-delay input { width: 90px; border: 1px solid var(--line); border-radius: var(--radius);
+  height: var(--control-h); padding: 0 9px; font: 400 13px var(--font-body); }
+.camp-delay span { font: 400 11px var(--font-mono); color: var(--ink-3); }
+.camp-edit textarea.bad { border-color: var(--danger); text-decoration: underline wavy var(--danger); }
+
+.camp-tokens { display: flex; flex-wrap: wrap; gap: 5px; }
+.camp-tokens button { font: 400 10.5px var(--font-mono); border: 1px solid var(--line);
+  background: var(--paper); border-radius: var(--radius); padding: 3px 7px; cursor: pointer;
+  color: var(--accent); }
+.camp-tokens button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-tint); }
+.camp-hint { margin: 0; font: 400 10.5px var(--font-mono); color: var(--ink-3); }
+
+.camp-prev { border-left: 1px solid var(--line); background: var(--paper-2);
+  padding: 20px 18px; overflow: auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.camp-prev-head { display: flex; justify-content: space-between; align-items: baseline; }
+.camp-mail { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); }
+.camp-mail-hdr { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px;
+  padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.camp-mail-hdr span { font: 400 9.5px var(--font-mono); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3); }
+.camp-mail-hdr b { font: 400 11px var(--font-mono); color: var(--ink-2); overflow: hidden;
+  text-overflow: ellipsis; }
+.camp-mail-subject { padding: 10px 12px 0; font-size: var(--text-base); font-weight: 600; }
+.camp-mail-body { padding: 10px 12px; font-size: var(--text-md); line-height: 1.5;
+  white-space: pre-wrap; }
+.camp-mail-foot { padding: 8px 12px; border-top: 1px solid var(--line);
+  font: 400 10.5px var(--font-mono); color: var(--ink-3); }
+.camp-missing { margin: 0; font-size: var(--text-sm); color: var(--warn); line-height: 1.45; }
+.camp-ok { margin: 0; font-size: var(--text-sm); color: var(--ok); }
+
+/* The preview is the reason this screen exists, so it is the last thing to go. */
+@media (max-width: 1080px) { .camp { grid-template-columns: 230px minmax(0, 1fr) 320px; } }
+@media (max-width: 900px) { .camp { grid-template-columns: 220px minmax(0, 1fr); }
+  .camp-prev { display: none; } }

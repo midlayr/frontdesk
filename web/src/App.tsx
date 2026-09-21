@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, applyBrand, orgSlug, userId, type Attachment, type Lead, type Message, type Org, PIPELINE, STATUS_LABEL, STATUS_DOT, type OrgUser } from './api';
 import { FlowBuilder } from './FlowBuilder';
+import { Campaigns } from './Campaigns';
 import { History } from './History';
 import { Settings } from './Settings';
 
@@ -317,6 +318,7 @@ export function App() {
 
   const flowSlug = path.startsWith('/chat/flows/') ? path.slice('/chat/flows/'.length) : '';
   const onSettings = path.startsWith('/settings');
+  const onCampaigns = path.startsWith('/campaigns');
   const brand = (org?.brand ?? {}) as Record<string, string>;
   const logo = brand.logo_url ? `${brand.logo_url}` : '/brand/dumont/logo-horizontal.png';
 
@@ -329,7 +331,7 @@ export function App() {
         <span className="powered">powered by Midlayr</span>
         <nav className="nav">
           <button aria-current={!flowSlug} onClick={() => go('/')}>Inbox</button>
-          <button title="Not built yet">Campaigns</button>
+          <button aria-current={onCampaigns} onClick={() => go('/campaigns')}>Campaigns</button>
           <button aria-current={!!flowSlug} onClick={() => go('/chat/flows/quote-intake')}>Chat</button>
           <button aria-current={onSettings} onClick={() => go('/settings/messaging')}>Settings</button>
         </nav>
@@ -342,7 +344,9 @@ export function App() {
         </span>
       </header>
 
-      {onSettings ? (
+      {onCampaigns ? (
+        <Campaigns me={me} />
+      ) : onSettings ? (
         <Settings me={me} org={org}
                   tab={path.startsWith('/settings/people') ? 'people'
                      : path.startsWith('/settings/appearance') ? 'appearance' : 'messaging'}

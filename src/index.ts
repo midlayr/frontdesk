@@ -16,6 +16,7 @@ import { rollUp } from './jobs/sequence-stats';
 import { runRadar } from './jobs/radar';
 import { leads } from './api/leads';
 import { internal } from './api/internal';
+import { platform } from './api/platform';
 import { widget } from './api/widget';
 import { flows } from './api/flows';
 import { sequences } from './api/sequences';
@@ -59,6 +60,10 @@ app.use('*', async (c, next) => {
 
 // Internal routes are guarded by x-internal-token inside the router, not by hostname.
 app.route('/internal', internal);
+
+// Tenant provisioning. Outside /api because everything under /api resolves an org from the
+// hostname first, which is the very thing this creates.
+app.route('/platform', platform);
 
 // Public widget surface: anonymous visitors, tenant from ?org=<slug>.
 app.route('/widget', widget);

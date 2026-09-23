@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SCALES, applyBrand, applyScale, currentScale, orgSlug, type ScaleId } from './api';
+import { SCALES, applyBrand, applyScale, contrast, currentScale, onColor, orgSlug, type ScaleId } from './api';
 
 /**
  * How Front Desk looks.
@@ -116,6 +116,7 @@ export function Appearance({ me, org }: {
           <div className="appear-fields">
             <Swatch label="Accent" hint="buttons, links, the chat launcher"
                     value={brand.color} disabled={!isAdmin}
+                    warning={accentWarning(brand.color, brand.ink, brand.paper)}
                     onChange={(v) => setBrand({ ...brand, color: v })} />
             <Swatch label="Ink" hint="text and dark bars"
                     value={brand.ink} disabled={!isAdmin}
@@ -147,10 +148,31 @@ export function Appearance({ me, org }: {
   );
 }
 
-function Swatch({ label, hint, value, disabled, onChange }: {
-  label: string; hint: string; value: string; disabled: boolean; onChange: (v: string) => void;
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * Said at the point of choosing, because it cannot be seen afterwards.
+ *
+ * The accent carries button and launcher labels. applyBrand() now picks whichever of the
+ * tenant's ink or paper reads better on it, but a colour can be pale enough that neither
+ * clears AA — and the launcher sits on the customer's own website, where nobody at the shop
+ * will notice it has gone unreadable. Warn rather than block: it is their brand, and a
+ * near-miss on a decorative shade is their call to make.
+ */
+function accentWarning(color: string, ink: string, paper: string): string | null {
+  if (!HEX.test(color) || !HEX.test(ink) || !HEX.test(paper)) return null;
+  const best = contrast(color, onColor(color, ink, paper));
+  if (best >= 4.5) return null;
+  return best < 3
+    ? 'Button and launcher text will be hard to read on this colour. Try a deeper shade.'
+    : 'Button text on this colour is below the usual readability bar. It will pass at large sizes only.';
+}
+
+function Swatch({ label, hint, value, disabled, warning, onChange }: {
+  label: string; hint: string; value: string; disabled: boolean;
+  warning?: string | null; onChange: (v: string) => void;
 }) {
-  const valid = /^#[0-9a-fA-F]{6}$/.test(value);
+  const valid = HEX.test(value);
   return (
     <label className="fb-field">
       <span className="label">{label} <i>· {hint}</i></span>
@@ -160,6 +182,7 @@ function Swatch({ label, hint, value, disabled, onChange }: {
         <input className="appear-hex" value={value} disabled={disabled} spellCheck={false}
                onChange={(e) => onChange(e.target.value.trim())} />
         {!valid && <em>needs a 6-digit hex, like #1CA3B6</em>}
+        {valid && warning && <em style={{ color: 'var(--warn)' }}>{warning}</em>}
       </span>
     </label>
   );

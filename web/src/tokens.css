@@ -25,6 +25,9 @@
   --accent-deep: #075E7C;  /* borders on accent buttons, hover */
   --accent-tint: #E6F2F7;  /* quick-reply chips */
   --accent-tint-fg: #075E7C;
+  /* Text that sits ON the accent. Not --paper: applyBrand() picks it by contrast, so a pale
+     tenant accent gets dark text instead of white-on-white. */
+  --accent-fg: #FBFAF8;
 
   /* semantic */
   --ok: #1F7A4D;           /* live, replied, ticket created */
@@ -63,7 +66,7 @@
 .eyebrow { font: 500 11px/1 var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
 .label   { font: 400 var(--text-xs)/1 var(--font-mono); letter-spacing: var(--track-mono); text-transform: uppercase; color: var(--ink-3); }
 .display { font-family: var(--font-display); font-variation-settings: 'wdth' var(--display-wdth); font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
-.btn-primary { background: var(--accent); color: var(--paper); border: 1px solid var(--accent-deep); border-radius: var(--radius); height: var(--control-h); padding: 0 16px; font: 600 13px var(--font-body); }
+.btn-primary { background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent-deep); border-radius: var(--radius); height: var(--control-h); padding: 0 16px; font: 600 13px var(--font-body); }
 .btn-ghost   { background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius); height: var(--control-h); padding: 0 12px; font: 400 13px var(--font-body); }
 .chip        { border: 1px solid var(--ink); border-radius: var(--radius); padding: 1px 6px; font: 11px var(--font-mono); }
 .chip.missing{ border-style: dashed; border-color: var(--ink-3); color: var(--ink-3); }

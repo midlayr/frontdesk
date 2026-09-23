@@ -226,6 +226,46 @@ function shade(hex: string, amt: number) {
 }
 
 /**
+ * Contrast, because shade() cannot see.
+ *
+ * shade() moves a colour lighter or darker with no idea whether anything stays readable on
+ * top of it. Button text used to be --paper unconditionally, which is right for a mid or
+ * dark accent and wrong for a pale one: a tenant picking yellow in Settings → Appearance got
+ * near-white text on near-white buttons, everywhere at once, with nothing at save time to
+ * say so. Text that sits on the accent is now chosen by measurement instead of assumption.
+ */
+function luminance(hex: string): number {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast ratio, 1 (identical) to 21 (black on white). AA body text wants 4.5. */
+export function contrast(a: string, b: string): number {
+  const [x, y] = [luminance(a), luminance(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+/** Whichever of the tenant's own ink or paper is legible on this background. */
+export function onColor(bg: string, ink = '#14161A', paper = '#FBFAF8'): string {
+  return contrast(bg, paper) >= contrast(bg, ink) ? paper : ink;
+}
+
+/**
+ * Darken `from` in steps until it clears `target` against `bg`, giving up after twelve.
+ * Used for chip text on the accent tint, where the tint is so close to white that a merely
+ * "deep" accent is not necessarily dark enough.
+ */
+function readableOn(bg: string, from: string, target = 4.5): string {
+  let c = from;
+  for (let i = 0; i < 12 && contrast(bg, c) < target; i++) c = shade(c, -0.15);
+  return c;
+}
+
+/**
  * Text size, as a preference of the person reading rather than of the tenant.
  *
  * Kept in localStorage and never sent anywhere: two reps sharing an org should not fight
@@ -259,10 +299,14 @@ export function applyBrand(org: Org) {
   const b = org.brand as Record<string, string>;
   const root = document.documentElement.style;
   if (b.color) {
+    const tint = shade(b.color, 0.9);
     root.setProperty('--accent', b.color);
     root.setProperty('--accent-deep', shade(b.color, -0.2));
-    root.setProperty('--accent-tint', shade(b.color, 0.9));
-    root.setProperty('--accent-tint-fg', shade(b.color, -0.2));
+    root.setProperty('--accent-tint', tint);
+    // Both foregrounds are measured against the surface they land on, using the tenant's own
+    // ink and paper so a dark-mode-ish palette does not get the platform defaults imposed.
+    root.setProperty('--accent-fg', onColor(b.color, b.ink, b.paper));
+    root.setProperty('--accent-tint-fg', readableOn(tint, shade(b.color, -0.2)));
   }
   // paper and ink were stored on every org and read by nothing, so a tenant could set them
   // and see no change at all. The secondary inks are derived rather than stored: three

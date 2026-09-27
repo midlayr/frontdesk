@@ -535,14 +535,31 @@ leads.post('/:id/reply', async (c) => {
 
   if (target.channel === 'email') return replyByEmail(c, org, id, body, target.email);
 
-  if (target.channel !== 'sms') {
-    // voice and chat replies land here once those channels ship (GETTING-STARTED §5).
+  /**
+   * Voice replies go out as a text.
+   *
+   * A voicemail has no reply channel of its own — you cannot answer a recording — but the
+   * caller left a number, and texting them back is what the shop does anyway. The lead stays
+   * 'voice' because that is how the job arrived; the message is stored as the SMS it
+   * actually is, so the thread shows the customer what they were really sent.
+   *
+   * Chat is deliberately still unimplemented: a chat ticket has a live socket while the
+   * visitor is there and nothing at all once they close the tab, so "reply" means something
+   * different and needs its own answer rather than being folded in here.
+   */
+  if (target.channel !== 'sms' && target.channel !== 'voice') {
     return c.json({ error: `reply on ${target.channel} not implemented yet` }, 501);
   }
-  if (!target.phone) return c.json({ error: 'contact has no phone' }, 422);
+  if (!target.phone) {
+    return c.json({ error: target.channel === 'voice'
+      ? 'no number to text — the call arrived without a caller id'
+      : 'contact has no phone' }, 422);
+  }
 
+  // Not a 500: nothing is broken, the tenant has not finished setting up. A 500 sends a rep
+  // to report a bug when what is needed is an admin filling in a field.
   const from = org.comms.sms_number;
-  if (!from) return c.json({ error: 'tenant has no comms.sms_number configured' }, 500);
+  if (!from) return c.json({ error: 'no SMS number configured — set one in Settings' }, 409);
 
   // The signature is appended on the way out and stored with the message, so the thread
   // shows exactly what the customer received rather than what the rep typed.

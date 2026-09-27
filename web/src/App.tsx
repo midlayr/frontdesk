@@ -262,7 +262,11 @@ export function App() {
       await openLead(detail.lead.id);
       await refresh();
     } catch (e) {
-      setError(String(e));
+      // .message, not String(e): the latter prefixes "Error:" onto a sentence written to be
+      // read by a rep. Put the draft back too — losing what someone typed because a send
+      // failed is worse than the failure.
+      setError(e instanceof Error ? e.message : String(e));
+      setDraft(body);
     } finally {
       setSending(false);
     }
@@ -523,6 +527,18 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
   const miss = l.missing_fields ?? [];
   const who = l.contact_name ?? l.contact_email ?? l.contact_phone ?? 'Anonymous';
   const isChat = l.channel === 'chat' && !!l.chat_sid;
+  // A reply to a voicemail leaves as a text, so the box says so rather than letting a rep
+  // assume the caller hears it back. No number means there is nothing to send to at all.
+  const byText = l.channel === 'voice';
+  // The composer used to be offered on every ticket and posted to /reply regardless, so a
+  // channel the server refuses answered a typed-out reply with a raw status string. Say up
+  // front where a message can actually go: a voicemail with no caller id has nowhere, and a
+  // chat whose visitor has closed the tab has no socket and no other channel of its own.
+  const deadChat = l.channel === 'chat' && !live;
+  const noRoute = (byText && !l.contact_phone) || deadChat;
+  const noRouteWhy = deadChat
+    ? 'This visitor has left the chat — reply by email or phone from their contact details'
+    : 'No caller id on this voicemail — nothing to text back';
 
   return (
     <div className="ticket">
@@ -647,11 +663,15 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
       </div>
 
       <div className="composer">
-        <input value={draft} placeholder={live ? 'Answer in the chat…' : `Reply to ${who}…`}
+        <input value={draft} disabled={noRoute}
+               placeholder={noRoute ? noRouteWhy
+                          : live ? 'Answer in the chat…'
+                          : byText ? `Text ${who} back…`
+                          : `Reply to ${who}…`}
                onChange={(e) => setDraft(e.target.value)}
                onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || !e.shiftKey)) { e.preventDefault(); send(); } }} />
-        <button className="btn-primary" onClick={send} disabled={sending || !draft.trim()}>
-          {live ? 'Send in chat' : sending ? 'Sending…' : 'Send'}
+        <button className="btn-primary" onClick={send} disabled={sending || noRoute || !draft.trim()}>
+          {live ? 'Send in chat' : sending ? 'Sending…' : byText ? 'Send text' : 'Send'}
         </button>
       </div>
     </div>

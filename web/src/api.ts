@@ -143,7 +143,15 @@ export const api = {
       method: 'POST', headers: { ...headers(), 'content-type': 'application/json' },
       body: JSON.stringify({ body }),
     });
-    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    // A rep sees whatever this throws, so it carries the server's sentence and not the
+    // status code and JSON around it. Every refusal on this route explains itself; the
+    // fallback is for the ones that cannot, like a proxy timing out with an HTML page.
+    if (!r.ok) {
+      const said = await r.text();
+      let msg = '';
+      try { msg = (JSON.parse(said) as { error?: string }).error ?? ''; } catch { /* not json */ }
+      throw new Error(msg || `Could not send that reply (${r.status}).`);
+    }
     return r.json();
   },
 

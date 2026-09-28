@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SCALES, applyBrand, applyScale, contrast, currentScale, onColor, orgSlug, type ScaleId } from './api';
+import { LEGIBLE_FLOOR, SCALES, applyBrand, applyScale, contrast, currentScale, onColor, orgSlug, type ScaleId } from './api';
 
 /**
  * How Front Desk looks.
@@ -161,11 +161,14 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
  */
 function accentWarning(color: string, ink: string, paper: string): string | null {
   if (!HEX.test(color) || !HEX.test(ink) || !HEX.test(paper)) return null;
+  // Warn only where the app has actually had to intervene — below the legibility floor,
+  // where button text is flipped to ink because the light version would be invisible. A
+  // warning that fires on ordinary brand colours is one people learn to scroll past.
   const best = contrast(color, onColor(color, ink, paper));
   if (best >= 4.5) return null;
-  return best < 3
-    ? 'Button and launcher text will be hard to read on this colour. Try a deeper shade.'
-    : 'Button text on this colour is below the usual readability bar. It will pass at large sizes only.';
+  return contrast(color, paper) < LEGIBLE_FLOOR
+    ? 'This colour is too pale for light button text, so buttons will use dark text instead.'
+    : null;
 }
 
 function Swatch({ label, hint, value, disabled, warning, onChange }: {

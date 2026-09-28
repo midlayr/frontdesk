@@ -10,6 +10,35 @@ export const CHAT_JS = `/* Midlayr Chat · drop-in widget · served from cdn.mid
     const c = (x, y) => Math.round(x + (y - x) * amt).toString(16).padStart(2, '0');
     return \`#\${c(r, r2)}\${c(g, g2)}\${c(bl, b2)}\`;
   }
+
+  /* Contrast, mirroring applyBrand() in web/src/api.ts. The launcher button is the most
+     public thing this product renders — it sits on a customer's own website — and its label
+     used to be #fff whatever the tenant chose, so a pale brand colour published an
+     unreadable button to every visitor. */
+  function lum(hex) {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const s = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  function ratio(a, b) {
+    const [x, y] = [lum(a), lum(b)];
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  }
+  /* Keep the tenant's light label unless it is genuinely unreadable — see onColor() in
+     web/src/api.ts. A mid-toned brand colour keeps white; a pale one flips to ink. */
+  var LEGIBLE_FLOOR = 2.5;
+  function on(bg, ink, paper) {
+    if (ratio(bg, paper) >= LEGIBLE_FLOOR) return paper;
+    return ratio(bg, ink) > ratio(bg, paper) ? ink : paper;
+  }
+  /** Darken toward ink until the text clears AA against its own tinted background. */
+  function readable(bg, from, ink) {
+    let c = from;
+    for (let i = 0; i < 12 && ratio(bg, c) < 4.5; i++) c = mix(c, ink, 0.15);
+    return c;
+  }
   const tag = document.currentScript; const org = tag.dataset.org; const flow = tag.dataset.flow || 'quote-intake';
   // Default to wherever this script came from: on cdn.midlayr.com data-api names the API,
   // but for a Worker serving its own /widget/chat.js the same origin is already correct.
@@ -30,6 +59,9 @@ export const CHAT_JS = `/* Midlayr Chat · drop-in widget · served from cdn.mid
     // fallback so a new org needs no extra config.
     const botName = b.bot_name || (cfg.orgName || '').split(/\\s+/)[0] || 'Chat';
     const tint = b.accent_tint || mix(color, '#ffffff', .88);
+    // brand.accent_fg overrides the derived choice — the tenant's call on their own brand.
+    const onColor = b.accent_fg || on(color, ink, paper);  // launcher label
+    const onTint = readable(tint, color, ink);  // quick-reply chips on the tint
     let repName = '';
     const root = document.createElement('div'); root.id = 'midlayr-chat'; document.body.appendChild(root);
     const sh = root.attachShadow({ mode: 'open' });
@@ -39,7 +71,7 @@ export const CHAT_JS = `/* Midlayr Chat · drop-in widget · served from cdn.mid
         :host{all:initial}
         .l{position:fixed;right:28px;bottom:28px;display:flex;flex-direction:column;align-items:flex-end;gap:10px;font:14px/1.4 system-ui,sans-serif;z-index:2147483000}
         .nudge{background:\${paper};color:\${ink};border:1px solid #E3E1DC;padding:10px 14px;max-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.1)}
-        .btn{background:\${color};color:#fff;border:0;border-radius:2px;padding:12px 18px;font:600 14px system-ui;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.14)}
+        .btn{background:\${color};color:\${onColor};border:0;border-radius:2px;padding:12px 18px;font:600 14px system-ui;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.14)}
         .w{position:fixed;right:28px;bottom:28px;width:min(380px,calc(100vw - 56px));height:min(560px,calc(100vh - 56px));display:none;flex-direction:column;background:\${paper};color:\${ink};border:1px solid #E3E1DC;box-shadow:0 12px 32px rgba(0,0,0,.16);font:14px/1.5 'Inter Tight',system-ui,sans-serif;z-index:2147483001}
         .w.open{display:flex}
         .h{display:flex;align-items:center;gap:8px;padding:11px 13px;background:\${ink};color:\${paper};font:700 11.5px 'Archivo',system-ui;font-variation-settings:'wdth' 125;letter-spacing:.05em;text-transform:uppercase}
@@ -52,12 +84,12 @@ export const CHAT_JS = `/* Midlayr Chat · drop-in widget · served from cdn.mid
         .m{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
         .t{max-width:86%;padding:9px 11px;border:1px solid #E3E1DC;background:#F2F1EE;font-size:13.5px}
         .t small{display:block;font:10.5px 'IBM Plex Mono',ui-monospace,monospace;text-transform:uppercase;letter-spacing:.06em;color:#9AA0A8;margin-bottom:4px}
-        .t.you{align-self:flex-end;background:\${tint};color:\${ink};border-color:\${color}}.t.you small{color:\${color}}
+        .t.you{align-self:flex-end;background:\${tint};color:\${ink};border-color:\${color}}.t.you small{color:\${onTint}}
         .t.rep{background:\${paper};border-color:#1F7A4D}.t.rep small{color:#1F7A4D}
         .sys{text-align:center;font:10.5px ui-monospace,monospace;color:#1F7A4D;letter-spacing:.06em}
         .f{border-top:1px solid #E3E1DC;padding:10px 14px 12px}
         .c{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}.c:empty{margin:0}
-        .c button{border:1px solid \${color};background:\${tint};color:\${color};border-radius:2px;padding:6px 11px;font:13px 'Inter Tight',system-ui;cursor:pointer}
+        .c button{border:1px solid \${color};background:\${tint};color:\${onTint};border-radius:2px;padding:6px 11px;font:13px 'Inter Tight',system-ui;cursor:pointer}
         form{display:flex;gap:8px;align-items:center;border:1px solid #E3E1DC;border-radius:2px;padding:0 10px;height:36px}
         input{flex:1;border:0;outline:0;background:none;font:13.5px system-ui;color:\${ink};min-width:0}
         form button{border:0;background:\${ink};color:\${paper};width:26px;height:26px;border-radius:2px;cursor:pointer}

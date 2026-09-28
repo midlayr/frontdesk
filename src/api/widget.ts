@@ -69,6 +69,8 @@ widget.get('/config', async (c) => {
       // The bot's display name, kept separate from the legal/org name.
       bot_name: brand.bot_name ?? String(org.name).split(/\s+/)[0],
       accent_tint: brand.accent_tint ?? null,
+      // Explicit label colour for the launcher, when a tenant does not want the derived one.
+      accent_fg: brand.accent_fg ?? null,
       show_powered_by: brand.show_powered_by ?? true,
       logo_url: brand.logo_r2_key ? `/widget/logo?org=${encodeURIComponent(org.slug)}` : null,
       mark_url: brand.mark_r2_key ? `/widget/logo?org=${encodeURIComponent(org.slug)}&kind=mark` : null,

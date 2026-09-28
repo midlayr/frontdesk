@@ -28,6 +28,7 @@ import {
   readCookie, readSession, sessionCookie, verifyPassword,
 } from './auth';
 import { CONSOLE_HTML } from './web-console';
+import { sendEmail } from './lib/mailgun';
 
 export { ChatSession } from './do/chat-session';
 export { InboxRoom } from './do/inbox-room';
@@ -174,6 +175,121 @@ app.post('/api/session', async (c) => {
 app.delete('/api/session', async (c) => {
   await destroySession(c.get('sql'), readCookie(c.req.header('cookie') ?? null, COOKIE));
   c.header('set-cookie', clearCookie(new URL(c.req.url).protocol === 'https:'));
+  return c.json({ ok: true });
+});
+
+/**
+ * Forgotten passwords.
+ *
+ * Both routes sit above the /api/* middleware because that middleware authenticates, and
+ * nobody here can. They resolve the tenant from the hostname themselves, exactly as
+ * /api/session does.
+ *
+ * The rules that matter, in one place:
+ *
+ *  · The reply is the same whether or not the address has an account. Anything else turns
+ *    this into a way to ask which of a shop's staff exist, from the open internet.
+ *  · What is stored is the SHA-256 of the token, never the token. The link in the mailbox is
+ *    the only redeemable copy, so this table leaking grants nothing — the same bargain as
+ *    password_hash.
+ *  · One hour, one use, and requesting again cancels any earlier outstanding link, so a
+ *    forwarded or shoulder-read older mail stops working.
+ *  · The token names its org and the confirm step checks it against the hostname, so a link
+ *    minted for one tenant cannot be redeemed on another that shares this Worker.
+ */
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+const sha256Hex = async (s: string) =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))]
+    .map((b) => b.toString(16).padStart(2, '0')).join('');
+
+app.post('/api/password-reset', async (c) => {
+  const body = await c.req.json().catch(() => null) as { email?: string } | null;
+  const email = body?.email?.trim().toLowerCase();
+  // Same shape of answer for a missing field as for a missing account, for the same reason.
+  if (!email) return c.json({ ok: true });
+
+  const sql = c.get('sql');
+  const url = new URL(c.req.url);
+  const org = await resolveOrg(c.env, sql, url);
+  if (!org) return c.json({ ok: true });
+
+  const [user] = await withOrg(sql, org.id, (tx) =>
+    tx<{ id: string; name: string }[]>`
+      SELECT id, name FROM users
+       WHERE email = ${email} AND org_id = ${org.id} AND disabled_at IS NULL`);
+
+  if (user) {
+    const token = [...crypto.getRandomValues(new Uint8Array(32))]
+      .map((b) => b.toString(16).padStart(2, '0')).join('');
+    const hash = await sha256Hex(token);
+    const expires = new Date(Date.now() + RESET_TTL_MS);
+
+    // Outside withOrg: password_resets carries no RLS policy, by design.
+    await sql`DELETE FROM password_resets WHERE user_id = ${user.id} AND used_at IS NULL`;
+    await sql`INSERT INTO password_resets (token_hash, user_id, org_id, expires_at, requested_ip)
+              VALUES (${hash}, ${user.id}, ${org.id}, ${expires},
+                      ${c.req.header('cf-connecting-ip') ?? null})`;
+
+    const link = `${url.origin}/?reset=${token}`;
+    const sender = org.comms.email_sender || `${org.slug}@${c.env.MAILGUN_DOMAIN}`;
+    try {
+      await sendEmail(c.env, {
+        from: `${org.name} <${sender}>`,
+        to: email,
+        subject: `Reset your ${org.name} Front Desk password`,
+        text: `Hello ${user.name},\n\n`
+            + `Someone asked to reset the password for this address on ${org.name} Front Desk.\n\n`
+            + `${link}\n\n`
+            + `The link works once and expires in an hour. If that was not you, ignore this — `
+            + `your password has not changed, and nobody can use this link without the mail.\n`,
+        replyTo: org.comms.email_inbound ?? sender,
+        inReplyTo: null,
+        references: [],
+      });
+    } catch (err) {
+      // Logged, not surfaced: telling the caller the send failed would tell them the account
+      // exists. The person simply sees no mail and tries again.
+      console.error('password reset send failed', err);
+    }
+  }
+
+  return c.json({ ok: true });
+});
+
+app.post('/api/password-reset/confirm', async (c) => {
+  const body = await c.req.json().catch(() => null) as { token?: string; password?: string } | null;
+  const token = body?.token?.trim();
+  const password = body?.password;
+  if (!token || !password) return c.json({ error: 'token and password required' }, 400);
+  if (password.length < 12) return c.json({ error: 'password must be at least 12 characters' }, 400);
+
+  const sql = c.get('sql');
+  const url = new URL(c.req.url);
+  const org = await resolveOrg(c.env, sql, url);
+  if (!org) return c.json({ error: 'unknown tenant' }, 404);
+
+  const hash = await sha256Hex(token);
+  const [row] = await sql<{ user_id: string; org_id: string }[]>`
+    SELECT user_id, org_id FROM password_resets
+     WHERE token_hash = ${hash} AND used_at IS NULL AND expires_at > now()`;
+
+  // One message for expired, spent, unknown and wrong-tenant alike: which of those it was is
+  // not the sender's business, and the remedy is the same in every case.
+  if (!row || row.org_id !== org.id) {
+    return c.json({ error: 'that link has expired or already been used — request a new one' }, 400);
+  }
+
+  const newHash = await hashPassword(password);
+  await withOrg(sql, org.id, (tx) => tx`
+    UPDATE users SET password_hash = ${newHash}, password_set_at = now()
+     WHERE id = ${row.user_id} AND org_id = ${org.id}`);
+
+  // Spend the token and end every existing session: a reset is what someone does when they
+  // suspect the account is not only theirs.
+  await sql`UPDATE password_resets SET used_at = now() WHERE token_hash = ${hash}`;
+  await sql`DELETE FROM sessions WHERE user_id = ${row.user_id}`;
+
   return c.json({ ok: true });
 });
 

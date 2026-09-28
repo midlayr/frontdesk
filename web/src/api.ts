@@ -138,6 +138,28 @@ export const api = {
   lead: (id: string) =>
     get<{ lead: Lead; messages: Message[]; attachments: Attachment[]; activity: unknown[] }>(`/api/leads/${id}`),
 
+  /** Always resolves: the server answers the same either way, so the UI must not branch. */
+  requestPasswordReset: async (email: string) => {
+    await fetch(url('/api/password-reset'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).catch(() => undefined);
+  },
+
+  confirmPasswordReset: async (token: string, password: string) => {
+    const r = await fetch(url('/api/password-reset/confirm'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token, password }),
+    });
+    if (!r.ok) {
+      const said = await r.text();
+      let msg = '';
+      try { msg = (JSON.parse(said) as { error?: string }).error ?? ''; } catch { /* not json */ }
+      throw new Error(msg || `Could not reset the password (${r.status}).`);
+    }
+    return r.json();
+  },
+
   reply: async (id: string, body: string) => {
     const r = await fetch(url(`/api/leads/${id}/reply`), {
       method: 'POST', headers: { ...headers(), 'content-type': 'application/json' },
@@ -257,9 +279,26 @@ export function contrast(a: string, b: string): number {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
-/** Whichever of the tenant's own ink or paper is legible on this background. */
+/**
+ * Text to put on the accent.
+ *
+ * Light text on a mid-toned brand colour is what almost every brand intends, and the first
+ * version of this overrode that whenever the pair missed AA — which flipped perfectly
+ * conventional buttons to dark text and surprised the people whose brand it was.
+ *
+ * So the rule is narrower than AA on purpose: keep the tenant's light text unless it is
+ * genuinely unreadable, and only then fall back to ink. The floor catches the cases this was
+ * written for — a yellow accent sits at 1.4:1, near-invisible — while leaving a mid teal or
+ * a hot pink alone. Tenants who want the other answer set brand.accent_fg explicitly.
+ *
+ * This is a legibility guard, not an accessibility guarantee. Settings → Appearance still
+ * says so while a colour is being chosen.
+ */
+export const LEGIBLE_FLOOR = 2.5;
+
 export function onColor(bg: string, ink = '#14161A', paper = '#FBFAF8'): string {
-  return contrast(bg, paper) >= contrast(bg, ink) ? paper : ink;
+  if (contrast(bg, paper) >= LEGIBLE_FLOOR) return paper;
+  return contrast(bg, ink) > contrast(bg, paper) ? ink : paper;
 }
 
 /**
@@ -313,7 +352,11 @@ export function applyBrand(org: Org) {
     root.setProperty('--accent-tint', tint);
     // Both foregrounds are measured against the surface they land on, using the tenant's own
     // ink and paper so a dark-mode-ish palette does not get the platform defaults imposed.
-    root.setProperty('--accent-fg', onColor(b.color, b.ink, b.paper));
+    // brand.accent_fg wins when set. Deriving the foreground is the right default, but a
+    // shop that wants its buttons a particular way is entitled to say so about its own
+    // brand — and the alternative, weakening the contrast rule for everyone, would quietly
+    // bring back unreadable text on the genuinely pale accents this was written for.
+    root.setProperty('--accent-fg', b.accent_fg || onColor(b.color, b.ink, b.paper));
     root.setProperty('--accent-tint-fg', readableOn(tint, shade(b.color, -0.2)));
   }
   // paper and ink were stored on every org and read by nothing, so a tenant could set them

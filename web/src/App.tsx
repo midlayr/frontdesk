@@ -686,44 +686,114 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
  * changing how sessions work.
  */
 function Login({ onDone }: { onDone: () => void }) {
+  // A reset link lands on the app itself rather than a route of its own, so the token is
+  // read once here and stripped from the address bar before anything else runs — it is a
+  // credential for the next minute, and it has no business staying in history or in the
+  // referer of the first image the page loads.
+  const [token, setToken] = useState<string | null>(null);
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    const t = u.searchParams.get('reset');
+    if (!t) return;
+    setToken(t);
+    u.searchParams.delete('reset');
+    window.history.replaceState({}, '', u.pathname + u.search + u.hash);
+  }, []);
+
+  const [mode, setMode] = useState<'in' | 'forgot'>('in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [sent, setSent] = useState(false);
+  const [done, setDone] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErr('');
     try {
-      await api.login(email.trim(), password);
-      onDone();
+      if (token) {
+        await api.confirmPasswordReset(token, password);
+        // Straight to a sign-in that now works, rather than logging them in from a link.
+        setToken(null); setDone(true); setPassword('');
+      } else if (mode === 'forgot') {
+        await api.requestPasswordReset(email.trim());
+        setSent(true);
+      } else {
+        await api.login(email.trim(), password);
+        onDone();
+      }
     } catch (e) {
-      setErr(String(e).replace(/^Error:\s*/, ''));
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   }
 
+  // Deliberately the same words whether or not that address has an account.
+  if (sent) {
+    return (
+      <div className="gate">
+        <div>
+          <span className="eyebrow">Front Desk</span>
+          <h1 className="display" style={{ fontSize: 'var(--h2)', margin: '2px 0 10px' }}>Check your email</h1>
+          <p className="appear-note">
+            If <strong>{email.trim()}</strong> has an account, a link to set a new password is on
+            its way. It works once and expires in an hour.
+          </p>
+          <button className="btn-ghost" onClick={() => { setSent(false); setMode('in'); }}>
+            Back to sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const heading = token ? 'Choose a new password' : mode === 'forgot' ? 'Reset your password' : 'Sign in';
+
   return (
     <div className="gate">
       <form onSubmit={submit}>
         <span className="eyebrow">Front Desk</span>
-        <h1 className="display" style={{ fontSize: 'var(--h2)', margin: '2px 0 10px' }}>Sign in</h1>
-        <label className="fb-field">
-          <span className="label">Email</span>
-          <input type="email" autoComplete="username" autoFocus required
-                 value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
-        <label className="fb-field">
-          <span className="label">Password</span>
-          <input type="password" autoComplete="current-password" required
-                 value={password} onChange={(e) => setPassword(e.target.value)} />
-        </label>
+        <h1 className="display" style={{ fontSize: 'var(--h2)', margin: '2px 0 10px' }}>{heading}</h1>
+
+        {done && <p className="appear-note">Password changed. Sign in with it below.</p>}
+
+        {!token && (
+          <label className="fb-field">
+            <span className="label">Email</span>
+            <input type="email" autoComplete="username" autoFocus required
+                   value={email} onChange={(e) => setEmail(e.target.value)} />
+          </label>
+        )}
+
+        {mode !== 'forgot' && (
+          <label className="fb-field">
+            <span className="label">{token ? 'New password' : 'Password'}</span>
+            <input type="password" required autoFocus={!!token}
+                   autoComplete={token ? 'new-password' : 'current-password'}
+                   minLength={token ? 12 : undefined}
+                   value={password} onChange={(e) => setPassword(e.target.value)} />
+            {token && <em className="label" style={{ textTransform: 'none' }}>At least 12 characters</em>}
+          </label>
+        )}
+
         {err && <p className="err">{err}</p>}
+
         <button className="btn-primary" type="submit" disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign in'}
+          {busy ? 'Working…'
+            : token ? 'Set password'
+            : mode === 'forgot' ? 'Email me a link'
+            : 'Sign in'}
         </button>
+
+        {!token && (
+          <button type="button" className="btn-ghost"
+                  onClick={() => { setMode(mode === 'forgot' ? 'in' : 'forgot'); setErr(''); }}>
+            {mode === 'forgot' ? 'Back to sign in' : 'Forgot your password?'}
+          </button>
+        )}
       </form>
     </div>
   );

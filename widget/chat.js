@@ -25,8 +25,13 @@
     const [x, y] = [lum(a), lum(b)];
     return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
   }
-  /** Whichever of the tenant's ink or paper is legible on `bg`. */
-  function on(bg, ink, paper) { return ratio(bg, paper) >= ratio(bg, ink) ? paper : ink; }
+  /* Keep the tenant's light label unless it is genuinely unreadable — see onColor() in
+     web/src/api.ts. A mid-toned brand colour keeps white; a pale one flips to ink. */
+  var LEGIBLE_FLOOR = 2.5;
+  function on(bg, ink, paper) {
+    if (ratio(bg, paper) >= LEGIBLE_FLOOR) return paper;
+    return ratio(bg, ink) > ratio(bg, paper) ? ink : paper;
+  }
   /** Darken toward ink until the text clears AA against its own tinted background. */
   function readable(bg, from, ink) {
     let c = from;
@@ -53,7 +58,8 @@
     // fallback so a new org needs no extra config.
     const botName = b.bot_name || (cfg.orgName || '').split(/\s+/)[0] || 'Chat';
     const tint = b.accent_tint || mix(color, '#ffffff', .88);
-    const onColor = on(color, ink, paper);      // launcher label
+    // brand.accent_fg overrides the derived choice — the tenant's call on their own brand.
+    const onColor = b.accent_fg || on(color, ink, paper);  // launcher label
     const onTint = readable(tint, color, ink);  // quick-reply chips on the tint
     let repName = '';
     const root = document.createElement('div'); root.id = 'midlayr-chat'; document.body.appendChild(root);

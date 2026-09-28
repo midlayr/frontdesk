@@ -313,8 +313,11 @@ export function App() {
     if (!detail) return;
     try {
       await api.takeover(detail.lead.id);
-      setLive(true);
+      // After openLead, not before: reopening the lead resets `live` to false and reconnects
+      // the socket, so setting it first was immediately undone. The socket's own 'joined'
+      // message sets it too, but that is a round trip away and the rep is already typing.
       await openLead(detail.lead.id);
+      setLive(true);
       await refresh();
     } catch (e) { setError(String(e)); }
   }
@@ -530,15 +533,14 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
   // A reply to a voicemail leaves as a text, so the box says so rather than letting a rep
   // assume the caller hears it back. No number means there is nothing to send to at all.
   const byText = l.channel === 'voice';
-  // The composer used to be offered on every ticket and posted to /reply regardless, so a
-  // channel the server refuses answered a typed-out reply with a raw status string. Say up
-  // front where a message can actually go: a voicemail with no caller id has nowhere, and a
-  // chat whose visitor has closed the tab has no socket and no other channel of its own.
-  const deadChat = l.channel === 'chat' && !live;
-  const noRoute = (byText && !l.contact_phone) || deadChat;
-  const noRouteWhy = deadChat
-    ? 'This visitor has left the chat — reply by email or phone from their contact details'
-    : 'No caller id on this voicemail — nothing to text back';
+  // Only disable where there is provably nowhere to send: a voicemail that arrived without
+  // a caller id. Chat is deliberately NOT disabled here. `live` means "a rep has joined",
+  // not "the visitor is present", so using it to lock the box took the input away the
+  // moment someone took a chat over — the exact moment they wanted to type. A chat the
+  // server cannot deliver to now answers with a sentence instead, which is the honest way
+  // to say it when the client cannot know in advance.
+  const noRoute = byText && !l.contact_phone;
+  const noRouteWhy = 'No caller id on this voicemail — nothing to text back';
 
   return (
     <div className="ticket">

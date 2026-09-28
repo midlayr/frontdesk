@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,600;125,700&family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#FBFAF8;color:#14161A;font-family:'Inter Tight',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#0B7FA8;text-decoration:none}a:hover{color:#075E7C;text-decoration:underline}
+input,textarea,select,button{font-family:inherit;color:inherit}
+:focus-visible{outline:2px solid #0B7FA8;outline-offset:2px}
+[data-scroll]{overflow-y:auto;overflow-x:hidden}
+[data-scroll]::-webkit-scrollbar{width:10px}[data-scroll]::-webkit-scrollbar-thumb{background:#E3E1DC}
+</style>
+</helmet>
+
+<div style="height:100vh;display:grid;grid-template-rows:56px auto 1fr;grid-template-columns:minmax(0,1fr);font-size:14px">
+
+  <header style="display:flex;align-items:center;gap:20px;padding:0 24px;border-bottom:1px solid #E3E1DC;background:#FBFAF8;min-width:0;overflow:hidden">
+    <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:22px;width:auto;object-fit:contain;display:block" />
+    <div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding-left:10px;border-left:1px solid #E3E1DC">Front Desk</div>
+    <nav style="display:flex;align-items:stretch;gap:18px;height:56px;margin-left:12px">
+      <span style="display:flex;align-items:center;font-size:13.5px;color:#5C6169;white-space:nowrap">Inbox</span>
+      <span style="display:flex;align-items:center;font-size:13.5px;color:#5C6169;white-space:nowrap">Pipeline</span>
+      <span style="display:flex;align-items:center;font-size:13.5px;color:#5C6169;white-space:nowrap">Campaigns</span>
+      <span style="display:flex;align-items:center;font-size:13.5px;color:#14161A;font-weight:600;border-bottom:2px solid #0B7FA8;white-space:nowrap">Deal flow</span>
+    </nav>
+    <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#5C6169;white-space:nowrap">{{ versionLine }}</span>
+    <button onClick="{{ publish }}" style="border:1px solid {{ pubBorder }};background:{{ pubBg }};color:#FBFAF8;border-radius:2px;height:30px;padding:0 14px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer">{{ pubLabel }}</button>
+  </header>
+
+  <div style="padding:18px 24px 14px;border-bottom:1px solid #E3E1DC;background:#F2F1EE;overflow-x:auto;min-width:0">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;min-width:960px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">DEAL FLOW · HOW EVERY LEAD MOVES FROM ARRIVAL TO WON OR LOST</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:#9AA0A8">CLICK A STAGE TO EDIT</span>
+    </div>
+    <div style="display:flex;align-items:center;min-width:960px">
+      <sc-for list="{{ mainNodes }}" as="n" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;flex:1 1 0;min-width:0">
+          <div onClick="{{ n.onClick }}" style="flex:1;min-width:0;position:relative;background:#FBFAF8;border:1px solid {{ n.border }};padding:12px 14px 12px 17px;cursor:pointer;box-shadow:{{ n.shadow }}">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:4px;background:{{ n.color }}"></span>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">{{ n.num }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:#1F7A4D;white-space:nowrap">{{ n.here }}</span></div>
+            <div style="margin-top:4px;font-size:15px;font-weight:600">{{ n.name }}</div>
+            <div style="margin-top:2px;font-size:12px;color:#5C6169;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.sub }}</div>
+            <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+              <span style="border:1px solid #E3E1DC;padding:1px 7px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#5C6169;white-space:nowrap">{{ n.autos }}</span>
+              <span style="border:1px solid {{ n.slaBorder }};padding:1px 7px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:{{ n.slaColor }};white-space:nowrap">{{ n.sla }}</span>
+            </div>
+          </div>
+          <div style="flex:none;width:34px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:16px;color:#9AA0A8">→</div>
+        </div>
+      </sc-for>
+      <div style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ termNodes }}" as="n" hint-placeholder-count="2">
+          <div onClick="{{ n.onClick }}" style="position:relative;background:#FBFAF8;border:1px solid {{ n.border }};padding:9px 14px 9px 17px;cursor:pointer;box-shadow:{{ n.shadow }}">
+            <span style="position:absolute;left:0;top:0;bottom:0;width:4px;background:{{ n.color }}"></span>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="font-size:14px;font-weight:600">{{ n.name }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#1F7A4D;white-space:nowrap">{{ n.here }}</span></div>
+            <div style="margin-top:2px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#5C6169">{{ n.autos }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;color:#9AA0A8;min-width:960px">{{ loopNote }}</div>
+  </div>
+
+  <div style="display:flex;min-height:0">
+    <div data-scroll style="flex:1;min-width:0;padding:24px 32px 40px">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">{{ selEyebrow }}</div>
+      <input value="{{ selName }}" onChange="{{ onSelName }}" style="margin-top:6px;width:100%;max-width:520px;border:0;border-bottom:1px dashed #E3E1DC;background:transparent;padding:2px 0 6px;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:26px;letter-spacing:-.02em;outline:none" />
+
+      <div style="margin-top:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;max-width:1040px">
+        <div style="border:1px solid #E3E1DC;padding:16px 18px;background:#FBFAF8">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">DEAL ENTERS THIS STAGE WHEN</div>
+          <select value="{{ selEnter }}" onChange="{{ onSelEnter }}" style="margin-top:10px;width:100%;border:1px solid #E3E1DC;border-radius:2px;padding:9px 10px;font-size:14px;background:#FBFAF8">
+            <option value="Lead arrives on any channel">Lead arrives on any channel</option>
+            <option value="Product, qty or deadline is missing">Product, qty or deadline is missing</option>
+            <option value="Rep sends a reply">Rep sends a reply</option>
+            <option value="Quote amount entered">Quote amount entered</option>
+            <option value="Rep marks it won">Rep marks it won</option>
+            <option value="Rep marks it lost">Rep marks it lost</option>
+          </select>
+          <div style="margin-top:10px;font-size:12.5px;color:#5C6169;line-height:1.5">{{ selEnterHelp }}</div>
+        </div>
+        <div style="border:1px solid #E3E1DC;padding:16px 18px;background:#FBFAF8">
+          <label style="display:flex;align-items:center;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8"><input type="checkbox" checked="{{ slaOn }}" onChange="{{ onSlaOn }}" />TIME LIMIT IN THIS STAGE</label>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;opacity:{{ slaOpacity }}">
+            <span style="font-size:13.5px">If a deal sits here longer than</span>
+            <input type="number" min="1" value="{{ slaHours }}" onChange="{{ onSlaHours }}" style="width:72px;border:1px solid #E3E1DC;border-radius:2px;padding:7px 8px;font-size:14px;background:#FBFAF8" />
+            <span style="font-size:13.5px">hours</span>
+          </div>
+          <select value="{{ slaThen }}" onChange="{{ onSlaThen }}" style="margin-top:10px;width:100%;border:1px solid #E3E1DC;border-radius:2px;padding:9px 10px;font-size:14px;background:#FBFAF8;opacity:{{ slaOpacity }}">
+            <option value="Notify team lead">Then notify team lead</option>
+            <option value="Create task for assignee">Then create a task for the assignee</option>
+            <option value="Reassign to next rep">Then reassign to the next rep</option>
+            <option value="Flag as going cold">Then flag as going cold</option>
+            <option value="Move to Lost">Then move to Lost</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;border:1px solid #E3E1DC;padding:16px 18px 6px;background:#FBFAF8;max-width:1040px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">WHEN A DEAL ENTERS · AUTOMATIONS</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8">{{ autoCount }}</span></div>
+        <sc-for list="{{ actions }}" as="a" hint-placeholder-count="2">
+          <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:1px solid #E3E1DC;margin-top:10px">
+            <input type="checkbox" checked="{{ a.on }}" onChange="{{ a.onToggle }}" style="margin-top:3px" />
+            <div style="flex:1;min-width:0;opacity:{{ a.opacity }}">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span style="font-size:13.5px;font-weight:600">{{ a.label }}</span><button onClick="{{ a.remove }}" style="border:0;background:transparent;color:#9AA0A8;font-size:13px;cursor:pointer;padding:0 2px">✕</button></div>
+              <sc-if value="{{ a.isText }}" hint-placeholder-val="{{ false }}">
+                <textarea value="{{ a.value }}" onChange="{{ a.onValue }}" rows="2" style="margin-top:8px;width:100%;border:1px solid #E3E1DC;border-radius:2px;padding:8px 10px;font-size:13.5px;line-height:1.5;resize:vertical;background:#FBFAF8"></textarea>
+              </sc-if>
+              <sc-if value="{{ a.isPick }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                  <sc-for list="{{ a.picks }}" as="p" hint-placeholder-count="3">
+                    <button onClick="{{ p.onClick }}" style="border:1px solid {{ p.border }};background:{{ p.bg }};color:{{ p.color }};border-radius:2px;padding:5px 10px;font-size:12.5px;white-space:nowrap;cursor:pointer">{{ p.label }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:12px 0 10px;border-top:1px solid #E3E1DC;margin-top:10px">
+          <sc-for list="{{ addKinds }}" as="k" hint-placeholder-count="5">
+            <button onClick="{{ k.onClick }}" style="border:1px dashed #9AA0A8;background:transparent;border-radius:2px;padding:5px 10px;font-size:12.5px;color:#5C6169;white-space:nowrap;cursor:pointer">+ {{ k.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;border:1px solid #E3E1DC;padding:16px 18px;background:#FBFAF8;max-width:1040px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">MOVES ON TO</div>
+        <sc-for list="{{ exits }}" as="x" hint-placeholder-count="1">
+          <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#9AA0A8">→</span>
+            <select value="{{ x.to }}" onChange="{{ x.onTo }}" style="border:1px solid #E3E1DC;border-radius:2px;padding:7px 10px;font-size:13.5px;background:#FBFAF8">
+              <option value="new">New</option><option value="needs">Needs info</option><option value="replied">Replied</option><option value="quoted">Quoted</option><option value="won">Won</option><option value="lost">Lost</option>
+            </select>
+            <span style="font-size:13.5px;color:#5C6169">when</span>
+            <select value="{{ x.when }}" onChange="{{ x.onWhen }}" style="flex:1;min-width:220px;border:1px solid #E3E1DC;border-radius:2px;padding:7px 10px;font-size:13.5px;background:#FBFAF8">
+              <option value="A required spec is missing">A required spec is missing</option>
+              <option value="Missing specs are filled in">Missing specs are filled in</option>
+              <option value="Rep sends a reply">Rep sends a reply</option>
+              <option value="Quote amount entered">Quote amount entered</option>
+              <option value="Customer approves the quote">Customer approves the quote</option>
+              <option value="Rep marks it won">Rep marks it won</option>
+              <option value="Rep marks it lost">Rep marks it lost</option>
+              <option value="Time limit passes">Time limit passes</option>
+            </select>
+            <button onClick="{{ x.remove }}" style="border:0;background:transparent;color:#9AA0A8;font-size:13px;cursor:pointer">✕</button>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noExits }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:10px;font-size:13px;color:#5C6169">End of the flow. Deals stay here.</div>
+        </sc-if>
+        <button onClick="{{ addExit }}" style="margin-top:12px;border:1px dashed #9AA0A8;background:transparent;border-radius:2px;padding:5px 10px;font-size:12.5px;color:#5C6169;cursor:pointer">+ Add a path</button>
+      </div>
+    </div>
+
+    <sc-if value="{{ showSim }}" hint-placeholder-val="{{ true }}">
+      <aside style="width:min(440px,42%);flex:none;border-left:1px solid #E3E1DC;background:#F2F1EE;display:flex;flex-direction:column;min-height:0">
+        <div style="padding:16px 18px 12px;border-bottom:1px solid #E3E1DC">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">TEST A DEAL</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8">{{ stepLine }}</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+            <sc-for list="{{ scenarios }}" as="s" hint-placeholder-count="3">
+              <button onClick="{{ s.onClick }}" style="border:1px solid {{ s.border }};background:{{ s.bg }};color:{{ s.color }};border-radius:2px;padding:5px 10px;font-size:12.5px;white-space:nowrap;cursor:pointer">{{ s.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:10px">
+            <button onClick="{{ prev }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:30px;padding:0 10px;font-size:12.5px;cursor:pointer">◀</button>
+            <button onClick="{{ togglePlay }}" style="flex:1;border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;height:30px;font-size:12.5px;font-weight:600;cursor:pointer">{{ playLabel }}</button>
+            <button onClick="{{ next }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:30px;padding:0 10px;font-size:12.5px;cursor:pointer">▶</button>
+            <button onClick="{{ restart }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:30px;padding:0 10px;font-size:12.5px;cursor:pointer">Restart</button>
+          </div>
+        </div>
+        <div data-scroll ref="{{ simScroll }}" style="flex:1;min-height:0;padding:14px 18px;display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+            <div onClick="{{ r.onClick }}" style="background:#FBFAF8;border:1px solid {{ r.border }};padding:10px 12px;opacity:{{ r.opacity }};cursor:pointer">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;color:#9AA0A8">{{ r.t }}</span><span style="border:1px solid {{ r.stageColor }};color:{{ r.stageColor }};padding:1px 7px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;white-space:nowrap">{{ r.stageName }}</span></div>
+              <div style="margin-top:5px;font-size:13.5px;line-height:1.45">{{ r.text }}</div>
+              <sc-for list="{{ r.fired }}" as="f" hint-placeholder-count="1">
+                <div style="display:flex;gap:6px;margin-top:4px;font-size:12.5px;line-height:1.45;color:{{ f.color }}"><span style="font-family:'IBM Plex Mono',monospace">↳</span><span>{{ f.text }}</span></div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+        <div style="padding:12px 18px;border-top:1px solid #E3E1DC;font-size:12.5px;line-height:1.5;color:#5C6169">{{ simSummary }}</div>
+      </aside>
+    </sc-if>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;showSimulator&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;playSpeed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1100,&quot;min&quot;:400,&quot;max&quot;:2500,&quot;step&quot;:100,&quot;unit&quot;:&quot;ms&quot;,&quot;tsType&quot;:&quot;number&quot;}}">
+const META = {
+  autoreply: { label: 'Auto-reply to the customer', type: 'text' },
+  assign: { label: 'Assign to', type: 'pick', options: ['Round robin', 'Danny O.', 'Susan R.', 'Last rep on this customer'] },
+  enroll: { label: 'Enroll in sequence', type: 'pick', options: ['Quote follow-up', 'Missing info nudge', 'Reorder radar', 'Cold intro'] },
+  notify: { label: 'Notify', type: 'pick', options: ['Team lead', 'Production (monday.com)', 'Whole team'] },
+  task: { label: 'Create a task', type: 'text' },
+  tag: { label: 'Tag the customer', type: 'pick', options: ['Repeat', 'VIP', 'Price-sensitive'] },
+  stop: { label: 'Stop all sequences', type: 'none' },
+  ask: { label: 'Ask the rep for a lost reason', type: 'none' },
+};
+const ENTER_HELP = {
+  'Lead arrives on any channel': 'Voice, SMS, chat, web form, or email. Every deal starts here.',
+  'Product, qty or deadline is missing': 'Checked right after specs are read from the first message.',
+  'Rep sends a reply': 'Any reply from the ticket, on any channel.',
+  'Quote amount entered': 'Set on the ticket or when dragged to Quoted on the Pipeline board.',
+  'Rep marks it won': 'From the ticket or the Pipeline board.',
+  'Rep marks it lost': 'From the ticket, the board, or a time limit elsewhere in the flow.',
+};
+const COLORS = { new: '#0B7FA8', needs: '#B4690E', replied: '#5C6169', quoted: '#075E7C', won: '#1F7A4D', lost: '#B4261B' };
+const SCEN = [
+  { label: 'Voicemail · rush', events: [
+    { t: 'MON 8:02', type: 'arrive', missing: true, text: 'Voicemail: "500 postcards, need them Friday."' },
+    { t: 'MON 9:15', type: 'fill', text: 'Customer texts back: 14pt gloss.' },
+    { t: 'MON 9:20', type: 'rep_reply', text: 'Danny replies with a price range.' },
+    { t: 'MON 11:00', type: 'quote', text: 'Quote sent · $640.' },
+    { t: 'TUE 10:30', type: 'customer_reply', text: 'Customer: "Approved, go ahead."' },
+    { t: 'TUE 10:32', type: 'won', text: 'Danny marks it won.' },
+  ] },
+  { label: 'Chat · goes cold', events: [
+    { t: 'WED 14:10', type: 'arrive', missing: false, text: 'Chat: 2,500 tri-folds, gloss, needed in two weeks.' },
+    { t: 'WED 17:10', type: 'wait', hours: 3, text: 'Nobody picks it up for 3 hours.' },
+    { t: 'WED 17:25', type: 'rep_reply', text: 'Susan replies.' },
+    { t: 'THU 09:00', type: 'quote', text: 'Quote sent · $6,200.' },
+    { t: '+9 DAYS', type: 'wait', hours: 216, text: 'No reply for 9 days.' },
+    { t: '+14 DAYS', type: 'lost', text: 'Customer: "Went with another shop."' },
+  ] },
+  { label: 'Web form · complete', events: [
+    { t: 'FRI 10:00', type: 'arrive', missing: false, text: 'Order form: 1,000 business cards, 16pt, files attached.' },
+    { t: 'FRI 10:20', type: 'wait', hours: 0.3, text: 'Sits in the queue for 20 minutes.' },
+    { t: 'FRI 10:21', type: 'rep_reply', text: 'Danny confirms the files look good.' },
+    { t: 'FRI 10:40', type: 'quote', text: 'Quote sent · $185.' },
+    { t: 'FRI 13:05', type: 'won', text: 'Customer pays online. Marked won.' },
+  ] },
+];
+const fmtH = (h) => (h >= 24 && h % 24 === 0 ? h / 24 + 'd' : h + 'h');
+const short = (s) => (s.length > 52 ? s.slice(0, 50) + '…' : s);
+
+function defaults() {
+  return [
+    { id: 'new', name: 'New', enter: 'Lead arrives on any channel', actions: [
+      { kind: 'autoreply', on: true, value: "Thanks, got it. We'll have a price back to you shortly." },
+      { kind: 'assign', on: true, value: 'Round robin' } ],
+      sla: { on: true, hours: 2, then: 'Notify team lead' },
+      exits: [{ to: 'needs', when: 'A required spec is missing' }, { to: 'replied', when: 'Rep sends a reply' }] },
+    { id: 'needs', name: 'Needs info', enter: 'Product, qty or deadline is missing', actions: [
+      { kind: 'autoreply', on: true, value: 'Quick question so we can price this: what stock and finish did you have in mind?' },
+      { kind: 'enroll', on: false, value: 'Missing info nudge' } ],
+      sla: { on: true, hours: 24, then: 'Create task for assignee' },
+      exits: [{ to: 'new', when: 'Missing specs are filled in' }] },
+    { id: 'replied', name: 'Replied', enter: 'Rep sends a reply', actions: [],
+      sla: { on: true, hours: 48, then: 'Create task for assignee' },
+      exits: [{ to: 'quoted', when: 'Quote amount entered' }] },
+    { id: 'quoted', name: 'Quoted', enter: 'Quote amount entered', actions: [
+      { kind: 'enroll', on: true, value: 'Quote follow-up' } ],
+      sla: { on: true, hours: 216, then: 'Flag as going cold' },
+      exits: [{ to: 'won', when: 'Rep marks it won' }, { to: 'lost', when: 'Rep marks it lost' }] },
+    { id: 'won', name: 'Won', enter: 'Rep marks it won', actions: [
+      { kind: 'stop', on: true, value: '' },
+      { kind: 'notify', on: true, value: 'Production (monday.com)' },
+      { kind: 'enroll', on: true, value: 'Reorder radar' } ],
+      sla: { on: false, hours: 24, then: 'Notify team lead' }, exits: [] },
+    { id: 'lost', name: 'Lost', enter: 'Rep marks it lost', actions: [
+      { kind: 'stop', on: true, value: '' },
+      { kind: 'ask', on: true, value: '' } ],
+      sla: { on: false, hours: 24, then: 'Notify team lead' }, exits: [] },
+  ];
+}
+
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.simScroll = React.createRef();
+    this.state = { stages: defaults(), sel: 'new', dirty: false, version: 4, scen: 0, step: 1, playing: false };
+  }
+  componentWillUnmount() { clearInterval(this._iv); }
+  componentDidUpdate(_, prev) {
+    if (prev.step !== this.state.step && this.simScroll.current) {
+      const el = this.simScroll.current.children[this.state.step - 1];
+      if (el) this.simScroll.current.scrollTop = Math.max(0, el.offsetTop - this.simScroll.current.offsetTop - 40);
+    }
+  }
+  upd(fn) {
+    this.setState((s) => ({ dirty: true, stages: s.stages.map((x) => (x.id === s.sel ? fn(JSON.parse(JSON.stringify(x))) : x)) }));
+  }
+  simulate() {
+    const by = Object.fromEntries(this.state.stages.map((s) => [s.id, s]));
+    const sc = SCEN[this.state.scen];
+    let cur = null; let enrolled = []; const rows = [];
+    const ink = '#5C6169', warn = '#B4690E', ok = '#1F7A4D', bad = '#B4261B';
+    const enter = (id, fired) => {
+      cur = id;
+      by[id].actions.filter((a) => a.on).forEach((a) => {
+        let text;
+        if (a.kind === 'autoreply') text = `Auto-reply sent: "${short(a.value)}"`;
+        else if (a.kind === 'assign') text = `Assigned · ${a.value}`;
+        else if (a.kind === 'enroll') { text = `Enrolled in ${a.value}`; enrolled.push(a.value); }
+        else if (a.kind === 'notify') text = `Notified ${a.value}`;
+        else if (a.kind === 'task') text = `Task created: ${a.value}`;
+        else if (a.kind === 'tag') text = `Tagged ${a.value}`;
+        else if (a.kind === 'ask') text = 'Rep asked for a lost reason';
+        else if (a.kind === 'stop') { text = enrolled.length ? `Stopped ${enrolled.join(', ')}` : 'No sequences running'; enrolled = []; }
+        fired.push({ text, color: ink });
+      });
+    };
+    for (const ev of sc.events) {
+      const fired = [];
+      if (ev.type === 'arrive') {
+        enter('new', fired);
+        if (ev.missing) { fired.push({ text: 'Specs read · stock is missing', color: warn }); enter('needs', fired); }
+        else fired.push({ text: 'Specs read · everything required is there', color: ok });
+      } else if (ev.type === 'fill') {
+        if (cur === 'needs') { cur = 'new'; fired.push({ text: 'Specs complete · back to New (its automations already ran)', color: ok }); }
+      } else if (ev.type === 'rep_reply') { enter('replied', fired); }
+      else if (ev.type === 'quote') { enter('quoted', fired); }
+      else if (ev.type === 'wait') {
+        const st = by[cur];
+        if (st.sla.on && ev.hours >= st.sla.hours) {
+          fired.push({ text: `Over the ${fmtH(st.sla.hours)} limit → ${st.sla.then}`, color: warn });
+          if (st.sla.then === 'Move to Lost') enter('lost', fired);
+        } else fired.push({ text: st.sla.on ? `Within the ${fmtH(st.sla.hours)} limit` : 'No time limit on this stage', color: ok });
+      } else if (ev.type === 'customer_reply') {
+        if (enrolled.length) { fired.push({ text: `Customer replied → stopped ${enrolled.join(', ')}`, color: ok }); enrolled = []; }
+        else fired.push({ text: 'Customer replied', color: ink });
+      } else if (ev.type === 'won') { enter('won', fired); }
+      else if (ev.type === 'lost') { enter('lost', fired); fired.forEach((f) => { if (f.color === ink) f.color = bad; }); }
+      rows.push({ t: ev.t, text: ev.text, stage: cur, fired });
+    }
+    return rows;
+  }
+  play() {
+    clearInterval(this._iv);
+    const total = this.simulate().length;
+    if (this.state.step >= total) this.setState({ step: 1 });
+    this.setState({ playing: true });
+    this._iv = setInterval(() => {
+      this.setState((s) => {
+        if (s.step >= total) { clearInterval(this._iv); return { playing: false }; }
+        return { step: s.step + 1 };
+      });
+    }, this.props.playSpeed ?? 1100);
+  }
+  stop() { clearInterval(this._iv); this.setState({ playing: false }); }
+  renderVals() {
+    const s = this.state; const stages = s.stages;
+    const sel = stages.find((x) => x.id === s.sel) || stages[0];
+    const rows = this.simulate(); const step = Math.min(s.step, rows.length);
+    const here = rows[step - 1] ? rows[step - 1].stage : null;
+    const nameOf = (id) => (stages.find((x) => x.id === id) || {}).name || id;
+    const node = (st, i) => {
+      const on = st.id === s.sel; const n = st.actions.filter((a) => a.on).length;
+      return {
+        num: String(i + 1).padStart(2, '0') + ' · STAGE', name: st.name, sub: st.enter, color: COLORS[st.id],
+        autos: n ? `${n} automation${n > 1 ? 's' : ''}` : 'no automations',
+        sla: st.sla.on ? `⏱ ${fmtH(st.sla.hours)}` : 'no limit', slaBorder: st.sla.on ? '#B4690E' : '#E3E1DC', slaColor: st.sla.on ? '#B4690E' : '#9AA0A8',
+        border: on ? '#14161A' : '#E3E1DC', shadow: on ? '0 6px 18px rgba(20,22,26,.10)' : 'none',
+        here: here === st.id ? '● DEAL HERE' : '', onClick: () => this.setState({ sel: st.id }),
+      };
+    };
+    const mainNodes = stages.filter((x) => !['won', 'lost'].includes(x.id)).map(node);
+    const termNodes = stages.filter((x) => ['won', 'lost'].includes(x.id)).map((st, i) => node(st, mainNodes.length + i));
+    const idx = stages.indexOf(sel); const terminal = ['won', 'lost'].includes(sel.id);
+    const autosOn = sel.actions.filter((a) => a.on).length;
+    const fired = rows.slice(0, step).reduce((n, r) => n + r.fired.length, 0);
+    return {
+      versionLine: s.dirty ? `v${s.version} LIVE · UNPUBLISHED CHANGES` : `v${s.version} · PUBLISHED 2 DAYS AGO`,
+      pubLabel: s.dirty ? 'Publish changes' : 'Published', pubBg: s.dirty ? '#B4690E' : '#9AA0A8', pubBorder: s.dirty ? '#8A4F08' : '#9AA0A8',
+      publish: () => { if (s.dirty) this.setState((st) => ({ dirty: false, version: st.version + 1 })); },
+      mainNodes, termNodes,
+      loopNote: 'NEEDS INFO ↺ RETURNS TO NEW WHEN SPECS ARE FILLED · QUOTED SPLITS TO WON OR LOST · EVERY REPLY FROM THE CUSTOMER STOPS RUNNING SEQUENCES',
+      selEyebrow: `${terminal ? 'END STAGE' : 'STAGE'} ${String(idx + 1).padStart(2, '0')} OF ${stages.length}`,
+      selName: sel.name, onSelName: (e) => { const v = e.target.value; this.upd((x) => ((x.name = v), x)); },
+      selEnter: sel.enter, selEnterHelp: ENTER_HELP[sel.enter] || '', onSelEnter: (e) => { const v = e.target.value; this.upd((x) => ((x.enter = v), x)); },
+      slaOn: sel.sla.on, slaOpacity: sel.sla.on ? 1 : 0.4, slaHours: sel.sla.hours, slaThen: sel.sla.then,
+      onSlaOn: (e) => { const v = e.target.checked; this.upd((x) => ((x.sla.on = v), x)); },
+      onSlaHours: (e) => { const v = Math.max(1, parseInt(e.target.value || '1', 10)); this.upd((x) => ((x.sla.hours = v), x)); },
+      onSlaThen: (e) => { const v = e.target.value; this.upd((x) => ((x.sla.then = v), x)); },
+      autoCount: `${autosOn} OF ${sel.actions.length} ON`,
+      actions: sel.actions.map((a, i) => {
+        const m = META[a.kind];
+        return {
+          on: a.on, opacity: a.on ? 1 : 0.45, label: m.label, value: a.value,
+          isText: m.type === 'text', isPick: m.type === 'pick',
+          picks: (m.options || []).map((o) => { const act = o === a.value; return { label: o, border: act ? '#0B7FA8' : '#E3E1DC', bg: act ? '#E6F2F7' : '#FBFAF8', color: act ? '#075E7C' : '#14161A', onClick: () => this.upd((x) => ((x.actions[i].value = o), x)) }; }),
+          onToggle: (e) => { const v = e.target.checked; this.upd((x) => ((x.actions[i].on = v), x)); },
+          onValue: (e) => { const v = e.target.value; this.upd((x) => ((x.actions[i].value = v), x)); },
+          remove: () => this.upd((x) => (x.actions.splice(i, 1), x)),
+        };
+      }),
+      addKinds: ['autoreply', 'assign', 'enroll', 'notify', 'task', 'tag', 'stop'].map((k) => ({
+        label: { autoreply: 'Auto-reply', assign: 'Assign', enroll: 'Sequence', notify: 'Notify', task: 'Task', tag: 'Tag', stop: 'Stop sequences' }[k],
+        onClick: () => this.upd((x) => (x.actions.push({ kind: k, on: true, value: META[k].type === 'pick' ? META[k].options[0] : META[k].type === 'text' ? (k === 'task' ? 'Call the customer' : 'Thanks, we\'re on it.') : '' }), x)),
+      })),
+      exits: sel.exits.map((x, i) => ({
+        to: x.to, when: x.when,
+        onTo: (e) => { const v = e.target.value; this.upd((y) => ((y.exits[i].to = v), y)); },
+        onWhen: (e) => { const v = e.target.value; this.upd((y) => ((y.exits[i].when = v), y)); },
+        remove: () => this.upd((y) => (y.exits.splice(i, 1), y)),
+      })),
+      noExits: sel.exits.length === 0,
+      addExit: () => this.upd((y) => (y.exits.push({ to: 'lost', when: 'Time limit passes' }), y)),
+      showSim: this.props.showSimulator ?? true,
+      scenarios: SCEN.map((sc, i) => { const on = i === s.scen; return { label: sc.label, border: on ? '#14161A' : '#E3E1DC', bg: on ? '#14161A' : '#FBFAF8', color: on ? '#FBFAF8' : '#14161A', onClick: () => { this.stop(); this.setState({ scen: i, step: 1 }); } }; }),
+      stepLine: `EVENT ${step} OF ${rows.length}`,
+      prev: () => { this.stop(); this.setState((st) => ({ step: Math.max(1, st.step - 1) })); },
+      next: () => { this.stop(); this.setState((st) => ({ step: Math.min(rows.length, st.step + 1) })); },
+      restart: () => { this.stop(); this.setState({ step: 1 }); },
+      togglePlay: () => (s.playing ? this.stop() : this.play()), playLabel: s.playing ? '❚❚ Pause' : '▶ Play the deal',
+      simScroll: this.simScroll,
+      rows: rows.map((r, i) => ({
+        t: r.t, text: r.text, stageName: nameOf(r.stage).toUpperCase(), stageColor: COLORS[r.stage] || '#5C6169', fired: r.fired,
+        border: i === step - 1 ? '#14161A' : '#E3E1DC', opacity: i < step ? 1 : 0.35,
+        onClick: () => { this.stop(); this.setState({ step: i + 1 }); },
+      })),
+      simSummary: `${fired} automation${fired === 1 ? '' : 's'} fired so far. Edit any stage and the test reruns with your unpublished changes.`,
+    };
+  }
+}
+</script>
+</body>
+</html>

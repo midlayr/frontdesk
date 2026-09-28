@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,600;125,700&family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#FBFAF8;color:#14161A;font-family:'Inter Tight',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#0B7FA8;text-decoration:none}a:hover{color:#075E7C;text-decoration:underline}
+input,textarea,select,button{font-family:inherit;color:inherit}
+:focus-visible{outline:2px solid #0B7FA8;outline-offset:2px}
+[data-scroll]{overflow-y:auto;overflow-x:hidden}
+[data-scroll]::-webkit-scrollbar{width:8px;height:8px}[data-scroll]::-webkit-scrollbar-thumb{background:#E3E1DC}
+</style>
+</helmet>
+
+<div style="height:100vh;display:grid;grid-template-rows:56px 52px 1fr;grid-template-columns:minmax(0,1fr);font-size:14px;position:relative">
+
+  <header style="display:flex;align-items:center;gap:20px;padding:0 24px;border-bottom:1px solid #E3E1DC;background:#FBFAF8;min-width:0;overflow:hidden">
+    <img src="uploads/DumontLogo11_horiz.png" alt="Dumont Printing" style="height:22px;width:auto;object-fit:contain;display:block" />
+    <div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;padding-left:10px;border-left:1px solid #E3E1DC">Front Desk</div>
+    <nav style="display:flex;align-items:stretch;gap:18px;height:56px;margin-left:12px">
+      <a href="Dumont Leads Inbox.dc.html" style="display:flex;align-items:center;font-size:13.5px;color:#5C6169;white-space:nowrap">Inbox</a>
+      <span style="display:flex;align-items:center;font-size:13.5px;color:#14161A;font-weight:600;border-bottom:2px solid #0B7FA8;white-space:nowrap">Pipeline</span>
+      <span style="display:flex;align-items:center;font-size:13.5px;color:#5C6169;white-space:nowrap">Campaigns</span>
+      <a href="Deal Flow Builder.dc.html" style="display:flex;align-items:center;font-size:13.5px;color:#5C6169;white-space:nowrap">Deal flow</a>
+    </nav>
+    <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;color:#5C6169;white-space:nowrap">{{ totals }}</span>
+    <span style="width:30px;height:30px;border-radius:50%;background:#14161A;color:#FBFAF8;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;flex:none">DO</span>
+  </header>
+
+  <div style="display:flex;align-items:center;gap:16px;padding:0 24px;border-bottom:1px solid #E3E1DC;background:#FBFAF8;min-width:0;overflow-x:auto">
+    <div style="display:flex;border:1px solid #E3E1DC;border-radius:2px;overflow:hidden;flex:none">
+      <sc-for list="{{ viewTabs }}" as="v" hint-placeholder-count="3">
+        <button onClick="{{ v.onClick }}" style="border:0;border-right:1px solid #E3E1DC;background:{{ v.bg }};color:{{ v.color }};height:30px;padding:0 14px;font-size:13px;font-weight:{{ v.weight }};white-space:nowrap;cursor:pointer">{{ v.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display:flex;gap:6px;flex:none">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+        <button onClick="{{ f.onClick }}" style="border:1px solid {{ f.border }};background:{{ f.bg }};color:{{ f.color }};border-radius:2px;height:28px;padding:0 10px;font-size:12.5px;white-space:nowrap;cursor:pointer">{{ f.label }} <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;opacity:.7">{{ f.count }}</span></button>
+      </sc-for>
+    </div>
+    <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Search company" style="margin-left:auto;width:220px;flex:none;border:1px solid #E3E1DC;border-radius:2px;height:30px;padding:0 10px;font-size:13px;background:#FBFAF8" />
+  </div>
+
+  <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ true }}">
+    <div data-scroll style="display:flex;gap:12px;padding:16px 20px;overflow-x:auto;overflow-y:hidden;min-height:0;align-items:stretch;background:#FBFAF8">
+      <sc-for list="{{ columns }}" as="col" hint-placeholder-count="4">
+        <div onDragOver="{{ col.onDragOver }}" onDrop="{{ col.onDrop }}" style="flex:none;width:292px;display:flex;flex-direction:column;min-height:0;background:{{ col.bg }};border:1px solid {{ col.border }}">
+          <div style="padding:12px 12px 10px;border-top:3px solid {{ col.color }}">
+            <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:600">{{ col.name }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5C6169">{{ col.count }}</span></div>
+            <div style="display:flex;justify-content:space-between;margin-top:3px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;color:#9AA0A8"><span>{{ col.sla }}</span><span style="color:#14161A">{{ col.sum }}</span></div>
+          </div>
+          <div data-scroll style="flex:1;min-height:0;padding:0 10px 12px;display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ col.cards }}" as="c" hint-placeholder-count="2">
+              <div draggable="true" onDragStart="{{ c.onDragStart }}" onDragEnd="{{ c.onDragEnd }}" onClick="{{ c.open }}" style="position:relative;flex:none;background:#FBFAF8;border:1px solid {{ c.border }};padding:{{ c.pad }};cursor:grab;opacity:{{ c.opacity }}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                  <div style="min-width:0">
+                    <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.co }}</div>
+                    <div style="margin-top:2px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5C6169;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.specLine }}</div>
+                  </div>
+                  <sc-if value="{{ c.showHealth }}" hint-placeholder-val="{{ true }}">
+                    <button onClick="{{ c.toggleHealth }}" aria-label="Health score" style="flex:none;width:34px;height:34px;border-radius:50%;border:3px solid {{ c.ringColor }};background:#FBFAF8;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:500;cursor:pointer;padding:0">{{ c.score }}</button>
+                  </sc-if>
+                </div>
+                <div style="margin-top:8px;font-size:12.5px;line-height:1.4;color:{{ c.stateColor }}">{{ c.state1 }}</div>
+                <sc-if value="{{ c.hasState2 }}" hint-placeholder-val="{{ false }}">
+                  <div style="margin-top:1px;font-size:12px;line-height:1.4;color:{{ c.state2Color }}">{{ c.state2 }}</div>
+                </sc-if>
+                <sc-if value="{{ c.showFoot }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:8px;border-top:1px solid #E3E1DC">
+                    <span style="width:22px;height:22px;border-radius:50%;background:{{ c.repBg }};color:{{ c.repFg }};display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-size:9.5px">{{ c.rep }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8">{{ c.meta }}</span>
+                    <sc-if value="{{ c.rush }}" hint-placeholder-val="{{ false }}">
+                      <span style="margin-left:auto;border:1px solid #B4690E;color:#B4690E;padding:0 6px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em">RUSH</span>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+              <div style="border:1px dashed #9AA0A8;padding:18px;text-align:center;font-size:12.5px;color:#9AA0A8">Drop a deal here</div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-for>
+
+      <div style="flex:none;width:260px;display:flex;flex-direction:column;gap:12px;min-height:0">
+        <sc-for list="{{ closed }}" as="z" hint-placeholder-count="2">
+          <div onDragOver="{{ z.onDragOver }}" onDrop="{{ z.onDrop }}" style="flex:1;min-height:0;display:flex;flex-direction:column;background:{{ z.bg }};border:1px solid {{ z.border }}">
+            <div style="padding:12px 12px 8px;border-top:3px solid {{ z.color }}">
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:600">{{ z.name }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5C6169">{{ z.count }}</span></div>
+              <div style="margin-top:3px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8">{{ z.sum }}</div>
+            </div>
+            <div data-scroll style="flex:1;min-height:0;padding:0 10px 10px;display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ z.rows }}" as="r" hint-placeholder-count="2">
+                <div onClick="{{ r.open }}" style="background:#FBFAF8;border:1px solid #E3E1DC;padding:7px 10px;cursor:pointer;flex:none">
+                  <div style="font-size:13px;font-weight:500">{{ r.co }}</div>
+                  <div style="margin-top:1px;font-size:11.5px;color:#5C6169">{{ r.meta }}</div>
+                </div>
+              </sc-for>
+              <div style="border:1px dashed #C9C6BF;padding:10px;text-align:center;font-size:12px;color:#9AA0A8;flex:none">{{ z.hint }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+    <div data-scroll style="min-height:0;padding:16px 24px 32px">
+      <div style="display:grid;grid-template-columns:minmax(160px,1.4fr) 110px 100px 90px 70px 50px minmax(220px,2.2fr);gap:0;min-width:900px;border:1px solid #E3E1DC">
+        <div style="display:contents">
+          <span style="padding:10px 12px;border-bottom:1px solid #14161A;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169;background:#F2F1EE">COMPANY</span>
+          <span style="padding:10px 12px;border-bottom:1px solid #14161A;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169;background:#F2F1EE">STAGE</span>
+          <span style="padding:10px 12px;border-bottom:1px solid #14161A;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169;background:#F2F1EE">VALUE</span>
+          <span style="padding:10px 12px;border-bottom:1px solid #14161A;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169;background:#F2F1EE">DUE</span>
+          <span style="padding:10px 12px;border-bottom:1px solid #14161A;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169;background:#F2F1EE">HEALTH</span>
+          <span style="padding:10px 12px;border-bottom:1px solid #14161A;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169;background:#F2F1EE">REP</span>
+          <span style="padding:10px 12px;border-bottom:1px solid #14161A;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169;background:#F2F1EE">NEXT MOVE</span>
+        </div>
+        <sc-for list="{{ listRows }}" as="r" hint-placeholder-count="6">
+          <div onClick="{{ r.open }}" style="display:contents;cursor:pointer">
+            <span style="padding:10px 12px;border-bottom:1px solid #E3E1DC;font-size:13.5px;font-weight:600;cursor:pointer">{{ r.co }}</span>
+            <span style="padding:10px 12px;border-bottom:1px solid #E3E1DC;cursor:pointer"><span style="border:1px solid {{ r.stageColor }};color:{{ r.stageColor }};padding:1px 7px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;white-space:nowrap">{{ r.stage }}</span></span>
+            <span style="padding:10px 12px;border-bottom:1px solid #E3E1DC;font-family:'IBM Plex Mono',monospace;font-size:12px;cursor:pointer">{{ r.value }}</span>
+            <span style="padding:10px 12px;border-bottom:1px solid #E3E1DC;font-size:13px;cursor:pointer">{{ r.due }}</span>
+            <span style="padding:8px 12px;border-bottom:1px solid #E3E1DC;cursor:pointer"><span style="display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;border:3px solid {{ r.ringColor }};font-family:'IBM Plex Mono',monospace;font-size:11px">{{ r.score }}</span></span>
+            <span style="padding:10px 12px;border-bottom:1px solid #E3E1DC;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5C6169;cursor:pointer">{{ r.rep }}</span>
+            <span style="padding:10px 12px;border-bottom:1px solid #E3E1DC;font-size:12.5px;line-height:1.45;color:#5C6169;cursor:pointer">{{ r.why }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isRadar }}" hint-placeholder-val="{{ false }}">
+    <div data-scroll style="min-height:0;padding:20px 24px 32px;background:#FBFAF8">
+      <div style="max-width:880px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#5C6169">RADAR · CUSTOMERS WHO SHOULD BE ORDERING</div>
+        <p style="margin:6px 0 0;font-size:13.5px;line-height:1.5;color:#5C6169;max-width:70ch">Reorder timing is learned from each customer's past won deals. Lapsed means twice their usual gap, or six months with no order.</p>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <sc-for list="{{ radarRows }}" as="r" hint-placeholder-count="4">
+            <div style="display:flex;gap:16px;align-items:flex-start;background:#FBFAF8;border:1px solid #E3E1DC;padding:14px 16px;flex-wrap:wrap">
+              <div style="flex:1;min-width:260px">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:15px;font-weight:600">{{ r.co }}</span><span style="border:1px solid {{ r.pillColor }};color:{{ r.pillColor }};padding:1px 7px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;white-space:nowrap">{{ r.flag }}</span></div>
+                <div style="margin-top:5px;font-size:13px;color:#5C6169;line-height:1.45">{{ r.ev }}</div>
+                <div style="margin-top:4px;font-size:12.5px;color:{{ r.nextColor }};line-height:1.45">{{ r.next }}</div>
+              </div>
+              <div style="display:flex;gap:6px;flex:none">
+                <button onClick="{{ r.call }}" style="border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;height:32px;padding:0 12px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer">Call today</button>
+                <button onClick="{{ r.snooze }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:32px;padding:0 12px;font-size:13px;white-space:nowrap;cursor:pointer">Snooze 30d</button>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ radarEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px dashed #9AA0A8;padding:20px;text-align:center;font-size:13px;color:#9AA0A8">Nothing on the radar right now.</div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDrawer }}" style="position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(20,22,26,.18);z-index:30"></div>
+    <aside data-scroll style="position:fixed;top:56px;right:0;bottom:0;width:min(440px,94vw);background:#FBFAF8;border-left:1px solid #E3E1DC;box-shadow:-12px 0 32px rgba(20,22,26,.12);z-index:31;display:flex;flex-direction:column">
+      <div style="padding:18px 20px 14px;border-bottom:1px solid #E3E1DC">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169">COMPANY</span><button onClick="{{ closeDrawer }}" style="border:0;background:transparent;color:#5C6169;font-size:15px;cursor:pointer">✕</button></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-top:6px">
+          <div style="min-width:0"><div style="font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:22px;letter-spacing:-.02em;line-height:1.1">{{ dv.name }}</div><div style="margin-top:4px;font-size:12.5px;color:#5C6169">{{ dv.domainCity }}</div></div>
+          <span style="flex:none;display:grid;place-items:center;width:46px;height:46px;border-radius:50%;border:3px solid {{ dv.ringColor }};font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:500">{{ dv.score }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:14px">
+          <div style="border:1px solid #E3E1DC;padding:7px 9px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:#9AA0A8">INDUSTRY</div><div style="margin-top:2px;font-size:13px">{{ dv.industry }}</div></div>
+          <div style="border:1px solid #E3E1DC;padding:7px 9px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:#9AA0A8">SIZE</div><div style="margin-top:2px;font-size:13px">{{ dv.size }}</div></div>
+          <div style="border:1px solid #E3E1DC;padding:7px 9px"><div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:#9AA0A8">LIFETIME</div><div style="margin-top:2px;font-size:13px">{{ dv.lifetime }}</div></div>
+        </div>
+        <div style="margin-top:8px;display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8"><span>ENRICHED 2 DAYS AGO</span><span style="color:#0B7FA8;cursor:pointer">↻ REFRESH</span></div>
+      </div>
+
+      <div style="padding:14px 20px;border-bottom:1px solid #E3E1DC">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">OPEN DEAL</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px">
+          <div style="min-width:0"><div style="font-size:14px;font-weight:600">{{ dv.spec }}</div><div style="margin-top:2px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5C6169">{{ dv.ticket }}</div></div>
+          <span style="border:1px solid {{ dv.stageColor }};color:{{ dv.stageColor }};padding:1px 8px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;white-space:nowrap">{{ dv.stageName }}</span>
+        </div>
+        <div style="margin-top:10px;background:#F2F1EE;border:1px solid #E3E1DC;padding:8px 10px;font-size:12.5px;line-height:1.45"><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#5C6169">NEXT MOVE · </span>{{ dv.why }}</div>
+      </div>
+
+      <div style="padding:14px 20px;border-bottom:1px solid #E3E1DC">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">CONTACTS</div>
+        <sc-for list="{{ dv.contacts }}" as="p" hint-placeholder-count="1">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:13px"><span>{{ p.name }} <span style="color:#5C6169">· {{ p.role }}</span></span><span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#0B7FA8">{{ p.via }}</span></div>
+        </sc-for>
+      </div>
+
+      <div style="padding:14px 20px;border-bottom:1px solid #E3E1DC">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">VOICE NOTES</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8">{{ dv.noteCount }}</span></div>
+        <button onMouseDown="{{ onRecDown }}" onMouseUp="{{ onRecUp }}" onMouseLeave="{{ onRecUp }}" onTouchStart="{{ onRecDown }}" onTouchEnd="{{ onRecUp }}" style="margin-top:10px;width:100%;display:flex;align-items:center;gap:12px;border:1px solid {{ recBorder }};background:{{ recBg }};color:#FBFAF8;border-radius:2px;padding:10px 12px;cursor:pointer;user-select:none;-webkit-user-select:none;text-align:left">
+          <span style="width:30px;height:30px;border-radius:50%;background:#FBFAF8;display:grid;place-items:center;flex:none"><span style="width:10px;height:10px;border-radius:50%;background:{{ recDot }}"></span></span>
+          <span style="display:flex;flex-direction:column"><span style="font-size:13.5px;font-weight:600">{{ recLabel }}</span><span style="font-size:11.5px;opacity:.85">{{ recSub }}</span></span>
+        </button>
+        <sc-for list="{{ dv.notes }}" as="n" hint-placeholder-count="0">
+          <div style="margin-top:10px;border:1px solid #E3E1DC;padding:10px 12px">
+            <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;color:#5C6169"><span>{{ n.meta }}</span><span style="color:#0B7FA8">▸ {{ n.dur }}</span></div>
+            <div style="margin-top:6px;font-size:13px;line-height:1.5">"{{ n.text }}"</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+              <sc-for list="{{ n.chips }}" as="ch" hint-placeholder-count="2">
+                <button onClick="{{ ch.onClick }}" style="border:1px solid {{ ch.border }};background:{{ ch.bg }};color:{{ ch.color }};border-radius:2px;padding:3px 9px;font-size:12px;white-space:nowrap;cursor:pointer">{{ ch.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="padding:14px 20px 24px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">TIMELINE</div>
+        <div style="margin-top:10px;border-left:2px solid #E3E1DC;padding-left:12px;display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ dv.timeline }}" as="t" hint-placeholder-count="3">
+            <div style="font-size:13px;line-height:1.45"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#9AA0A8;margin-right:8px">{{ t.when }}</span>{{ t.text }}</div>
+          </sc-for>
+        </div>
+      </div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:rgba(20,22,26,.35);z-index:40;display:grid;place-items:center;padding:20px">
+      <div style="width:min(400px,100%);background:#FBFAF8;border:1px solid #14161A;box-shadow:0 12px 32px rgba(20,22,26,.2);padding:20px 22px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169">{{ modalEyebrow }}</div>
+        <div style="margin-top:6px;font-family:Archivo,sans-serif;font-variation-settings:'wdth' 125;font-weight:700;font-size:20px;letter-spacing:-.02em">{{ modalTitle }}</div>
+        <sc-if value="{{ modalIsQuote }}" hint-placeholder-val="{{ true }}">
+          <label style="display:flex;flex-direction:column;gap:6px;margin-top:16px"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#9AA0A8">QUOTE AMOUNT · USD</span><input value="{{ amount }}" onChange="{{ onAmount }}" inputmode="numeric" style="border:1px solid #E3E1DC;border-radius:2px;padding:10px 12px;font-family:'IBM Plex Mono',monospace;font-size:16px;background:#FBFAF8" /></label>
+          <div style="margin-top:10px;font-size:12.5px;color:#5C6169;line-height:1.5">Moving to Quoted starts the Quote follow-up sequence. It stops as soon as the customer replies.</div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+            <button onClick="{{ cancelModal }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:34px;padding:0 14px;font-size:13px;cursor:pointer">Cancel</button>
+            <button onClick="{{ confirmQuote }}" style="border:1px solid #075E7C;background:#0B7FA8;color:#FBFAF8;border-radius:2px;height:34px;padding:0 16px;font-size:13px;font-weight:600;cursor:pointer">Move to Quoted</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ modalIsLost }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:14px;font-size:13px;color:#5C6169">Why was it lost?</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+            <sc-for list="{{ lostReasons }}" as="r" hint-placeholder-count="4">
+              <button onClick="{{ r.onClick }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:38px;font-size:13.5px;cursor:pointer">{{ r.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:16px"><button onClick="{{ cancelModal }}" style="border:1px solid #E3E1DC;background:#FBFAF8;border-radius:2px;height:34px;padding:0 14px;font-size:13px;cursor:pointer">Cancel</button></div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hpOn }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeHealth }}" style="position:fixed;inset:0;z-index:25"></div>
+    <div style="position:fixed;top:{{ hpTop }};left:{{ hpLeft }};width:300px;z-index:26;background:#FBFAF8;border:1px solid #14161A;box-shadow:0 8px 24px rgba(20,22,26,.14);padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.08em;color:#5C6169">{{ hpLabel }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9AA0A8">6 FACTORS · 0–20 EACH</span></div>
+      <div style="margin-top:4px;font-size:13.5px;font-weight:600">{{ hpCo }}</div>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:5px">
+        <sc-for list="{{ hpFactors }}" as="f" hint-placeholder-count="6">
+          <div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px"><span style="color:#5C6169">{{ f.label }}</span><span style="display:flex;gap:10px"><span style="font-family:'IBM Plex Mono',monospace;font-size:11px">{{ f.ev }}</span><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:{{ f.color }};width:28px;text-align:right">{{ f.pts }}</span></span></div>
+        </sc-for>
+      </div>
+      <div style="margin-top:10px;background:#F2F1EE;border:1px solid #E3E1DC;padding:8px 10px;font-size:12.5px;line-height:1.45"><span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#5C6169">NEXT MOVE · </span>{{ hpWhy }}</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:20px;bottom:20px;z-index:50;width:min(360px,calc(100vw - 40px));background:#14161A;color:#FBFAF8;padding:12px 14px;box-shadow:0 12px 32px rgba(20,22,26,.25)">
+      <div style="font-size:13.5px;font-weight:600">{{ toastTitle }}</div>
+      <sc-for list="{{ toastLines }}" as="l" hint-placeholder-count="1">
+        <div style="display:flex;gap:6px;margin-top:4px;font-size:12.5px;line-height:1.45;color:#CFE8F2"><span style="font-family:'IBM Plex Mono',monospace;color:#4FC28A">↳</span><span>{{ l.text }}</span></div>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;comfortable&quot;,&quot;compact&quot;],&quot;default&quot;:&quot;comfortable&quot;,&quot;tsType&quot;:&quot;'comfortable' | 'compact'&quot;},&quot;showHealth&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const STAGES = [
+  { id: 'new', name: 'New', sla: '⏱ 2H LIMIT' },
+  { id: 'needs', name: 'Needs info', sla: '⏱ 24H LIMIT' },
+  { id: 'replied', name: 'Replied', sla: '⏱ 48H LIMIT' },
+  { id: 'quoted', name: 'Quoted', sla: '⏱ 9D LIMIT' },
+];
+const SNAME = { new: 'New', needs: 'Needs info', replied: 'Replied', quoted: 'Quoted', won: 'Won', lost: 'Lost' };
+const COLORS = { new: '#0B7FA8', needs: '#B4690E', replied: '#5C6169', quoted: '#075E7C', won: '#1F7A4D', lost: '#B4261B' };
+const FL = { recency: 'Last contact', deadline: 'Deadline', value: 'Quote value', reply: 'Our first reply', repeat: 'Repeat customer', fit: 'Company fit' };
+const CH = { '☎': 'Voicemail', '✉': 'Email', '▣': 'Chat', '▤': 'Web form' };
+const AUTOS = {
+  new: ['Auto-reply sent: "Thanks, got it…"', 'Assigned · round robin'],
+  needs: ['Auto-reply sent asking for the missing specs'],
+  replied: ['48h time limit started'],
+  quoted: ['Enrolled in Quote follow-up · first touch in 2 days'],
+  won: ['Stopped Quote follow-up', 'Notified Production (monday.com)', 'Enrolled in Reorder radar'],
+  lost: ['Stopped Quote follow-up', 'Lost reason saved to the deal'],
+};
+const f = (a, b, c, d, e, g) => ({ recency: a, deadline: b, value: c, reply: d, repeat: e, fit: g });
+const DEALS = [
+  { id: 'd1', co: 'Harbor Dental', contact: 'Maria Ochoa', role: 'Office manager', ticket: 'DL-2046', ch: '☎', stage: 'needs', product: 'Postcards', qty: '500', due: 'Fri', rush: true, missing: 'stock', est: 640, rep: 'DO', touched: '2h ago', lifetime: '$2,560 · 4 orders',
+    f: f([18, '2h ago'], [20, 'Fri · 3 days'], [6, '~$640 est.'], [16, '11 min'], [20, '4 past orders'], [12, 'Dental · 8 staff']), why: 'Get the stock answer today. They reorder quarterly and need these Friday.' },
+  { id: 'd2', co: 'Lakeside Church', contact: 'Pastor Jim Hale', role: 'Admin', ticket: 'DL-2040', ch: '✉', stage: 'needs', product: 'Booklets', qty: '', due: '', missing: 'qty and page count', est: 380, rep: 'SR', touched: '1 day ago',
+    f: f([10, '1 day ago'], [0, 'none given'], [4, 'unknown'], [12, '3h'], [0, 'no'], [8, 'Church · 20 staff']), why: 'Ask page count and quantity. Weekly bulletins could become a standing order.' },
+  { id: 'd3', co: 'Fresno Pediatrics', contact: 'Web visitor', role: 'Chat', ticket: 'DL-2052', ch: '▣', stage: 'new', product: 'Flyers', qty: '1,000', due: 'Next wk', est: 320, rep: '—', touched: '12 min ago',
+    f: f([20, '12 min ago'], [12, '8 days'], [8, '~$320 est.'], [0, 'not yet'], [0, 'no'], [14, 'Medical · 30 staff']), why: 'Reply now. Chat leads that wait over an hour rarely convert.' },
+  { id: 'd4', co: 'Tower District Brewing', contact: 'Alex Moreno', role: 'Owner', ticket: 'DL-2049', ch: '☎', stage: 'new', product: 'Labels', qty: '5,000', due: '2 wks', est: 2100, rep: 'DO', touched: '2h 20m ago', overSla: true,
+    f: f([12, '2h 20m ago'], [8, '14 days'], [14, '~$2,100 est.'], [0, 'not yet'], [0, 'no'], [18, 'Brewery · 25 staff']), why: 'High-value first order. Call instead of texting and ask about seasonal releases.' },
+  { id: 'd5', co: 'Clovis Rotary', contact: 'Dana Pruitt', role: 'Events chair', ticket: 'DL-2053', ch: '▤', stage: 'new', product: 'Banners', qty: '3', due: 'Oct 12', est: 450, rep: 'SR', touched: '5 min ago', lifetime: '$900 · 2 orders',
+    f: f([20, '5 min ago'], [10, '15 days'], [6, '~$450 est.'], [0, 'not yet'], [20, '2 past orders'], [6, 'Nonprofit']), why: 'Repeat customer with complete specs. Quote straight from the form.' },
+  { id: 'd6', co: 'Ridge Realty', contact: 'Maria Chen', role: 'Office manager', ticket: 'DL-2047', ch: '☎', stage: 'replied', product: 'Tri-folds', qty: '2,500', due: 'Mon', est: 1840, rep: 'SR', touched: '2h ago', history: [['MAR', 'Web visit, no contact']],
+    f: f([20, '2h ago'], [15, 'Mon · 5 days'], [10, '~$1,840 est.'], [14, '11 min'], [0, 'no'], [15, 'Real estate · 12 staff']), why: 'Send the quote today. Realty offices decide on Fridays.' },
+  { id: 'd7', co: 'Sequoia Dental Group', contact: 'Priya Nair', role: 'Marketing', ticket: 'DL-2044', ch: '✉', stage: 'replied', product: 'Appt. cards', qty: '2,000', due: '3 wks', est: 520, rep: 'DO', touched: '1 day ago', lifetime: '$4,200 · 6 orders',
+    f: f([12, '1 day ago'], [6, '21 days'], [8, '~$520 est.'], [18, '6 min'], [20, '6 past orders'], [12, 'Dental · 40 staff']), why: 'Waiting on their artwork. Nudge tomorrow if nothing comes in.' },
+  { id: 'd8', co: 'Valley Auto Group', contact: 'Rick Soto', role: 'General manager', ticket: 'DL-2031', ch: '▤', stage: 'quoted', product: 'Mailers', qty: '10,000', due: '3 wks', value: 6200, rep: 'SR', touched: '9 days ago', cold: true,
+    f: f([0, '9 days ago'], [2, '21 days'], [20, '$6,200'], [4, '6h'], [0, 'no'], [6, 'Auto dealer · 80 staff']), why: 'Call the GM directly. Big quotes that go quiet this long usually went elsewhere.' },
+  { id: 'd9', co: 'Sierra Montessori', contact: 'Hannah Lee', role: 'Director', ticket: 'DL-2043', ch: '✉', stage: 'quoted', product: 'Folders', qty: '600', due: '10 days', value: 890, rep: 'DO', touched: '1 day ago', drip: 'Follow-up tomorrow', lifetime: '$2,100 · 3 orders',
+    f: f([16, '1 day ago'], [14, '10 days'], [8, '$890'], [16, '14 min'], [20, '3 past orders'], [10, 'School · 35 staff']), why: 'Likely yes. Mention the same stock as last year to make it easy.' },
+  { id: 'd10', co: 'Kings Canyon Outfitters', contact: 'Sam Ortiz', role: 'Buyer', ticket: 'DL-2048', ch: '▣', stage: 'quoted', product: 'Catalogs', qty: '1,500', due: '4 wks', value: 2400, rep: 'DO', touched: '3h ago', drip: 'Follow-up in 2 days',
+    f: f([18, '3h ago'], [10, '28 days'], [14, '$2,400'], [12, '40 min'], [0, 'no'], [14, 'Retail · 18 staff']), why: 'Offer a proof by Thursday. Catalog buyers want to see paper before committing.' },
+  { id: 'w1', co: 'Fresno Unified', contact: 'Carla Diaz', role: 'Purchasing', ticket: 'DL-2019', ch: '✉', stage: 'won', product: 'Workbooks', qty: '8,000', due: 'Aug', value: 12400, outcome: 'in production', rep: 'SR', touched: '3 days ago', lifetime: '$38,900 · 9 orders',
+    f: f([14, '3 days ago'], [0, '—'], [20, '$12,400'], [16, '20 min'], [20, '9 past orders'], [16, 'School district']), why: 'In production. Radar flags the next back-to-school run in June.' },
+  { id: 'w2', co: 'Sierra Vineyards', contact: 'Luis Vega', role: 'Operations', ticket: 'DL-2024', ch: '☎', stage: 'won', product: 'Wine labels', qty: '12,000', due: '—', value: 3100, outcome: 'shipped', rep: 'DO', touched: '6 days ago', lifetime: '$15,500 · 5 orders',
+    f: f([10, '6 days ago'], [0, '—'], [14, '$3,100'], [18, '8 min'], [20, '5 past orders'], [14, 'Winery · 22 staff']), why: 'Shipped. Reorder window opens in about 3 months.' },
+  { id: 'w3', co: 'Blackstone Deli', contact: 'Tony Russo', role: 'Owner', ticket: 'DL-2036', ch: '▣', stage: 'won', product: 'Menus', qty: '200', due: '—', value: 410, outcome: 'picked up', rep: 'SR', touched: '2 days ago',
+    f: f([14, '2 days ago'], [0, '—'], [5, '$410'], [14, '25 min'], [0, 'no'], [8, 'Restaurant · 6 staff']), why: 'Done. Ask for a review when they pick up the next run.' },
+  { id: 'l1', co: 'Kern Medical', contact: 'Office', role: 'Admin', ticket: 'DL-2022', ch: '✉', stage: 'lost', product: 'Brochures', qty: '5,000', due: '—', value: 2900, reason: 'price · went to Vistaprint', rep: 'DO', touched: '12 days ago',
+    f: f([0, '12 days ago'], [0, '—'], [14, '$2,900'], [8, '4h'], [0, 'no'], [14, 'Medical']), why: 'Lost on price.' },
+  { id: 'l2', co: 'Madera Chamber', contact: 'Office', role: 'Admin', ticket: 'DL-2028', ch: '☎', stage: 'lost', product: 'Programs', qty: '400', due: '—', value: 520, reason: 'timing', rep: 'SR', touched: '8 days ago',
+    f: f([0, '8 days ago'], [0, '—'], [8, '$520'], [10, '2h'], [0, 'no'], [6, 'Nonprofit']), why: 'Lost on timing.' },
+];
+const RADAR = [
+  { co: 'Sierra Vineyards', flag: 'Reorder due', tone: '#B4690E', ev: 'Wine labels every 90 days · last order 87 days ago · $3,100 average', next: 'Reorder sequence sends Thursday unless someone calls first.', nextColor: '#1F7A4D' },
+  { co: 'Central Valley Dental', flag: 'Lapsed', tone: '#B4261B', ev: '3 orders in 2025 · nothing in 210 days · $8,400 lifetime', next: 'Not in a sequence. Worth a personal call.', nextColor: '#5C6169' },
+  { co: 'Fresno Unified', flag: 'Seasonal', tone: '#5C6169', ev: 'Back-to-school run every August · 3 years running', next: 'Start outreach in June.', nextColor: '#5C6169' },
+  { co: 'Harbor Dental', flag: 'Reorder due', tone: '#B4690E', ev: 'Postcards every quarter · last order 84 days ago · $640 average', next: 'Already has an open deal in Needs info.', nextColor: '#5C6169' },
+];
+const NOTES = {
+  d1: { text: 'Maria says 14pt is fine, same as last time. Needs them by Friday noon.', chips: [['spec', 'Stock: 14pt'], ['spec', 'Due: Fri noon']] },
+  d6: { text: 'Maria wants gloss front, matte back, and asked if we do EDDM. Follow up Monday.', chips: [['spec', 'Finish: gloss/matte'], ['task', 'Follow up Mon'], ['interest', 'Interest: EDDM']] },
+  d8: { text: 'Rick says they are still deciding. Price is the question. Call back Wednesday with a 5,000 option.', chips: [['task', 'Call back Wed'], ['spec', 'Alt qty: 5,000']] },
+};
+const money = (v) => '$' + Math.round(v).toLocaleString('en-US');
+const valPts = (v) => (v >= 10000 ? 20 : v >= 5000 ? 18 : v >= 2000 ? 14 : v >= 1000 ? 11 : v >= 500 ? 8 : 5);
+const ringOf = (s) => (s >= 70 ? '#1F7A4D' : s >= 40 ? '#B4690E' : '#B4261B');
+
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = { deals: DEALS.map((d) => ({ ...d, f: { ...d.f } })), view: 'board', filter: 'all', q: '', healthOpen: null, drawer: null, modal: null, amount: '', toast: null, dragging: null, over: null, notes: {}, rec: false, secs: 0, transcribing: false, applied: {}, radar: RADAR.map((r) => r.co) };
+  }
+  componentWillUnmount() { clearInterval(this._rec); clearTimeout(this._toast); clearTimeout(this._tr); }
+  score(d) { return Math.min(98, Object.values(d.f).reduce((a, x) => a + x[0], 0)); }
+  flash(title, lines) { clearTimeout(this._toast); this.setState({ toast: { title, lines } }); this._toast = setTimeout(() => this.setState({ toast: null }), 4500); }
+  move(id, to, extra = {}, silent) {
+    const d = this.state.deals.find((x) => x.id === id); if (!d || d.stage === to) return;
+    const nd = { ...d, stage: to, touched: 'just now', cold: false, overSla: false, f: { ...d.f, recency: [20, 'just now'] } };
+    if (extra.value) { nd.value = extra.value; nd.f.value = [valPts(extra.value), money(extra.value)]; nd.drip = 'Follow-up in 2 days'; }
+    if (to === 'won') { if (!nd.value) nd.value = d.est || 0; nd.outcome = 'in production'; }
+    if (to === 'needs' && !nd.missing) nd.missing = 'stock';
+    if (to === 'new') nd.missing = null;
+    if (extra.reason) nd.reason = extra.reason;
+    this.setState((s) => ({ deals: s.deals.map((x) => (x.id === id ? nd : x)), modal: null, over: null, dragging: null }));
+    if (!silent) this.flash(`${d.co} → ${SNAME[to]}`, AUTOS[to]);
+  }
+  drop(to) {
+    const id = this.dragId; this.dragId = null;
+    const d = this.state.deals.find((x) => x.id === id);
+    if (!d || d.stage === to) { this.setState({ over: null, dragging: null }); return; }
+    if (to === 'quoted' && !d.value) { this.setState({ modal: { kind: 'quote', id }, amount: String(d.est || ''), over: null, dragging: null }); return; }
+    if (to === 'lost') { this.setState({ modal: { kind: 'lost', id }, over: null, dragging: null }); return; }
+    this.move(id, to);
+  }
+  startRec() { if (this.state.rec || this.state.transcribing) return; this.setState({ rec: true, secs: 0 }); this._rec = setInterval(() => this.setState((s) => ({ secs: s.secs + 1 })), 1000); }
+  stopRec() {
+    if (!this.state.rec) return; clearInterval(this._rec);
+    const id = this.state.drawer; const secs = Math.max(3, this.state.secs);
+    this.setState({ rec: false, transcribing: true });
+    this._tr = setTimeout(() => {
+      const d = this.state.deals.find((x) => x.id === id);
+      const base = NOTES[id] || { text: `Talked to ${d.contact.split(' ')[0]}. They want to go ahead if we can hit the date. Follow up Monday.`, chips: [['task', 'Follow up Mon'], ['spec', 'Confirm deadline']] };
+      const note = { id: String(Date.now()), dur: '0:' + String(secs).padStart(2, '0'), text: base.text, chips: base.chips };
+      this.setState((s) => ({ transcribing: false, notes: { ...s.notes, [id]: [note, ...(s.notes[id] || [])] } }));
+    }, 1300);
+  }
+  applyChip(dealId, note, i) {
+    const key = note.id + '-' + i; if (this.state.applied[key]) return;
+    const [kind, label] = note.chips[i]; const d = this.state.deals.find((x) => x.id === dealId);
+    this.setState((s) => ({ applied: { ...s.applied, [key]: true } }));
+    if (kind === 'task') this.flash('Task created', [`${label} · ${d.co} · assigned to Danny`]);
+    else if (kind === 'interest') this.flash(`Tagged ${d.co}`, [label]);
+    else if (d.stage === 'needs') { this.move(dealId, 'new', {}, true); this.flash(`${d.co} → New`, [`${label} saved to ${d.ticket}`, 'Specs complete, so it left Needs info', "New stage automations already ran and weren't repeated"]); }
+    else this.flash(`Saved to ${d.ticket}`, [label]);
+  }
+  stateLines(d) {
+    if (d.stage === 'new') return d.overSla ? [`Arrived ${d.touched} · over the 2h limit`, '#B4690E', 'Team lead notified', '#B4690E'] : [`Arrived ${d.touched} · no reply yet`, d.rep === '—' ? '#B4690E' : '#5C6169', d.rep === '—' ? 'Unassigned' : '', '#B4690E'];
+    if (d.stage === 'needs') return [`Missing ${d.missing || 'specs'}`, '#B4690E', `Auto-reply asked ${d.touched}`, '#5C6169'];
+    if (d.stage === 'replied') return [`Replied ${d.touched} · waiting on customer`, '#5C6169', '', ''];
+    if (d.stage === 'quoted') return [`${money(d.value || 0)} · sent ${d.touched}`, '#14161A', d.cold ? 'No reply · going cold' : d.drip || 'Follow-up in 2 days', d.cold ? '#B4261B' : '#1F7A4D'];
+    return ['', '', '', ''];
+  }
+  renderVals() {
+    const s = this.state; const P = this.props;
+    const compact = (P.density ?? 'comfortable') === 'compact'; const showH = P.showHealth ?? true;
+    const q = s.q.trim().toLowerCase();
+    const pass = (d) => (!q || d.co.toLowerCase().includes(q)) && (s.filter === 'all' || (s.filter === 'mine' && d.rep === 'DO') || (s.filter === 'rush' && d.rush) || (s.filter === 'cold' && (d.cold || d.overSla || this.score(d) < 35)));
+    const open = s.deals.filter((d) => !['won', 'lost'].includes(d.stage));
+    const factors = (d) => Object.keys(FL).map((k) => ({ label: FL[k], ev: d.f[k][1], pts: '+' + d.f[k][0], color: d.f[k][0] >= 14 ? '#1F7A4D' : d.f[k][0] >= 7 ? '#14161A' : '#9AA0A8' }));
+    const card = (d) => {
+      const sc = this.score(d); const [s1, c1, s2, c2] = this.stateLines(d);
+      return {
+        co: d.co, specLine: [d.product, d.qty, d.due].filter((x) => x && x !== '—').join(' · ') || 'no specs yet',
+        score: sc, ringColor: ringOf(sc), showHealth: showH, border: sc < 35 ? '#B4261B' : s.drawer === d.id ? '#14161A' : '#E3E1DC',
+        pad: compact ? '8px 10px' : '12px 12px 10px', opacity: s.dragging === d.id ? 0.4 : 1,
+        state1: s1, stateColor: c1, hasState2: !!s2, state2: s2, state2Color: c2,
+        showFoot: !compact, rep: d.rep, repBg: d.rep === '—' ? '#F2F1EE' : '#14161A', repFg: d.rep === '—' ? '#9AA0A8' : '#FBFAF8', meta: `${d.ch} ${d.ticket}`, rush: !!d.rush,
+        healthOpen: s.healthOpen === d.id, factors: factors(d), why: d.why, scoreLabel: `HEALTH · ${sc}`,
+        onDragStart: (e) => { this.dragId = d.id; try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', d.id); } catch (_) {} this.setState({ dragging: d.id, healthOpen: null }); },
+        onDragEnd: () => this.setState({ dragging: null, over: null }),
+        open: () => this.setState({ drawer: d.id, healthOpen: null }),
+        toggleHealth: (e) => {
+          e.stopPropagation();
+          if (this.state.healthOpen === d.id) { this.setState({ healthOpen: null }); return; }
+          const r = e.currentTarget.getBoundingClientRect(); const W = window.innerWidth, H = window.innerHeight;
+          const left = Math.max(12, Math.min(r.right - 300, W - 312));
+          const top = r.bottom + 8 + 260 > H ? Math.max(12, r.top - 268) : r.bottom + 8;
+          this.setState({ healthOpen: d.id, healthPos: { top, left } });
+        },
+        stop: (e) => e.stopPropagation(),
+      };
+    };
+    const zone = (id) => ({ bg: s.over === id ? '#E6F2F7' : '#F2F1EE', border: s.over === id ? '#0B7FA8' : '#E3E1DC', onDragOver: (e) => { e.preventDefault(); if (this.state.over !== id) this.setState({ over: id }); }, onDrop: (e) => { e.preventDefault(); this.drop(id); } });
+    const quotedSum = open.filter((d) => d.stage === 'quoted').reduce((a, d) => a + (d.value || 0), 0);
+    const columns = STAGES.map((st) => {
+      const cards = open.filter((d) => d.stage === st.id && pass(d)).sort((a, b) => this.score(b) - this.score(a));
+      return { name: st.name, count: String(cards.length), sla: st.sla, sum: st.id === 'quoted' ? money(quotedSum) : '', color: COLORS[st.id], cards: cards.map(card), empty: !cards.length, ...zone(st.id) };
+    });
+    const closed = ['won', 'lost'].map((id) => {
+      const ds = s.deals.filter((d) => d.stage === id && pass(d));
+      return { name: SNAME[id], color: COLORS[id], count: String(ds.length), sum: id === 'won' ? money(ds.reduce((a, d) => a + (d.value || 0), 0)) + ' THIS MONTH' : 'LAST 30 DAYS', hint: id === 'won' ? 'Drop to mark won' : 'Drop to mark lost',
+        rows: ds.map((d) => ({ co: d.co, meta: id === 'won' ? `${money(d.value || 0)} · ${d.outcome}` : d.reason, open: () => this.setState({ drawer: d.id }) })), ...zone(id) };
+    });
+    const cnt = (k) => open.filter((d) => (k === 'all' ? true : k === 'mine' ? d.rep === 'DO' : k === 'rush' ? d.rush : d.cold || d.overSla || this.score(d) < 35)).length;
+    const d = s.deals.find((x) => x.id === s.drawer);
+    let dv = { name: '', domainCity: '', score: 0, ringColor: '#E3E1DC', industry: '', size: '', lifetime: '', spec: '', ticket: '', stageName: '', stageColor: '#5C6169', why: '', contacts: [], notes: [], noteCount: '', timeline: [] };
+    if (d) {
+      const sc = this.score(d); const [ind, size] = d.f.fit[1].split(' · ');
+      const notes = s.notes[d.id] || [];
+      dv = {
+        name: d.co, domainCity: `${d.co.toLowerCase().replace(/[^a-z]+/g, '')}.com · Fresno, CA`, score: sc, ringColor: ringOf(sc),
+        industry: ind, size: size || '—', lifetime: d.lifetime || '$0 · prospect',
+        spec: [d.product, d.qty, d.due].filter((x) => x && x !== '—').join(' · '), ticket: `${d.ticket} · ${CH[d.ch]} · ${d.rep === '—' ? 'unassigned' : d.rep === 'DO' ? 'Danny O.' : 'Susan R.'}`,
+        stageName: SNAME[d.stage].toUpperCase(), stageColor: COLORS[d.stage], why: d.why,
+        contacts: [{ name: d.contact, role: d.role, via: d.ch === '✉' ? '✉' : '☎ ✉' }],
+        noteCount: notes.length ? String(notes.length) : '',
+        notes: notes.map((n) => ({ meta: 'DANNY · JUST NOW', dur: n.dur, text: n.text, chips: n.chips.map(([k, label], i) => { const done = s.applied[n.id + '-' + i]; return { label: done ? '✓ ' + label : label, border: done ? '#1F7A4D' : k === 'task' ? '#B4690E' : '#0B7FA8', bg: done ? '#FBFAF8' : k === 'task' ? '#FBF3E8' : '#E6F2F7', color: done ? '#1F7A4D' : k === 'task' ? '#8A4F08' : '#075E7C', onClick: () => this.applyChip(d.id, n, i) }; }) })),
+        timeline: [{ when: d.touched.toUpperCase(), text: this.stateLines(d)[0] || (d.stage === 'won' ? `Won · ${money(d.value || 0)}` : `Lost · ${d.reason}`) }, { when: 'ARRIVED', text: `${CH[d.ch]} → ${d.ticket}` }, ...((d.history || []).map(([w, t]) => ({ when: w, text: t })))],
+      };
+    }
+    const hd = s.healthOpen ? s.deals.find((x) => x.id === s.healthOpen) : null; const hp = s.healthPos || { top: 0, left: 0 };
+    const m = s.modal; const md = m ? s.deals.find((x) => x.id === m.id) : null;
+    const radar = RADAR.filter((r) => s.radar.includes(r.co));
+    return {
+      totals: `${money(quotedSum)} QUOTED · ${open.length} OPEN DEALS`,
+      viewTabs: [['board', 'Board'], ['list', 'List'], ['radar', `Radar · ${radar.length}`]].map(([k, label]) => { const on = s.view === k; return { label, bg: on ? '#14161A' : '#FBFAF8', color: on ? '#FBFAF8' : '#14161A', weight: on ? 600 : 400, onClick: () => this.setState({ view: k, healthOpen: null }) }; }),
+      filters: [['all', 'All'], ['mine', 'Mine'], ['rush', 'Rush'], ['cold', 'Needs attention']].map(([k, label]) => { const on = s.filter === k; return { label, count: String(cnt(k)), border: on ? '#0B7FA8' : '#E3E1DC', bg: on ? '#E6F2F7' : '#FBFAF8', color: on ? '#075E7C' : '#14161A', onClick: () => this.setState({ filter: k }) }; }),
+      q: s.q, onQ: (e) => this.setState({ q: e.target.value }),
+      isBoard: s.view === 'board', isList: s.view === 'list', isRadar: s.view === 'radar',
+      columns, closed,
+      listRows: open.filter(pass).sort((a, b) => this.score(b) - this.score(a)).map((x) => { const sc = this.score(x); return { co: x.co, stage: SNAME[x.stage].toUpperCase(), stageColor: COLORS[x.stage], value: x.value ? money(x.value) : x.est ? '~' + money(x.est) : '—', due: x.due || '—', score: sc, ringColor: ringOf(sc), rep: x.rep, why: x.why, open: () => this.setState({ drawer: x.id }) }; }),
+      radarRows: radar.map((r) => ({ ...r, pillColor: r.tone, call: () => this.flash('Task created', [`Call ${r.co} today · assigned to Danny`]), snooze: () => { this.setState((st) => ({ radar: st.radar.filter((x) => x !== r.co) })); this.flash(`${r.co} snoozed`, ['Back on the radar in 30 days']); } })),
+      radarEmpty: radar.length === 0,
+      drawerOpen: !!d, dv, closeDrawer: () => { this.stopRec(); this.setState({ drawer: null }); },
+      onRecDown: (e) => { e.preventDefault(); this.startRec(); }, onRecUp: () => this.stopRec(),
+      recLabel: s.rec ? `Recording · 0:${String(s.secs).padStart(2, '0')}` : s.transcribing ? 'Transcribing…' : 'Hold to record a note',
+      recSub: s.rec ? 'Release to save' : s.transcribing ? 'Pulling out specs and tasks' : 'Specs and follow-ups are pulled out for you',
+      recBg: s.rec ? '#B4261B' : s.transcribing ? '#5C6169' : '#0B7FA8', recBorder: s.rec ? '#8A1D15' : s.transcribing ? '#5C6169' : '#075E7C', recDot: s.rec ? '#B4261B' : '#0B7FA8',
+      modalOpen: !!md, modalIsQuote: m && m.kind === 'quote', modalIsLost: m && m.kind === 'lost',
+      modalEyebrow: md ? `${md.ticket} · ${SNAME[md.stage].toUpperCase()} →` : '', modalTitle: md ? (m.kind === 'quote' ? `Quote ${md.co}` : `Mark ${md.co} lost`) : '',
+      amount: s.amount, onAmount: (e) => this.setState({ amount: e.target.value.replace(/[^0-9.]/g, '') }),
+      confirmQuote: () => { const v = parseFloat(s.amount); if (!v) return; this.move(m.id, 'quoted', { value: v }); },
+      lostReasons: ['Price', 'Timing', 'Went elsewhere', 'No response'].map((r) => ({ label: r, onClick: () => this.move(m.id, 'lost', { reason: r.toLowerCase() }) })),
+      cancelModal: () => this.setState({ modal: null }),
+      hpOn: !!hd, hpTop: hp.top + 'px', hpLeft: hp.left + 'px', hpLabel: hd ? `HEALTH · ${this.score(hd)}` : '', hpCo: hd ? hd.co : '', hpFactors: hd ? factors(hd) : [], hpWhy: hd ? hd.why : '',
+      closeHealth: () => this.setState({ healthOpen: null }),
+      toastOn: !!s.toast, toastTitle: s.toast ? s.toast.title : '', toastLines: s.toast ? s.toast.lines.map((t) => ({ text: t })) : [],
+    };
+  }
+}
+</script>
+</body>
+</html>

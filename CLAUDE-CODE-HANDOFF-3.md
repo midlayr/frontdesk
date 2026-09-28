@@ -1,54 +1,59 @@
-# Claude Code handoff · Session 3 — Pathfinder (Pipeline)
+# Claude Code handoff · Session 3 — Pipeline + Deal Flow
 
-Design: `design/Pathfinder Wireframes.dc.html` (six wireframes 1a–1f with build notes under each). Brand rules unchanged: `design/BRAND.md`, `web/src/tokens.css`. Screenshots of the existing Inbox for chrome reference in `design/ref-*.png`.
+**Design files (read these first, they are working prototypes — match them):**
+- `design/Pipeline.dc.html` — board, list, radar, company drawer, health popover, voice notes, drag rules, toasts
+- `design/Deal Flow Builder.dc.html` — stage map, stage editor, test-a-deal simulator
+- `design/Pathfinder Wireframes.dc.html` — build notes for enrichment, import, radar internals
+- `design/BRAND.md`, `web/src/tokens.css` — fonts, colors, recipes. No new colors or fonts.
 
-Goal: a **Pipeline** nav item in Front Desk with a board, health scores that explain themselves, a company drawer, hold-to-talk notes, list import, and a radar tab. Build in the order below; each step is shippable on its own.
+Open the `.dc.html` files in a browser to click through them. The data model is in each file's `class Component` (DEALS, STAGES, AUTOS, RADAR, NOTES constants and the `defaults()` flow).
 
 ## 0. Schema
-Run `schema-pathfinder.sql`. Adds quote_amount / won_at / lost_reason on leads, lifetime_value / last_order_at / reorder_interval_days / radar on companies, `notes`, `tasks`, `leads.health`.
+Run `schema-pathfinder.sql`, then `schema-dealflow.sql`. Seed Dumont's `deal_flows` row from `defaults()` in Deal Flow Builder and publish it (version 1).
 
-## 1. Health score (backend) — wireframe 1b
-`src/jobs/score-intent.ts`. Six deterministic factors, each 0–20, sum capped at 98:
-- recency: hours since last inbound or outbound message → 20 (<2h) … 0 (>14d)
-- deadline: days to deadline_at → 20 (≤3d) … 0 (none / >30d)
-- value: quote_amount or qty-based estimate → 0–20 log scale ($200 → 4, $2k → 12, $10k+ → 20)
-- reply_speed: OUR first_reply_at − created_at → 20 (<15min) … 0 (>24h or none)
-- repeat: company has ≥1 won lead → 20; ≥3 → 20; else 0
-- fit: from companies.enrichment (industry in print-heavy list, size 11–200) → 0–20
-Then one LLM call (Workers AI) for `why` — a single sentence "next best move" given the factors and last 3 messages. Write to `leads.health` and `leads.intent_score`. Trigger on: lead created, message in/out, status change, nightly cron for all open leads. Also roll up `companies.health_score` = max over open leads.
+## 1. Deal Flow engine (backend first — Pipeline depends on it)
+`src/flow/engine.ts`, pure functions, unit-tested:
+- `enterStage(lead, stageId, flow, ctx)` → list of effects: `autoreply(text)`, `assign(rule)`, `enroll(sequenceName)`, `notify(target)`, `task(text)`, `tag(tag)`, `stopSequences()`, `askLostReason()`. Only `on:true` actions.
+- `evaluateExits(lead, event, flow)` → next stage id or null. Events: `specs_missing`, `specs_filled`, `rep_reply`, `quote_entered`, `customer_approved`, `marked_won`, `marked_lost`, `sla_passed`.
+- Rule from the simulator: returning to New from Needs info does **not** re-run New's automations.
+- Platform rule, always on: inbound customer reply stops all active enrollments on the lead.
 
-## 2. Pipeline board — wireframe 1a
-Route `/pipeline`. Four columns from leads.status: **New** (new, needs_info, replied), **Quoted** (quoted), **Won**, **Lost**. Header shows Σ quote_amount of Quoted + "N deals", board/list toggle.
-Card: company or contact name, health ring (score inside; ring color ≥70 ok / 40–69 warn / <40 danger; card border danger when <35), one line of specs (product · qty · deadline), one line of state ("needs stock", "$1,840 · sent 2h ago", "drip: follow-up in 22h", "no reply · going cold").
-Drag between columns → `PATCH /api/leads/:id {status}`; moving to Quoted prompts for quote_amount; to Lost prompts for lost_reason (price / timing / went elsewhere / no response). Set quoted_at / won_at server-side. On won: add quote_amount to companies.lifetime_value, set last_order_at, enqueue `learn_interval`.
-List view = same data as a table sorted by score desc.
+Wire it in: every place that changes `leads.status` (inbound hooks, extract_specs, reply, PATCH, pipeline drag) calls one function `transition(tx, leadId, event | {to})` that updates status + `stage_entered_at`, runs effects, writes `activity`, pushes to InboxRoom. Nothing else may write `leads.status`.
+Time limits: 5-min cron finds `now() - stage_entered_at > sla.hours` with `sla_breached_at IS NULL`, applies `sla.then`, sets `sla_breached_at`.
 
-## 3. Health popover — wireframe 1b
-Click the ring → popover: six rows "factor · evidence · +N", then the `why` sentence in a sunk box. Evidence strings are generated server-side alongside the factors (e.g. "2h ago", "Mon", "$1,840", "11 min", "no", "real estate · 12 staff"). `GET /api/leads/:id/health`.
+API `src/api/deal-flow.ts`: `GET /api/deal-flow` (draft + published + version), `PUT` (save draft, zod-validated), `POST /publish` (copy draft → published, bump version), `POST /simulate {events[]}` (runs engine on the draft, returns rows exactly like the prototype's right panel).
 
-## 4. Company drawer — wireframe 1c
-Opens from any card, any ticket, any contact name. Right-side drawer 420px over the current view (never a route change).
-Header: name, domain · city, health ring. Three cells: industry, size, lifetime (`$X · N orders` or `$0 · prospect`). "Enriched Xh ago · provider" + refresh. Contacts list with ☎ ✉ actions that open the reply composer on the most recent lead. Timeline merges leads, messages (collapsed per lead), notes, tasks, ordered desc. Footer: 🎤 Add note, Enroll in drip.
-`GET /api/companies/:id` returns everything in one payload. Enrichment: `JOBS.enrich` → Clearbit or Apollo by domain (ask me which key I have) → companies.enrichment; 30-day cache; strip to {industry, size_band, city, logo_url, description}.
+## 2. Health score — Pipeline popover
+`src/jobs/score-intent.ts`. Six factors 0–20, sum capped at 98. Each factor returns `[points, evidence]` exactly like `d.f` in Pipeline.dc.html:
+recency (hours since last message), deadline (days to deadline_at), value (quote_amount or estimate, `valPts` thresholds in the file), reply_speed (our first_reply_at − created_at), repeat (won deals for company), fit (enrichment industry + size). Plus one LLM sentence `why`. Store in `leads.health` `{recency:[n,'2h ago'],…,why}` and `leads.intent_score`. Recompute on every transition, message in/out, and nightly.
 
-## 5. Audible notes — wireframe 1d
-Hold-to-talk button (mouse down / touch start → MediaRecorder; release → upload). Available on ticket, company drawer, and pipeline card (long-press). Shows "Recording · 0:14 · release to save" in accent bar while held.
-`POST /api/notes` multipart → R2 `org/<orgId>/notes/<id>.webm` → `JOBS.transcribe` (Whisper) → `JOBS.extract_note` (LLM): `{specs:{…}, tasks:[{text, due_iso}], interests:[…]}`.
-Extract results render as chips under the transcript: spec chips PATCH the lead when clicked (or auto if confidence high); task chips insert into `tasks` with assignee = author; interest chips tag the company. Transcript is editable inline; edits re-run extract.
+## 3. Pipeline board
+Route `/pipeline`, nav between Inbox and Campaigns.
+- **Columns come from the published Deal Flow**: one column per non-terminal stage in flow order (names from the flow), plus a 260px right rail with Won and Lost. Column header: name, count, `⏱ {sla} LIMIT`, Σ value on Quoted.
+- **Card** (copy markup/spacing from the prototype): company, spec line (product · qty · due), health ring 34px (≥70 #1F7A4D, 40–69 #B4690E, <40 #B4261B), status lines from `stateLines()` in the file, footer with rep initials, channel glyph + ticket, RUSH pill. Card border #B4261B when score < 35. Sorted by score desc within a column.
+- **Drag and drop** (HTML5 DnD, column highlight #E6F2F7 on dragover). Drop calls `POST /api/leads/:id/transition {to}`. To Quoted without a value → modal asks quote amount. To Lost → modal with Price / Timing / Went elsewhere / No response. Response returns fired effects; show them in the bottom-left dark toast (4.5s) exactly like the prototype.
+- **Health popover**: `position:fixed` at the root, placed from the ring's `getBoundingClientRect()` (below, or above if no room), click-outside closes. Six factor rows + NEXT MOVE box.
+- Header: `$X QUOTED · N OPEN DEALS`. Sub-bar: Board / List / Radar · N segmented, filters All / Mine / Rush / Needs attention (cold, over SLA, or score < 35) with counts, search by company.
+- Realtime: subscribe to InboxRoom; cards move when other reps move them.
 
-## 6. List import — wireframe 1e
-Route `/pipeline/import`. Four-step wizard: Upload (CSV/XLSX drop, parse client-side with papaparse/sheetjs, show first 5 rows) → Map (each source column → target field select, auto-guess by header name, "skip") → Review (counts: new / already in system → merge / invalid phone or email) → Enrich & enroll (checkbox enrich all with estimated cost at $0.01/row, checkbox enroll in a sequence, optional tag).
-Server: `POST /api/imports` stores file in R2 + mapping; `JOBS.import_rows` in batches of 100: dedupe on phone / email / domain within org, insert companies + contacts with source `import:<id>`, then `JOBS.enrich` per new company, then enrollments if chosen. Progress pushed via InboxRoom DO; wizard shows a live bar.
+## 4. List view
+Same data as a table sorted by score: Company · Stage pill · Value (or ~estimate) · Due · Health ring · Rep · Next move. Row click opens the drawer.
 
-## 7. Radar — wireframe 1f
-Tab inside Pipeline. Nightly `JOBS.learn_interval` per company with ≥2 won leads: median gap between won_at values → reorder_interval_days (source learned) unless manual. Flags:
-- reorder_due: now − last_order_at ≥ 0.9 × interval
-- lapsed: ≥ 2 × interval or ≥ 180d with ≥1 past order
-- seasonal: orders cluster in same month ≥2 years → flag 60d before that month
-Radar list: company, flag pill, one-line evidence ("wine labels every 90d · last 87 days ago · $3,100 avg"), what happens next ("Reorder drip sends Thu unless you call first"). Rep can edit interval inline and snooze a flag. Radar flags are valid `sequences.trigger` values (`reorder_due`, `lapsed`) so drips can fire automatically when the org enables it.
+## 5. Company drawer
+Fixed right drawer `min(440px, 94vw)` with scrim; never a route change. Opens from any card, list row, won/lost row, or ticket. Sections in order: header (name, domain · city, 46px ring, Industry / Size / Lifetime cells, "Enriched X ago · ↻ refresh"), Open deal (spec, ticket · channel · rep, stage pill, NEXT MOVE), Contacts (☎ ✉ open the composer), Voice notes, Timeline.
+`GET /api/companies/:id` returns it in one payload. Enrichment job per Pathfinder wireframe 1c — ask me which provider key I have.
 
-## Nav & shell
-Add **Pipeline** between Inbox and Campaigns. Same 3-pane shell; Pipeline uses full width for the board. Keyboard: `g p` go to pipeline, `1–4` filter to a column, `n` new note on the focused card.
+## 6. Voice notes
+Hold-to-talk button (mousedown/touchstart → MediaRecorder; release or mouseleave → stop). States exactly as the prototype: blue "Hold to record a note" → red "Recording · 0:14 / Release to save" → grey "Transcribing…". Upload → R2 `org/<id>/notes/<noteId>.webm` → `JOBS.transcribe` → `JOBS.extract_note` → `{specs:[…], tasks:[…], interests:[…]}` rendered as chips (spec = blue, task = amber). Clicking a chip applies it: spec → PATCH lead (and if that clears missing fields on a Needs info deal, `transition(event:'specs_filled')`); task → `tasks` row; interest → company tag. Applied chips turn green with ✓. Push progress over InboxRoom so the note appears when transcription finishes.
+
+## 7. Radar tab
+Nightly `JOBS.learn_interval` per Pathfinder 1f. Radar list: company, flag pill (Reorder due amber / Lapsed red / Seasonal grey), evidence line, what happens next line, **Call today** (creates task, toast) and **Snooze 30d**.
+
+## 8. Deal Flow Builder UI
+Route `/settings/deal-flow` (admin only), also linked as "Deal flow" in nav for admins. Port `Deal Flow Builder.dc.html` 1:1: stage map strip (click to select, "● DEAL HERE" marker from the simulator), stage editor (name, enters-when, time limit + then, automations with on/off, add chips, exits), test-a-deal panel calling `/simulate` with the unsaved draft, Publish button amber when draft ≠ published. Autosave draft 500ms.
+
+## 9. List import
+Per Pathfinder wireframe 1e (unchanged from before). Lower priority; do last.
 
 ## Constraints
-Every query via `withOrg()`. Every job carries orgId. Nothing Dumont-specific. Commit per numbered step. Append to SETUP-LOG.md with any new secrets (enrichment provider) I gave you.
+Every query via `withOrg()`. Every job carries orgId. Only `transition()` writes `leads.status`. Nothing Dumont-specific in code. Commit after each numbered step. After step 3, give me the Pipeline URL so I can react before you continue. Append new secrets and URLs to SETUP-LOG.md.

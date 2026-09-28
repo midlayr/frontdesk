@@ -3,29 +3,187 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dumont Printing</title>
+<title>Dumont Printing · Full-service printing · Fresno</title>
+<link rel="icon" href="/brand/dumont/logo-mark.png">
+<meta name="description" content="Established 1950. The largest full-service printer in the central valley. Offset, digital, grand and large format, direct mail, bindery and fulfillment.">
+<!--
+  A stand-in for the shop's own website, so the chat widget can be seen the way a customer
+  meets it: on somebody else's page, not inside the app.
+
+  Typography and palette follow design/BRAND.md rather than being invented here — Archivo at
+  wdth 125 for headings, Inter Tight for body, IBM Plex Mono for labels, 2px radius, 1px
+  borders, no shadows except on the launcher. The accent is Dumont's own #1CA3B6, the same
+  value the Worker serves from orgs.brand.color, so the page and the launcher agree instead
+  of clashing by a shade.
+
+  The script tag at the bottom is the entire integration — exactly what a tenant pastes.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,500;125,600;125,700&family=Inter+Tight:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  body{margin:0;font:16px/1.6 Georgia,serif;color:#14161A;background:#FBFAF8}
-  .wrap{max-width:720px;margin:0 auto;padding:64px 24px}
-  h1{font:700 34px system-ui;letter-spacing:-.01em;margin:0 0 6px}
-  .k{font:600 11px ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:#8A9099}
-  hr{border:0;border-top:1px solid #E3E1DC;margin:28px 0}
-  .note{background:#fff;border:1px solid #E3E1DC;padding:14px 16px;font:13px/1.55 system-ui;color:#444}
+  :root{
+    --paper:#FBFAF8; --paper-2:#F2F1EE; --line:#E3E1DC;
+    --ink:#14161A; --ink-2:#5C6169; --ink-3:#9AA0A8;
+    --accent:#1CA3B6; --accent-deep:#16828F;
+    --display:'Archivo',system-ui,sans-serif;
+    --body:'Inter Tight',system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:400 15.5px/1.65 var(--body);
+       -webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:var(--display);font-variation-settings:'wdth' 125;font-weight:700;
+           letter-spacing:-.02em;margin:0}
+  .label{font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+  a{color:inherit}
+
+  /* header */
+  header{border-bottom:1px solid var(--line);background:var(--paper);position:sticky;top:0;z-index:10}
+  .bar{display:flex;align-items:center;gap:26px;height:64px}
+  .bar img{height:22px;width:auto;object-fit:contain;display:block}
+  nav{display:flex;gap:22px;margin-left:auto;font:500 13.5px var(--body)}
+  nav a{text-decoration:none;color:var(--ink-2)}
+  nav a:hover{color:var(--ink)}
+  .tel{font:500 12px var(--mono);letter-spacing:.06em;color:var(--ink);white-space:nowrap}
+
+  /* hero */
+  .hero{padding:84px 0 64px;border-bottom:1px solid var(--line)}
+  .hero h1{font-size:clamp(34px,6vw,58px);line-height:1.04;max-width:16ch}
+  .hero p{font-size:17.5px;color:var(--ink-2);max-width:54ch;margin:18px 0 0}
+  .rule{width:46px;height:2px;background:var(--accent);margin:0 0 22px}
+
+  /* capabilities */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+        border-top:1px solid var(--line);border-left:1px solid var(--line)}
+  .cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:22px 20px 26px}
+  .cell h3{font-size:16px;margin:8px 0 5px}
+  .cell p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.55}
+  section{padding:56px 0}
+  .sechead{display:flex;align-items:baseline;gap:14px;margin-bottom:22px}
+  .sechead h2{font-size:21px}
+
+  /* the about band */
+  .band{background:var(--paper-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .band .wrap{display:grid;grid-template-columns:1fr 1fr;gap:42px;padding-top:52px;padding-bottom:52px}
+  .band p{margin:10px 0 0;color:var(--ink-2)}
+  .stats{display:flex;gap:38px;margin-top:26px}
+  .stat b{display:block;font-family:var(--display);font-variation-settings:'wdth' 125;
+          font-weight:700;font-size:27px;letter-spacing:-.02em}
+
+  /* quote prompt */
+  .quote{border:1px solid var(--line);background:#fff;padding:30px 28px;
+         display:flex;align-items:center;gap:26px;flex-wrap:wrap}
+  .quote h2{font-size:19px;margin-bottom:5px}
+  .quote>div{max-width:60ch}
+  .quote p{margin:0;color:var(--ink-2);font-size:14px}
+  .arrow{margin-left:auto;font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;
+         color:var(--accent-deep);white-space:nowrap}
+
+  footer{border-top:1px solid var(--line);padding:34px 0 104px;color:var(--ink-2);font-size:13.5px}
+  .fgrid{display:flex;gap:46px;flex-wrap:wrap}
+  footer strong{display:block;color:var(--ink);font-weight:600;margin-bottom:4px}
+  .fine{margin-top:26px;font:400 11px var(--mono);letter-spacing:.06em;color:var(--ink-3)}
+
+  @media (max-width:720px){
+    nav{display:none}
+    .band .wrap{grid-template-columns:1fr;gap:26px}
+    .hero{padding:56px 0 44px}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="k">Fresno, California · since 1958</div>
-  <h1>Dumont Printing</h1>
-  <p>Commercial offset and digital printing. Business cards, banners, booklets, packaging.</p>
-  <hr>
-  <p>Need a quote? Use the chat at the bottom right.</p>
-  <div class="note">
-    Test page for the Midlayr Chat widget. The script tag is exactly what a tenant pastes
-    into their site — <code>data-org</code> and nothing else. Same origin as the Worker, so
-    <code>/w.js</code>, <code>/widget</code> and <code>/api</code> resolve without a proxy.
+
+<header>
+  <div class="wrap bar">
+    <img src="/brand/dumont/logo-horizontal.png" alt="Dumont Printing">
+    <nav>
+      <a href="#work">Capabilities</a>
+      <a href="#about">About</a>
+      <a href="#quote">Request a quote</a>
+    </nav>
+    <span class="tel">(559) 485-6311</span>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="rule"></div>
+    <span class="label">Fresno, California · Established 1950</span>
+    <h1 style="margin-top:14px">The largest full-service printer in the central valley.</h1>
+    <p>A direct marketing solutions provider for businesses across the valley.
+       If you have ideas, we have solutions.</p>
   </div>
 </div>
+
+<section id="work">
+  <div class="wrap">
+    <div class="sechead"><h2>Capabilities</h2><span class="label">The difference is in quality</span></div>
+  </div>
+  <div class="wrap" style="padding:0 24px">
+    <div class="grid">
+      <div class="cell"><span class="label">01</span><h3>Offset &amp; digital</h3>
+        <p>Short runs through long, on the right press for the job.</p></div>
+      <div class="cell"><span class="label">02</span><h3>Grand &amp; large format</h3>
+        <p>Banners, signage, vehicle graphics and trade show display.</p></div>
+      <div class="cell"><span class="label">03</span><h3>Direct mail</h3>
+        <p>Variable data, addressing, sorting and postal drop.</p></div>
+      <div class="cell"><span class="label">04</span><h3>Complete bindery</h3>
+        <p>Folding, stitching, binding and die-cutting, all in house.</p></div>
+      <div class="cell"><span class="label">05</span><h3>Graphic design</h3>
+        <p>Artwork from scratch, or your files prepared for press.</p></div>
+      <div class="cell"><span class="label">06</span><h3>Direct mail</h3>
+        <p>Variable data, addressing, sorting and postal drop.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="band" id="about">
+  <div class="wrap">
+    <div>
+      <span class="label">About the shop</span>
+      <h2 style="font-size:23px;margin-top:10px">Seventy-five years in Fresno.</h2>
+      <p>Dumont began in 1950 as a small printing company in Fresno, and is owned and
+         operated today by Susan Moore. A technology-driven shop that treats its people as
+         its greatest resource.</p>
+    </div>
+    <div>
+      <div class="stats">
+        <div class="stat"><b>1950</b><span class="label">Established</span></div>
+        <div class="stat"><b>#1</b><span class="label">In the valley</span></div>
+        <div class="stat"><b>10+</b><span class="label">Services</span></div>
+      </div>
+      <p style="margin-top:22px;font-size:14px">Our core focus is quality products and
+         outstanding service, to support our clients in their growth.</p>
+    </div>
+  </div>
+</div>
+
+<section id="quote">
+  <div class="wrap">
+    <div class="quote">
+      <div>
+        <span class="label">Quotes</span>
+        <h2 style="margin-top:8px">Tell us what you need printed.</h2>
+        <p>Most quotes come back the same working day. Start in the chat, or call the shop.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="fgrid">
+      <div><strong>Dumont Printing</strong>Fresno, California<br>Established 1950</div>
+      <div><strong>Hours</strong>Monday–Friday, 8am–5pm<br>Closed weekends</div>
+      <div><strong>Contact</strong>(559) 485-6311<br>quotes@dumontprinting.com</div>
+    </div>
+    <div class="fine">Demonstration site · the chat widget is live and creates real tickets</div>
+  </div>
+</footer>
+
+<!-- The entire integration. One tag, no framework, no build step. -->
 <script src="/w.js" data-org="dumont" data-flow="quote-intake" async></script>
 </body>
 </html>

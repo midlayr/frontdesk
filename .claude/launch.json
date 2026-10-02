@@ -1,11 +1,19 @@
 {
+  "_comment": [
+    "Attach-only, deliberately. There is no separate front-end dev server to start: the",
+    "Worker serves web/dist itself, so the app and the API share an origin and the session",
+    "cookie works. Run the Worker yourself with",
+    "  npx wrangler dev -c wrangler.dev.toml --port 8787",
+    "and these entries point the preview pane at it. An earlier entry here tried to launch",
+    "`npm run dev --prefix web` on 5173, which starts a Vite server nothing serves the API",
+    "from — and fails outright in sessions where launching dev servers is not permitted."
+  ],
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "frontdesk-web",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "web"],
-      "port": 5173
+      "name": "frontdesk-local",
+      "url": "http://localhost:8787",
+      "port": 8787
     },
     {
       "name": "frontdesk-prod",

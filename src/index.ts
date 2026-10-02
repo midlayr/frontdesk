@@ -8,6 +8,7 @@ import { twilioSms } from './hooks/twilio-sms';
 import { twilioVoice, twilioRecording } from './hooks/twilio-voice';
 import { handleEmail } from './hooks/email';
 import { mailgunInbound } from './hooks/mailgun';
+import { formSubmit, formOptions } from './hooks/form';
 import { mailgunEvents, twilioStatus } from './hooks/delivery';
 import { transcribe } from './jobs/transcribe';
 import { extractSpecs } from './jobs/extract-specs';
@@ -103,6 +104,21 @@ app.post('/hooks/mailgun', async (c) => {
 // Delivery outcomes. Additive: they stamp timestamps onto messages a send already wrote,
 // and are what make the opened / clicked / bounced branch conditions answerable.
 app.post('/hooks/mailgun/events', (c) => mailgunEvents(c.req.raw, c.env, c.get('sql')));
+
+/**
+ * The website quote form. Posted to from the shop's own page, so it is cross-origin and
+ * unauthenticated by necessity — the tenant's widget.allowed_domains is the gate, checked
+ * before anything is written. `orgBySlug` here rather than resolveOrg: the hostname on this
+ * request is the customer's website, not ours.
+ */
+const orgForSlug = (env: Env, sql: Sql) => async (slug: string) => {
+  const [org] = await sql<Org[]>`
+    SELECT id, slug, name, brand, comms, widget, features
+      FROM orgs WHERE slug = ${slug} AND status = 'active'`;
+  return org ?? null;
+};
+app.post('/hooks/form', (c) => formSubmit(c.req.raw, c.env, c.get('sql'), orgForSlug(c.env, c.get('sql'))));
+app.options('/hooks/form', (c) => formOptions(c.req.raw, c.env, orgForSlug(c.env, c.get('sql'))));
 app.post('/hooks/twilio/status', (c) => twilioStatus(c.req.raw, c.env, c.get('sql')));
 
 /**
@@ -179,81 +195,170 @@ app.delete('/api/session', async (c) => {
 });
 
 /**
- * Forgotten passwords.
+ * Signing in by email: a link to get in, and a link to set a new password.
  *
- * Both routes sit above the /api/* middleware because that middleware authenticates, and
- * nobody here can. They resolve the tenant from the hostname themselves, exactly as
- * /api/session does.
+ * These routes sit above the /api/* middleware because that middleware authenticates and
+ * nobody here can. They resolve the tenant from the hostname themselves, as /api/session
+ * does. Both mint the same object — a secret mailed to an address, good once, briefly — and
+ * differ only in what redeeming it does, so they share one table and one mint.
  *
- * The rules that matter, in one place:
+ * The rules that carry the weight:
  *
- *  · The reply is the same whether or not the address has an account. Anything else turns
- *    this into a way to ask which of a shop's staff exist, from the open internet.
- *  · What is stored is the SHA-256 of the token, never the token. The link in the mailbox is
- *    the only redeemable copy, so this table leaking grants nothing — the same bargain as
- *    password_hash.
- *  · One hour, one use, and requesting again cancels any earlier outstanding link, so a
- *    forwarded or shoulder-read older mail stops working.
- *  · The token names its org and the confirm step checks it against the hostname, so a link
- *    minted for one tenant cannot be redeemed on another that shares this Worker.
+ *  · The reply is identical whether or not the address has an account. Anything else turns
+ *    this into a way to ask, from the open internet, which of a shop's staff exist.
+ *  · Stored is the SHA-256 of the token, never the token: the mail is the only redeemable
+ *    copy, so the table leaking grants nothing — the bargain password_hash already makes.
+ *  · One use, and a fresh request cancels any earlier outstanding token of the same purpose,
+ *    so a forwarded or shoulder-read older mail stops working.
+ *  · The row names its org and redemption checks it against the hostname, so a token minted
+ *    for one tenant cannot be spent on another sharing this Worker.
+ *  · REDEMPTION IS A POST, NEVER A GET. Mail clients and security scanners fetch links in
+ *    messages before anyone reads them; a link that signs you in on GET is a link that is
+ *    already spent by the time it reaches the inbox. The link opens the app, and the app
+ *    posts the token back.
  */
-const RESET_TTL_MS = 60 * 60 * 1000;
+const LOGIN_TTL_MS = 15 * 60 * 1000;        // short: it is a door, not a password
+const RESET_TTL_MS = 60 * 60 * 1000;        // longer: someone may go and find their password manager
+// An invite is sent to somebody who is not waiting for it and may be away. Expiring it over
+// a weekend turns a welcome into a support request on Monday.
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const sha256Hex = async (s: string) =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))]
     .map((b) => b.toString(16).padStart(2, '0')).join('');
 
-app.post('/api/password-reset', async (c) => {
+/** Mint a single-use token for this user, cancelling any outstanding one of that purpose. */
+type Purpose = 'login' | 'invite' | 'reset';
+
+async function mintToken(
+  sql: Sql, purpose: Purpose, userId: string, orgId: string, ttlMs: number, ip: string | null,
+): Promise<string> {
+  const token = [...crypto.getRandomValues(new Uint8Array(32))]
+    .map((b) => b.toString(16).padStart(2, '0')).join('');
+  // Outside withOrg: auth_tokens carries no RLS policy, by design.
+  await sql`DELETE FROM auth_tokens
+             WHERE user_id = ${userId} AND purpose = ${purpose} AND used_at IS NULL`;
+  await sql`INSERT INTO auth_tokens (token_hash, purpose, user_id, org_id, expires_at, requested_ip)
+            VALUES (${await sha256Hex(token)}, ${purpose}, ${userId}, ${orgId},
+                    ${new Date(Date.now() + ttlMs)}, ${ip})`;
+  return token;
+}
+
+/** Redeem one. Null for expired, spent, unknown, or minted for a different tenant. */
+async function redeemToken(
+  sql: Sql, purposes: Purpose[], token: string, orgId: string,
+): Promise<string | null> {
+  const hash = await sha256Hex(token);
+  // jsonb, not a bound array: under fetch_types: false an array binds as a string literal
+  // that matches nothing, and the row simply fails to be found — see SETUP-LOG.
+  const [row] = await sql<{ user_id: string; org_id: string }[]>`
+    SELECT user_id, org_id FROM auth_tokens
+     WHERE token_hash = ${hash}
+       AND purpose IN (SELECT jsonb_array_elements_text(${sql.json(purposes)}::jsonb))
+       AND used_at IS NULL AND expires_at > now()`;
+  if (!row || row.org_id !== orgId) return null;
+  await sql`UPDATE auth_tokens SET used_at = now() WHERE token_hash = ${hash}`;
+  return row.user_id;
+}
+
+/** The sender a tenant's mail goes out as — see replyByEmail for why it is derived. */
+function mailFrom(org: Org, env: Env) {
+  const sender = org.comms.email_sender || `${org.slug}@${env.MAILGUN_DOMAIN}`;
+  return { from: `${org.name} <${sender}>`, replyTo: org.comms.email_inbound ?? sender };
+}
+
+/** The account behind an address on this tenant, if it can sign in at all. */
+async function signInUser(sql: Sql, orgId: string, email: string) {
+  const [user] = await withOrg(sql, orgId, (tx) =>
+    tx<{ id: string; name: string }[]>`
+      SELECT id, name FROM users
+       WHERE email = ${email} AND org_id = ${orgId} AND disabled_at IS NULL`);
+  return user ?? null;
+}
+
+app.post('/api/login-link', async (c) => {
   const body = await c.req.json().catch(() => null) as { email?: string } | null;
   const email = body?.email?.trim().toLowerCase();
-  // Same shape of answer for a missing field as for a missing account, for the same reason.
+  const sql = c.get('sql');
+  const url = new URL(c.req.url);
+  // Same shape of answer for a missing field, an unknown tenant and an unknown account.
   if (!email) return c.json({ ok: true });
+  const org = await resolveOrg(c.env, sql, url);
+  if (!org) return c.json({ ok: true });
+
+  const user = await signInUser(sql, org.id, email);
+  if (user) {
+    const token = await mintToken(sql, 'login', user.id, org.id, LOGIN_TTL_MS,
+      c.req.header('cf-connecting-ip') ?? null);
+    const { from, replyTo } = mailFrom(org, c.env);
+    try {
+      await sendEmail(c.env, {
+        from, to: email, replyTo, inReplyTo: null, references: [],
+        subject: `Your ${org.name} Front Desk sign-in link`,
+        text: `Hello ${user.name},\n\n`
+            + `Here is your link to sign in to ${org.name} Front Desk:\n\n`
+            + `${url.origin}/?login=${token}\n\n`
+            + `It works once and expires in 15 minutes. If you did not ask to sign in, `
+            + `ignore this — the link does nothing on its own and nobody can use it `
+            + `without this message.\n`,
+      });
+    } catch (err) {
+      // Logged, not surfaced: saying the send failed would confirm the account exists.
+      console.error('login link send failed', err);
+    }
+  }
+  return c.json({ ok: true });
+});
+
+app.post('/api/login-link/consume', async (c) => {
+  const body = await c.req.json().catch(() => null) as { token?: string } | null;
+  const token = body?.token?.trim();
+  if (!token) return c.json({ error: 'token required' }, 400);
 
   const sql = c.get('sql');
   const url = new URL(c.req.url);
   const org = await resolveOrg(c.env, sql, url);
+  if (!org) return c.json({ error: 'unknown tenant' }, 404);
+
+  const userId = await redeemToken(sql, ['login', 'invite'], token, org.id);
+  // One message for expired, spent, unknown and wrong-tenant alike: which it was is not the
+  // sender's business, and the remedy is the same every time.
+  if (!userId) return c.json({ error: 'that link has expired or already been used — ask for a new one' }, 400);
+
+  const { token: session, expires } = await createSession(
+    sql, userId, org.id, c.req.header('user-agent') ?? null, c.req.header('cf-connecting-ip') ?? null);
+  c.header('set-cookie', sessionCookie(session, expires, url.protocol === 'https:'));
+  return c.json({ ok: true, userId });
+});
+
+app.post('/api/password-reset', async (c) => {
+  const body = await c.req.json().catch(() => null) as { email?: string } | null;
+  const email = body?.email?.trim().toLowerCase();
+  const sql = c.get('sql');
+  const url = new URL(c.req.url);
+  if (!email) return c.json({ ok: true });
+  const org = await resolveOrg(c.env, sql, url);
   if (!org) return c.json({ ok: true });
 
-  const [user] = await withOrg(sql, org.id, (tx) =>
-    tx<{ id: string; name: string }[]>`
-      SELECT id, name FROM users
-       WHERE email = ${email} AND org_id = ${org.id} AND disabled_at IS NULL`);
-
+  const user = await signInUser(sql, org.id, email);
   if (user) {
-    const token = [...crypto.getRandomValues(new Uint8Array(32))]
-      .map((b) => b.toString(16).padStart(2, '0')).join('');
-    const hash = await sha256Hex(token);
-    const expires = new Date(Date.now() + RESET_TTL_MS);
-
-    // Outside withOrg: password_resets carries no RLS policy, by design.
-    await sql`DELETE FROM password_resets WHERE user_id = ${user.id} AND used_at IS NULL`;
-    await sql`INSERT INTO password_resets (token_hash, user_id, org_id, expires_at, requested_ip)
-              VALUES (${hash}, ${user.id}, ${org.id}, ${expires},
-                      ${c.req.header('cf-connecting-ip') ?? null})`;
-
-    const link = `${url.origin}/?reset=${token}`;
-    const sender = org.comms.email_sender || `${org.slug}@${c.env.MAILGUN_DOMAIN}`;
+    const token = await mintToken(sql, 'reset', user.id, org.id, RESET_TTL_MS,
+      c.req.header('cf-connecting-ip') ?? null);
+    const { from, replyTo } = mailFrom(org, c.env);
     try {
       await sendEmail(c.env, {
-        from: `${org.name} <${sender}>`,
-        to: email,
+        from, to: email, replyTo, inReplyTo: null, references: [],
         subject: `Reset your ${org.name} Front Desk password`,
         text: `Hello ${user.name},\n\n`
             + `Someone asked to reset the password for this address on ${org.name} Front Desk.\n\n`
-            + `${link}\n\n`
+            + `${url.origin}/?reset=${token}\n\n`
             + `The link works once and expires in an hour. If that was not you, ignore this — `
             + `your password has not changed, and nobody can use this link without the mail.\n`,
-        replyTo: org.comms.email_inbound ?? sender,
-        inReplyTo: null,
-        references: [],
       });
     } catch (err) {
-      // Logged, not surfaced: telling the caller the send failed would tell them the account
-      // exists. The person simply sees no mail and tries again.
       console.error('password reset send failed', err);
     }
   }
-
   return c.json({ ok: true });
 });
 
@@ -269,27 +374,17 @@ app.post('/api/password-reset/confirm', async (c) => {
   const org = await resolveOrg(c.env, sql, url);
   if (!org) return c.json({ error: 'unknown tenant' }, 404);
 
-  const hash = await sha256Hex(token);
-  const [row] = await sql<{ user_id: string; org_id: string }[]>`
-    SELECT user_id, org_id FROM password_resets
-     WHERE token_hash = ${hash} AND used_at IS NULL AND expires_at > now()`;
-
-  // One message for expired, spent, unknown and wrong-tenant alike: which of those it was is
-  // not the sender's business, and the remedy is the same in every case.
-  if (!row || row.org_id !== org.id) {
-    return c.json({ error: 'that link has expired or already been used — request a new one' }, 400);
-  }
+  const userId = await redeemToken(sql, ['reset'], token, org.id);
+  if (!userId) return c.json({ error: 'that link has expired or already been used — request a new one' }, 400);
 
   const newHash = await hashPassword(password);
   await withOrg(sql, org.id, (tx) => tx`
     UPDATE users SET password_hash = ${newHash}, password_set_at = now()
-     WHERE id = ${row.user_id} AND org_id = ${org.id}`);
+     WHERE id = ${userId} AND org_id = ${org.id}`);
 
-  // Spend the token and end every existing session: a reset is what someone does when they
-  // suspect the account is not only theirs.
-  await sql`UPDATE password_resets SET used_at = now() WHERE token_hash = ${hash}`;
-  await sql`DELETE FROM sessions WHERE user_id = ${row.user_id}`;
-
+  // End every existing session: a reset is what someone does when they suspect the account
+  // is not only theirs.
+  await sql`DELETE FROM sessions WHERE user_id = ${userId}`;
   return c.json({ ok: true });
 });
 
@@ -543,6 +638,142 @@ app.patch('/api/users/:id', async (c) => {
   if (body.disabled === true) await c.get('sql')`DELETE FROM sessions WHERE user_id = ${id}`;
 
   return c.json({ ok: true, user: updated });
+});
+
+/**
+ * Send someone their way in.
+ *
+ * An invite is a sign-in link with a longer life, mailed to a colleague who is not sitting
+ * waiting for it. Redeeming one signs them in — there is no password to choose first, and
+ * asking a new person to invent one before they have seen the thing is how accounts end up
+ * sharing a password.
+ *
+ * Unlike /api/login-link, this one may say whether it worked: the caller is already an
+ * authenticated admin of this tenant and can see the whole staff list anyway, so there is
+ * nothing here to leak.
+ */
+async function sendInvite(
+  c: Context<{ Bindings: Env; Variables: Vars }>, userId: string, email: string, name: string,
+): Promise<{ sent: boolean; error?: string }> {
+  const org = c.get('org');
+  const sql = c.get('sql');
+  const url = new URL(c.req.url);
+  const token = await mintToken(sql, 'invite', userId, org.id, INVITE_TTL_MS,
+    c.req.header('cf-connecting-ip') ?? null);
+
+  const [inviter] = await withOrg(sql, org.id, (tx) =>
+    tx<{ name: string }[]>`SELECT name FROM users WHERE id = ${c.get('userId')}`);
+
+  const { from, replyTo } = mailFrom(org, c.env);
+  try {
+    await sendEmail(c.env, {
+      from, to: email, replyTo, inReplyTo: null, references: [],
+      subject: `${inviter?.name ?? 'Someone'} has added you to ${org.name} Front Desk`,
+      text: `Hello ${name},\n\n`
+          + `${inviter?.name ?? 'An administrator'} has set you up on ${org.name} Front Desk — `
+          + `where the shop's calls, texts, emails and website chats arrive as one queue.\n\n`
+          + `${url.origin}/?login=${token}\n\n`
+          + `That link signs you in. It works once and lasts seven days; after that ask for a `
+          + `new one from the sign-in page. You do not need a password — you can set one later `
+          + `if you would rather.\n`,
+    });
+    return { sent: true };
+  } catch (err) {
+    // Surfaced, unlike the public routes: an admin who has just added a colleague needs to
+    // know the welcome did not arrive, and there is nothing to leak to them.
+    console.error('invite send failed', err);
+    return { sent: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+app.post('/api/users/:id/invite', async (c) => {
+  const denied = adminOnly(c); if (denied) return denied;
+  const org = c.get('org');
+  const [user] = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ id: string; email: string; name: string; disabled_at: string | null }[]>`
+      SELECT id, email, name, disabled_at FROM users WHERE id = ${c.req.param('id')}`);
+  if (!user) return c.json({ error: 'not found' }, 404);
+  if (user.disabled_at) return c.json({ error: 'that account is disabled — enable it first' }, 409);
+
+  const r = await sendInvite(c, user.id, user.email, user.name);
+  if (!r.sent) return c.json({ error: `could not send the invite: ${r.error}` }, 502);
+  return c.json({ ok: true, sent_to: user.email });
+});
+
+/**
+ * Is each thing we depend on actually working?
+ *
+ * Every provider failure this product has had was silent: a truncated Twilio SID, a disabled
+ * Mailgun key, a cancelled Mailgun subscription. All three were invisible because the code
+ * that uses them is careful not to leak information when it fails — correct, and the reason
+ * nobody noticed for days. This asks each one a harmless question and says what came back.
+ *
+ * Read-only by construction: it reads configuration, never sends a message or places a call.
+ */
+app.get('/api/health/providers', async (c) => {
+  const denied = adminOnly(c); if (denied) return denied;
+  const env = c.env;
+  const org = c.get('org');
+
+  const check = async (name: string, detail: string, fn: () => Promise<string | null>) => {
+    const started = Date.now();
+    try {
+      const problem = await fn();
+      return { name, detail, ok: !problem, note: problem ?? 'Working', ms: Date.now() - started };
+    } catch (err) {
+      return { name, detail, ok: false, ms: Date.now() - started,
+               note: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
+  const results = await Promise.all([
+    check('Database', 'Postgres via Hyperdrive', async () => {
+      const [row] = await c.get('sql')<{ n: number }[]>`SELECT 1 AS n`;
+      return row?.n === 1 ? null : 'unexpected reply';
+    }),
+
+    check('Email', `Mailgun · ${env.MAILGUN_DOMAIN ?? '(no domain set)'}`, async () => {
+      if (!env.MAILGUN_API_KEY) return 'MAILGUN_API_KEY is not set';
+      if (!env.MAILGUN_DOMAIN) return 'MAILGUN_DOMAIN is not set';
+      const base = env.MAILGUN_BASE_URL || 'https://api.mailgun.net';
+      const r = await fetch(`${base}/v3/domains/${env.MAILGUN_DOMAIN}`, {
+        headers: { authorization: 'Basic ' + btoa(`api:${env.MAILGUN_API_KEY}`) },
+      });
+      if (r.status === 401) return 'Key rejected — disabled, or wrong for this account';
+      if (!r.ok) return `Mailgun returned ${r.status}`;
+      const d = await r.json() as { domain?: { state?: string } };
+      // "active" is not the same as "allowed to send": a cancelled subscription leaves the
+      // domain active and refuses at send time. Worth saying which we actually checked.
+      return d.domain?.state === 'active' ? null : `Domain state is ${d.domain?.state ?? 'unknown'}`;
+    }),
+
+    check('Text and voice', 'Twilio', async () => {
+      if (!env.TWILIO_SID) return 'TWILIO_SID is not set';
+      if (env.TWILIO_SID.length !== 34) return `TWILIO_SID is ${env.TWILIO_SID.length} characters, expected 34`;
+      if (!env.TWILIO_AUTH_TOKEN) return 'TWILIO_AUTH_TOKEN is not set';
+      if (env.TWILIO_AUTH_TOKEN.length !== 32) return `Auth token is ${env.TWILIO_AUTH_TOKEN.length} characters, expected 32`;
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_SID}.json`, {
+        headers: { authorization: 'Basic ' + btoa(`${env.TWILIO_SID}:${env.TWILIO_AUTH_TOKEN}`) },
+      });
+      if (r.status === 401) return 'Credentials rejected';
+      return r.ok ? null : `Twilio returned ${r.status}`;
+    }),
+
+    check('Files', 'R2 · artwork and voicemail', async () => {
+      await env.FILES.head(`org/${org.id}/.healthcheck`);  // absent is fine; an error is not
+      return null;
+    }),
+
+    check('Shop number', 'The number customers ring and text', async () =>
+      org.comms.sms_number ? null : 'No SMS number set for this shop — replies cannot be sent'),
+
+    check('Inbound email', 'Where forwarded enquiries arrive', async () => {
+      if (!env.MAILGUN_SIGNING_KEY) return 'MAILGUN_SIGNING_KEY is not set — inbound mail is rejected unverified';
+      return org.comms.email_inbound ? null : 'No intake address set for this shop';
+    }),
+  ]);
+
+  return c.json({ checked_at: new Date().toISOString(), providers: results });
 });
 
 app.get('/api/org', (c) => {

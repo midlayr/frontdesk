@@ -35,6 +35,8 @@ export interface OrgUser {
   disabled_at?: string | null; last_seen_at?: string | null; password_set_at?: string | null;
 }
 
+export type ProviderCheck = { name: string; detail: string; ok: boolean; note: string; ms: number };
+
 export const ROLES: { id: 'sales' | 'admin'; label: string; can: string }[] = [
   { id: 'sales', label: 'Sales', can: 'Works the queue: reply, edit a spec, move and assign tickets.' },
   { id: 'admin', label: 'Admin', can: 'Everything sales can do, plus the chat flow, messaging and people.' },
@@ -139,6 +141,28 @@ export const api = {
     get<{ lead: Lead; messages: Message[]; attachments: Attachment[]; activity: unknown[] }>(`/api/leads/${id}`),
 
   /** Always resolves: the server answers the same either way, so the UI must not branch. */
+  requestLoginLink: async (email: string) => {
+    await fetch(url('/api/login-link'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).catch(() => undefined);
+  },
+
+  consumeLoginLink: async (token: string) => {
+    const r = await fetch(url('/api/login-link/consume'), {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    if (!r.ok) {
+      const said = await r.text();
+      let msg = '';
+      try { msg = (JSON.parse(said) as { error?: string }).error ?? ''; } catch { /* not json */ }
+      throw new Error(msg || `Could not sign you in (${r.status}).`);
+    }
+    return r.json();
+  },
+
+  /** Always resolves: the server answers the same either way, so the UI must not branch. */
   requestPasswordReset: async (email: string) => {
     await fetch(url('/api/password-reset'), {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -180,6 +204,15 @@ export const api = {
   users: () => get<{ users: OrgUser[] }>('/api/users').then((r) => r.users),
 
   activity: (id: string) => get<History>(`/api/leads/${id}/activity`),
+
+  inviteUser: async (id: string) => {
+    const r = await fetch(url(`/api/users/${id}/invite`), { method: 'POST', headers: headers() });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j as { error?: string }).error ?? `${r.status}`);
+    return j as { ok: true; sent_to: string };
+  },
+
+  providerHealth: () => get<{ checked_at: string; providers: ProviderCheck[] }>('/api/health/providers'),
 
   addUser: async (body: { name: string; email: string; role: string }) => {
     const r = await fetch(url('/api/users'), {

@@ -698,3 +698,63 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   padding: 7px 9px; border-radius: var(--radius); font-size: var(--text-sm); color: var(--ink); }
 .tmenu button:hover { background: var(--paper-2); }
 .tmenu button.danger { color: var(--danger); }
+
+/* ── People, invites and connection health ──────────────────────────────
+   Same vocabulary as the rest of the app: 1px lines, 2px radius, mono for
+   labels and states, accent only for what is interactive. The one new idea
+   is the state pill, which carries meaning rather than decoration — amber
+   for somebody we are waiting on, green for somebody who is using it. */
+.team-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:22px 0 12px}
+.team-head .section{margin:0}
+
+.invite-card{border:1px solid var(--accent);background:var(--accent-tint);
+             border-radius:var(--radius);padding:16px 18px 18px;margin-bottom:18px}
+.invite-sub{margin:6px 0 14px;font-size:13px;color:var(--ink-2);max-width:62ch}
+.invite-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.invite-acts{display:flex;gap:8px;margin-top:14px}
+
+.role-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.role-pick button{text-align:left;background:var(--paper);border:1px solid var(--line);
+                  border-radius:var(--radius);padding:10px 12px;cursor:pointer}
+.role-pick button[data-on="true"]{border-color:var(--ink);box-shadow:inset 3px 0 0 var(--accent)}
+.role-pick b{display:block;font:600 13.5px var(--font-body);margin-bottom:2px}
+.role-pick span{display:block;font-size:12px;color:var(--ink-2);line-height:1.45}
+
+.people{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.person{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;
+        padding:13px 2px;border-bottom:1px solid var(--line)}
+.person.off{opacity:.55}
+.person-name{display:flex;align-items:center;gap:8px;font:600 14.5px var(--font-body)}
+.person-mail{font:12.5px var(--font-mono);color:var(--ink-2);margin-top:3px}
+.person-why{font-size:12px;color:var(--ink-3);margin-top:2px}
+.person-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.person-acts button{font:500 12px var(--font-body);border:1px solid var(--line);
+                    background:var(--paper);border-radius:var(--radius);
+                    padding:6px 10px;cursor:pointer;white-space:nowrap}
+.person-acts button:hover:not(:disabled){border-color:var(--ink)}
+.person-acts button.danger{color:var(--danger);border-color:#E7C9C6}
+.person .team-pw{grid-column:1 / -1}
+
+.pill{font:500 10px var(--font-mono);letter-spacing:.07em;text-transform:uppercase;
+      padding:2px 7px;border-radius:999px;border:1px solid currentColor}
+.pill.ok{color:var(--ok)} .pill.wait{color:var(--warn)} .pill.off{color:var(--ink-3)}
+
+.health{margin-top:34px}
+.health-list{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.hz{display:grid;grid-template-columns:auto 1fr 1.4fr auto;gap:12px;align-items:center;
+    padding:11px 2px;border-bottom:1px solid var(--line)}
+.hz-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.hz.ok .hz-dot{background:var(--ok)} .hz.bad .hz-dot{background:var(--danger)}
+.hz-what b{display:block;font:600 13.5px var(--font-body)}
+.hz-what span{display:block;font:11px var(--font-mono);color:var(--ink-3);margin-top:2px}
+.hz-note{font-size:13px;color:var(--ink-2)}
+.hz.bad .hz-note{color:var(--danger)}
+.hz-ms{font:11px var(--font-mono);color:var(--ink-3)}
+
+@media (max-width:760px){
+  .invite-grid,.role-pick{grid-template-columns:1fr}
+  .person{grid-template-columns:1fr}
+  .person-acts{justify-content:flex-start}
+  .hz{grid-template-columns:auto 1fr;row-gap:4px}
+  .hz-note,.hz-ms{grid-column:2}
+}

@@ -688,21 +688,35 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
  * changing how sessions work.
  */
 function Login({ onDone }: { onDone: () => void }) {
-  // A reset link lands on the app itself rather than a route of its own, so the token is
-  // read once here and stripped from the address bar before anything else runs — it is a
-  // credential for the next minute, and it has no business staying in history or in the
+  // Both kinds of link land on the app itself rather than a route of their own. The token is
+  // read once and stripped from the address bar before anything else runs — it is a
+  // credential for the next few minutes and has no business staying in history, or in the
   // referer of the first image the page loads.
+  //
+  // A sign-in link is redeemed from here with a POST, never by the browser following a GET:
+  // mail clients and scanners fetch links before anyone reads them, and a link that signs
+  // you in on GET is already spent by the time it reaches the inbox.
   const [token, setToken] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
   useEffect(() => {
     const u = new URL(window.location.href);
-    const t = u.searchParams.get('reset');
-    if (!t) return;
-    setToken(t);
+    const reset = u.searchParams.get('reset');
+    const login = u.searchParams.get('login');
+    if (!reset && !login) return;
     u.searchParams.delete('reset');
+    u.searchParams.delete('login');
     window.history.replaceState({}, '', u.pathname + u.search + u.hash);
-  }, []);
+    if (reset) { setToken(reset); return; }
+    if (login) {
+      setSigningIn(true);
+      api.consumeLoginLink(login)
+        .then(onDone)
+        .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
+        .finally(() => setSigningIn(false));
+    }
+  }, [onDone]);
 
-  const [mode, setMode] = useState<'in' | 'forgot'>('in');
+  const [mode, setMode] = useState<'link' | 'password' | 'forgot'>('link');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -718,7 +732,10 @@ function Login({ onDone }: { onDone: () => void }) {
       if (token) {
         await api.confirmPasswordReset(token, password);
         // Straight to a sign-in that now works, rather than logging them in from a link.
-        setToken(null); setDone(true); setPassword('');
+        setToken(null); setDone(true); setPassword(''); setMode('password');
+      } else if (mode === 'link') {
+        await api.requestLoginLink(email.trim());
+        setSent(true);
       } else if (mode === 'forgot') {
         await api.requestPasswordReset(email.trim());
         setSent(true);
@@ -733,26 +750,42 @@ function Login({ onDone }: { onDone: () => void }) {
     }
   }
 
+  // While a link from the inbox is being exchanged for a session.
+  if (signingIn) {
+    return (
+      <div className="gate">
+        <div>
+          <span className="eyebrow">Front Desk</span>
+          <h1 className="display" style={{ fontSize: 'var(--h2)', margin: '2px 0 10px' }}>Signing you in…</h1>
+        </div>
+      </div>
+    );
+  }
+
   // Deliberately the same words whether or not that address has an account.
   if (sent) {
+    const forReset = mode === 'forgot';
     return (
       <div className="gate">
         <div>
           <span className="eyebrow">Front Desk</span>
           <h1 className="display" style={{ fontSize: 'var(--h2)', margin: '2px 0 10px' }}>Check your email</h1>
           <p className="appear-note">
-            If <strong>{email.trim()}</strong> has an account, a link to set a new password is on
-            its way. It works once and expires in an hour.
+            If <strong>{email.trim()}</strong> has an account, {forReset
+              ? 'a link to set a new password is on its way. It works once and expires in an hour.'
+              : 'a sign-in link is on its way. It works once and expires in 15 minutes.'}
           </p>
-          <button className="btn-ghost" onClick={() => { setSent(false); setMode('in'); }}>
-            Back to sign in
+          <button className="btn-ghost" onClick={() => { setSent(false); setMode('link'); setErr(''); }}>
+            Back
           </button>
         </div>
       </div>
     );
   }
 
-  const heading = token ? 'Choose a new password' : mode === 'forgot' ? 'Reset your password' : 'Sign in';
+  const heading = token ? 'Choose a new password'
+    : mode === 'forgot' ? 'Reset your password'
+    : 'Sign in';
 
   return (
     <div className="gate">
@@ -770,7 +803,8 @@ function Login({ onDone }: { onDone: () => void }) {
           </label>
         )}
 
-        {mode !== 'forgot' && (
+        {/* No password field in link mode: the whole point is not having one. */}
+        {(token || mode === 'password') && (
           <label className="fb-field">
             <span className="label">{token ? 'New password' : 'Password'}</span>
             <input type="password" required autoFocus={!!token}
@@ -786,14 +820,35 @@ function Login({ onDone }: { onDone: () => void }) {
         <button className="btn-primary" type="submit" disabled={busy}>
           {busy ? 'Working…'
             : token ? 'Set password'
-            : mode === 'forgot' ? 'Email me a link'
+            : mode === 'link' ? 'Email me a sign-in link'
+            : mode === 'forgot' ? 'Email me a reset link'
             : 'Sign in'}
         </button>
 
-        {!token && (
+        {/* A link is the default way in. Password stays for anyone who prefers it, and as a
+            way back when mail is slow or the shop's filter eats the message. */}
+        {!token && mode === 'link' && (
           <button type="button" className="btn-ghost"
-                  onClick={() => { setMode(mode === 'forgot' ? 'in' : 'forgot'); setErr(''); }}>
-            {mode === 'forgot' ? 'Back to sign in' : 'Forgot your password?'}
+                  onClick={() => { setMode('password'); setErr(''); }}>
+            Use a password instead
+          </button>
+        )}
+        {!token && mode === 'password' && (
+          <>
+            <button type="button" className="btn-ghost"
+                    onClick={() => { setMode('link'); setErr(''); }}>
+              Email me a link instead
+            </button>
+            <button type="button" className="btn-ghost"
+                    onClick={() => { setMode('forgot'); setErr(''); }}>
+              Forgot your password?
+            </button>
+          </>
+        )}
+        {!token && mode === 'forgot' && (
+          <button type="button" className="btn-ghost"
+                  onClick={() => { setMode('link'); setErr(''); }}>
+            Back to sign in
           </button>
         )}
       </form>

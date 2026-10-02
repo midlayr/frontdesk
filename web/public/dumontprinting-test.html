@@ -81,6 +81,27 @@
   .arrow{margin-left:auto;font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;
          color:var(--accent-deep);white-space:nowrap}
 
+
+  /* quote form */
+  .qf{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;margin-top:22px}
+  .qf label{display:flex;flex-direction:column;gap:5px;font:500 10.5px var(--mono);
+            letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .qf input,.qf textarea,.qf select{border:1px solid var(--line);border-radius:var(--radius);
+       padding:9px 10px;font:15px var(--body);color:var(--ink);background:#fff;width:100%}
+  .qf input:focus,.qf textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .qf textarea{min-height:88px;resize:vertical}
+  .qf .wide{grid-column:1 / -1}
+  .qf button{grid-column:1 / -1;justify-self:start;background:var(--accent);color:#fff;
+       border:1px solid var(--accent-deep);border-radius:var(--radius);padding:11px 22px;
+       font:600 14px var(--body);cursor:pointer}
+  .qf button:disabled{opacity:.55;cursor:default}
+  /* the honeypot: off-screen, not display:none — some bots skip hidden fields */
+  .qf .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+  .qf-done{border:1px solid var(--accent);background:var(--accent-tint);padding:18px 20px;
+           margin-top:22px;font-size:15px}
+  .qf-done b{font-family:var(--mono);font-weight:500}
+  @media (max-width:720px){ .qf{grid-template-columns:1fr} }
+
   footer{border-top:1px solid var(--line);padding:34px 0 104px;color:var(--ink-2);font-size:13.5px}
   .fgrid{display:flex;gap:46px;flex-wrap:wrap}
   footer strong{display:block;color:var(--ink);font-weight:600;margin-bottom:4px}
@@ -166,8 +187,24 @@
       <div>
         <span class="label">Quotes</span>
         <h2 style="margin-top:8px">Tell us what you need printed.</h2>
-        <p>Most quotes come back the same working day. Start in the chat, or call the shop.</p>
+        <p>Most quotes come back the same working day. Fill this in, or start a chat.</p>
       </div>
+
+      <form class="qf wide" id="qf" novalidate>
+        <label class="wide">What do you need printed?
+          <textarea name="What do you need printed?" required
+            placeholder="3 hanging banners, 10ft x 3ft, scrim vinyl, grommets top and bottom"></textarea></label>
+        <label>How many do you need?<input name="How many do you need?" placeholder="1,000"></label>
+        <label>When do you need it?<input name="When do you need it?" placeholder="Thursday 7/30 — hard date"></label>
+        <label>Company<input name="Company" placeholder="Valley Ag Supply"></label>
+        <label>Your name<input name="Your name" required placeholder="Curt Brenneman"></label>
+        <label>Email<input name="Email" type="email" required placeholder="you@company.com"></label>
+        <label>Phone<input name="Phone" placeholder="(559) 555-0119"></label>
+        <label class="wide">Anything else?
+          <textarea name="Anything else?" placeholder="Reprint of a prior job, budget, delivery notes"></textarea></label>
+        <label class="hp" aria-hidden="true" tabindex="-1">Leave this empty<input name="_hp" tabindex="-1" autocomplete="off"></label>
+        <button type="submit">Request a quote</button>
+      </form>
     </div>
   </div>
 </section>
@@ -184,6 +221,43 @@
 </footer>
 
 <!-- The entire integration. One tag, no framework, no build step. -->
+
+<script>
+  // Posts to the same Worker the chat widget talks to. One endpoint, no backend of its own:
+  // a real shop would paste this form into their site and point it at /hooks/form.
+  (function () {
+    var f = document.getElementById('qf');
+    if (!f) return;
+    f.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var btn = f.querySelector('button');
+      btn.disabled = true; btn.textContent = 'Sending…';
+      var payload = { org: 'dumont' };
+      new FormData(f).forEach(function (v, k) { payload[k] = v; });
+      try {
+        var r = await fetch('/hooks/form', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        var j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Something went wrong');
+        var done = document.createElement('div');
+        done.className = 'qf-done';
+        done.innerHTML = j.ticket
+          ? 'Thanks — your request is in as <b>' + j.ticket + '</b>. We will come back to you today.'
+          : 'Thanks — your request is in. We will come back to you today.';
+        f.replaceWith(done);
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Request a quote';
+        var p = f.querySelector('.qf-err') || document.createElement('p');
+        p.className = 'qf-err wide'; p.style.color = '#B4261B'; p.style.margin = '0';
+        p.textContent = String(err.message || err);
+        f.insertBefore(p, btn);
+      }
+    });
+  })();
+</script>
+
 <script src="/w.js" data-org="dumont" data-flow="quote-intake" async></script>
 </body>
 </html>

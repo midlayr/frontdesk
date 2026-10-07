@@ -50,6 +50,18 @@ function urgency(l: Lead): { color: string; label: string } {
   return { color: 'transparent', label: l.status };
 }
 
+/** How a date reads to someone deciding what to do next, rather than as a date. */
+function dueLabel(l: Lead): { text: string; late: boolean } {
+  if (!l.deadline_at) return { text: 'no date set', late: false };
+  const d = new Date(l.deadline_at);
+  const days = Math.round((d.getTime() - Date.now()) / 86_400_000);
+  const when = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  if (days < 0) return { text: `${when} — ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`, late: true };
+  if (days === 0) return { text: `${when} — today`, late: true };
+  if (days === 1) return { text: `${when} — tomorrow`, late: false };
+  return { text: `${when} — ${days} days`, late: false };
+}
+
 function age(iso: string) {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
   if (m < 60) return `${m}m`;
@@ -64,13 +76,58 @@ function summarise(l: Lead) {
   const head = l.description
     ? l.description
     : [l.qty ?? null, l.stock ?? l.product ?? null].filter(Boolean).join(' · ');
-  const tail = [l.finish, l.color, l.size].filter(Boolean).join(', ');
-  return { head: head || 'no specs yet', tail };
+  return { head: head || 'no specs yet' };
 }
+
+/**
+ * Whose turn it is — the one question a rep is actually asking while scanning.
+ *
+ * The queue used to answer it nowhere: a ticket where the customer replied an hour ago and
+ * one where we are waiting on them looked identical, so every row had to be opened to find
+ * out. Everything needed was already on the row.
+ */
+function turn(l: Lead): { who: 'us' | 'them' | null; label: string } {
+  if (l.status === 'live') return { who: 'us', label: 'In chat' };
+  if (l.status === 'won' || l.status === 'lost' || l.status === 'closed' || l.status === 'spam') {
+    return { who: null, label: '' };
+  }
+  // Something inbound arrived after our last reply — or we have never replied at all.
+  const lastIn = l.last_in_at ? new Date(l.last_in_at).getTime() : null;
+  const ourReply = l.first_reply_at ? new Date(l.first_reply_at).getTime() : null;
+  if (ourReply === null) return { who: 'us', label: 'Not answered' };
+  if (lastIn !== null && lastIn > ourReply) return { who: 'us', label: 'They replied' };
+  return { who: 'them', label: 'Waiting on them' };
+}
+
+/** Owner, value and due date — what a rep wants on a row they are not opening. */
+function rowFacts(l: Lead, users: OrgUser[]): string {
+  const out: string[] = [];
+  const owner = users.find((u) => u.id === l.assignee_id);
+  if (owner) out.push((owner.name || owner.email).split(/\s+/)[0]);
+  else out.push('Unassigned');
+  if (l.quote_amount != null) {
+    out.push('$' + Number(l.quote_amount).toLocaleString('en-US', { maximumFractionDigits: 0 }));
+  }
+  if (l.deadline_at) {
+    const d = new Date(l.deadline_at);
+    const days = Math.round((d.getTime() - Date.now()) / 86_400_000);
+    out.push(days < 0 ? `${Math.abs(days)}d overdue`
+           : days === 0 ? 'due today'
+           : days === 1 ? 'due tomorrow'
+           : `due ${d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}`);
+  }
+  return out.join(' · ');
+}
+
+/** Finished work. Reachable from the rail, but not padding the live queue. */
+const CLOSED = new Set(['won', 'lost', 'closed', 'spam']);
 
 function matches(l: Lead, v: View) {
   if (v === 'Archived') return true;   // the server already filtered to archived rows
-  if (v === 'All') return true;
+  // "All" means everything still in play. Three won jobs from last year were sitting
+  // between today's work and pushing it below the fold; closed work is history, and
+  // history has its own views.
+  if (v === 'All') return !CLOSED.has(l.status);
   if (v === 'Rush') return l.rush;
   if (v === 'Mine') return l.assignee_id === userId;
   return l.status === STATUS_OF[v];
@@ -229,15 +286,32 @@ export function App() {
         .some((v) => v?.toLowerCase().includes(q))));
   }, [leads, view, query]);
 
+  /**
+   * Headings that are true.
+   *
+   * The last bucket was labelled "Today" and held everything that was neither live nor
+   * rush — including jobs 265 days old. A heading that confidently misreports is worse
+   * than none, so the rest of the queue is now split by when something last came in.
+   */
   const groups = useMemo(() => {
+    const when = (l: Lead) => new Date(l.last_in_at ?? l.created_at).getTime();
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    const weekAgo = Date.now() - 7 * 86_400_000;
+
     const inChat = shown.filter((l) => l.status === 'live');
-    const rush = shown.filter((l) => l.rush && l.status !== 'live');
-    const rest = shown.filter((l) => !l.rush && l.status !== 'live');
+    const open = shown.filter((l) => l.status !== 'live');
+    const rush = open.filter((l) => l.rush);
+    const rest = open.filter((l) => !l.rush);
+
     return [
       { title: `In chat now · ${inChat.length}`, rows: inChat },
       { title: `Rush · ${rush.length}`, rows: rush },
-      { title: `Today · ${rest.length}`, rows: rest },
-    ].filter((g) => g.rows.length);
+      { title: 'Today', rows: rest.filter((l) => when(l) >= startOfToday.getTime()) },
+      { title: 'This week', rows: rest.filter((l) => when(l) < startOfToday.getTime() && when(l) >= weekAgo) },
+      { title: 'Older', rows: rest.filter((l) => when(l) < weekAgo) },
+    ]
+      .map((g) => ({ ...g, title: g.title.includes('·') ? g.title : `${g.title} · ${g.rows.length}` }))
+      .filter((g) => g.rows.length);
   }, [shown]);
 
   // Arrived since the rep last acknowledged the queue. Survives reconnects because it is
@@ -419,6 +493,7 @@ export function App() {
               {g.rows.map((l) => {
                 const s = summarise(l);
                 const u = urgency(l);
+                const t = turn(l);
                 const hot = l.status === 'live' || isFresh(l);
                 return (
                   <button key={l.id}
@@ -431,13 +506,17 @@ export function App() {
                       {l.rush && <span className="tag rush">Rush</span>}
                       {l.status === 'live' && <span className="tag live">Live</span>}
                       <span className="name">{l.contact_name ?? l.contact_email ?? l.contact_phone ?? 'Anonymous'}</span>
-                      <span className="age">{age(l.created_at)}</span>
+                      {t.who && <span className={`turn ${t.who}`}>{t.label}</span>}
+                      <span className="age">{age(l.last_in_at ?? l.created_at)}</span>
                     </div>
                     <div className="r2">
                       <span className="tag" style={{ marginRight: 6 }}>{CHANNEL_TAG[l.channel] ?? l.channel}</span>
                       {s.head}
                     </div>
-                    {s.tail && <div className="r3">{s.tail}</div>}
+                    {/* Owner, money and due date rather than a second line of spec: the
+                        finish and the trim size are visible the moment the ticket opens,
+                        and none of them help decide whether to open it. */}
+                    <div className="r3">{rowFacts(l, users)}</div>
                   </button>
                 );
               })}
@@ -635,6 +714,21 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
                     onSave={(v) => onPatch({ contact: { email: v } })} />
           <EditCell leadId={l.id} label="phone" value={l.contact_phone} placeholder="phone"
                     onSave={(v) => onPatch({ contact: { phone: v } })} />
+        </div>
+
+        {/* When it is needed, on the job itself. It drove the coloured bar in the queue and
+            appeared nowhere on the ticket — the one fact that makes a job urgent was the one
+            a rep could not see once they opened it. */}
+        <div className="section">When</div>
+        <div className="spec">
+          <EditCell leadId={l.id} label="needed" type="date"
+                    value={l.deadline_at ? l.deadline_at.slice(0, 10) : null}
+                    placeholder="no date yet"
+                    onSave={(v) => onPatch({ deadline_at: v ? new Date(v + 'T14:00:00').toISOString() : null })} />
+          <div className="scell">
+            <span className="label">status</span>
+            <span className={`val${dueLabel(l).late ? ' late' : ''}`}>{dueLabel(l).text}</span>
+          </div>
         </div>
 
         <div className="section">Spec</div>

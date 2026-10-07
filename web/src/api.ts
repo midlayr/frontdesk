@@ -6,6 +6,7 @@ export interface Lead {
   /** A short human name for the job — the shop's own words, as on their job jacket. */
   description: string | null;
   product: string | null; qty: number | null; size: string | null;
+  quote_amount: string | number | null;
   stock: string | null; color: string | null; finish: string | null;
   confidence: Record<string, number>; missing_fields: string[];
   intent_score: number | null; first_reply_at: string | null; created_at: string;

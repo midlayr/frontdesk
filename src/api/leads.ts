@@ -24,6 +24,8 @@ leads.get('/', async (c) => {
   const rows = await withOrg(c.get('sql'), org.id, (tx) => tx`
     SELECT l.id, l.ticket_no, l.channel, l.status, l.rush, l.deadline_at, l.assignee_id,
            l.description, l.product, l.qty, l.size, l.stock, l.color, l.finish,
+           -- the queue shows money on a row now, so it has to come down with the list
+           l.quote_amount,
            l.confidence, l.intent_score, l.first_reply_at, l.created_at, l.updated_at, l.archived_at,
            -- newest inbound timestamp: lets the queue pulse a row that just got a reply,
            -- which updated_at alone would miss when only messages changed

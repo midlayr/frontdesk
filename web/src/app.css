@@ -778,3 +778,14 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .fb-grip{font:13px/1 var(--font-mono);color:var(--ink-3);letter-spacing:-1px;cursor:grab;user-select:none}
 .fb-card[data-on="true"] .fb-grip{color:var(--ink-2)}
 .fb-edge-default .fb-edge-chip{background:var(--paper-2);border-style:dashed;color:var(--ink-2)}
+
+/* ── whose turn it is ─────────────────────────────────────────────────
+   The one thing a rep is scanning for. Amber when the ball is with us,
+   quiet grey when we are waiting on the customer — the asymmetry is the
+   point: only one of the two is a thing to act on. */
+.turn{font:500 10px var(--font-mono);letter-spacing:.06em;text-transform:uppercase;
+      padding:1px 6px;border-radius:2px;white-space:nowrap}
+.turn.us{color:var(--warn);background:#FDF4E7}
+.turn.them{color:var(--ink-3);background:var(--paper-2)}
+.row .r3{font:12px var(--font-body);color:var(--ink-3);margin-top:2px}
+.scell .val.late{color:var(--rush);font-weight:500}

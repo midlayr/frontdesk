@@ -57,6 +57,14 @@ export type Step =
        * in order, which is what every flow did before branching existed.
        */
       next?: Record<string, string>;
+      /**
+       * Where an answer with no edge of its own goes: an ask id, or 'ticket' to finish.
+       *
+       * Without this a question that takes typed text can only ever lead to the next one in
+       * order, because every route is keyed on a quick-reply label and typing matches none
+       * of them. Absent, the old behaviour stands — fall through to the following question.
+       */
+      otherwise?: string;
     }
   | { kind: 'rule'; words: string; handoff: string; route: string }
   | { kind: 'ticket'; text: string };

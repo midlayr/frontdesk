@@ -70,12 +70,14 @@ export function fallThrough(steps: Step[], cur: Ask): Ask | null {
  */
 export function nextAfter(steps: Step[], cur: Ask | null, answer: string): Ask | null {
   if (!cur) return null;
-  const edge = cur.next?.[answer];
+  const edge = cur.next?.[answer] ?? cur.otherwise;
   if (edge === TO_TICKET) return null;
   if (edge) {
     const target = askById(steps, edge);
     if (target) return target;
   }
+  // No edge, or one pointing at a question since deleted: the following question. A
+  // half-edited flow should still carry the visitor to a ticket.
   return fallThrough(steps, cur);
 }
 
@@ -170,10 +172,11 @@ export function simulate(steps: Step[], said: string[]): Advance & { chips: stri
 export function edgesFrom(steps: Step[], a: Ask): { label: string | null; to: Ask | null }[] {
   const labels = labelsOf(a);
   const out: { label: string | null; to: Ask | null }[] = [];
-  // Free text always exists as a path: no chip matches it, so it falls through. The only
-  // case where it cannot happen is a question whose every label is pinned somewhere else
-  // AND which the visitor can only answer by tapping — which the widget does not enforce.
-  out.push({ label: null, to: fallThrough(steps, a) });
+  // Free text always exists as a path: no chip matches it, so it takes the question's own
+  // 'otherwise' if it has one, and the following question if it does not. The only case
+  // where it cannot happen is a question whose every label is pinned somewhere else AND
+  // which the visitor can only answer by tapping — which the widget does not enforce.
+  out.push({ label: null, to: nextAfter(steps, a, '\u0000no chip matches this\u0000') });
   for (const l of labels) out.push({ label: l, to: nextAfter(steps, a, l) });
   return out;
 }

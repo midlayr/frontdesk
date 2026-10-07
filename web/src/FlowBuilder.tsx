@@ -106,6 +106,28 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
     });
   }
 
+  /**
+   * Drag to reorder.
+   *
+   * Safe because a branch names its target by ask id, not by position — a question keeps
+   * every route pointing at it when it moves, and keeps its own. Reordering in most builders
+   * silently reroutes branches; here it cannot. The arrow buttons stay for keyboard users
+   * and for anyone who finds a five-pixel drop zone unkind.
+   */
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
+  function reorder(from: number, to: number) {
+    setSteps((prev) => {
+      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);   // move, not swap: dragging past two rows should pass both
+      setSel(to);
+      return next;
+    });
+  }
+
   function move(dir: -1 | 1) {
     setSteps((prev) => {
       const to = sel + dir;
@@ -192,9 +214,31 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
             const on = i === sel;
             return (
               <div key={i} className="fb-card" data-on={on}
+                   draggable
+                   onDragStart={(e) => {
+                     // The index rides on the drag itself, not only in React state: the
+                     // drop handler is a closure from the render that was current when the
+                     // drag began, and nothing guarantees a re-render lands between
+                     // dragstart and drop. State here is for the visuals; this is the truth.
+                     e.dataTransfer.setData('text/plain', String(i));
+                     e.dataTransfer.effectAllowed = 'move';
+                     setDragFrom(i);
+                   }}
+                   onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dragOver !== i) setDragOver(i); }}
+                   onDragLeave={() => { if (dragOver === i) setDragOver(null); }}
+                   onDrop={(e) => {
+                     e.preventDefault();
+                     const carried = Number(e.dataTransfer.getData('text/plain'));
+                     const from = Number.isInteger(carried) ? carried : dragFrom;
+                     if (from !== null && from >= 0) reorder(from, i);
+                     setDragFrom(null); setDragOver(null);
+                   }}
+                   onDragEnd={() => { setDragFrom(null); setDragOver(null); }}
+                   data-drag={dragFrom === i ? 'from' : dragOver === i && dragFrom !== null ? 'over' : undefined}
                    style={{ borderColor: on ? 'var(--ink)' : 'var(--line)', borderLeftColor: on ? k.color : 'var(--line)' }}
                    onClick={() => setSel(i)}>
                 <div className="fb-card-top">
+                  <span className="fb-grip" title="Drag to reorder" aria-hidden="true">⠿</span>
                   <span className="fb-n">{String(i + 1).padStart(2, '0')}</span>
                   <span className="fb-kind" style={{ color: k.color }}>{k.label}</span>
                   <span className="fb-ctl">
@@ -252,32 +296,49 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
                     <span>Allow skipping this question</span>
                   </label>
 
-                  {labelsOf(current).length > 0 && (
-                    <div className="fb-field">
-                      <span className="label">
-                        Where each reply goes
-                        <i> · anything typed instead follows the default</i>
-                      </span>
-                      <div className="fb-edges">
-                        {labelsOf(current).map((label) => (
-                          <div key={label} className="fb-edge">
-                            <span className="fb-edge-chip">{label}</span>
-                            <span className="fb-edge-arrow">→</span>
-                            <select value={current.next?.[label] ?? ''}
-                                    onChange={(e) => setEdge(label, e.target.value)}>
-                              <option value="">Next question in order</option>
-                              {targets.filter((t) => t.id !== current.id).map((t) => (
-                                <option key={t.id} value={t.id}>
-                                  {String(t.n).padStart(2, '0')} · {t.prompt.length > 42 ? t.prompt.slice(0, 42) + '…' : t.prompt}
-                                </option>
-                              ))}
-                              <option value={TO_TICKET}>Create the ticket and finish</option>
-                            </select>
-                          </div>
-                        ))}
+                  {/* Always shown, chips or not. A question answered by typing has no chip
+                      to hang a route on, so without the "Anything else" row below it could
+                      only ever lead to the question after it. */}
+                  <div className="fb-field">
+                    <span className="label">
+                      Where the answer goes
+                      {labelsOf(current).length > 0
+                        ? <i> · a quick reply with its own route wins</i>
+                        : <i> · this question is answered by typing</i>}
+                    </span>
+                    <div className="fb-edges">
+                      {labelsOf(current).map((label) => (
+                        <div key={label} className="fb-edge">
+                          <span className="fb-edge-chip">{label}</span>
+                          <span className="fb-edge-arrow">→</span>
+                          <select value={current.next?.[label] ?? ''}
+                                  onChange={(e) => setEdge(label, e.target.value)}>
+                            <option value="">Follow "anything else"</option>
+                            {targets.filter((t) => t.id !== current.id).map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {String(t.n).padStart(2, '0')} · {t.prompt.length > 42 ? t.prompt.slice(0, 42) + '…' : t.prompt}
+                              </option>
+                            ))}
+                            <option value={TO_TICKET}>Create the ticket and finish</option>
+                          </select>
+                        </div>
+                      ))}
+                      <div className="fb-edge fb-edge-default">
+                        <span className="fb-edge-chip">Anything else</span>
+                        <span className="fb-edge-arrow">→</span>
+                        <select value={current.otherwise ?? ''}
+                                onChange={(e) => update({ otherwise: e.target.value || undefined })}>
+                          <option value="">Next question in order</option>
+                          {targets.filter((t) => t.id !== current.id).map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {String(t.n).padStart(2, '0')} · {t.prompt.length > 42 ? t.prompt.slice(0, 42) + '…' : t.prompt}
+                            </option>
+                          ))}
+                          <option value={TO_TICKET}>Create the ticket and finish</option>
+                        </select>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </>
               )}
 

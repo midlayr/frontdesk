@@ -11,6 +11,7 @@ const DEFAULT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 // Mirrors the spec columns on leads. Everything is nullable: a first text rarely has it all,
 // and a guessed value is worse than a gap the rep can see.
 const Spec = z.object({
+  description: z.string().nullable(),
   product: z.string().nullable(),
   qty: z.number().int().positive().nullable(),
   size: z.string().nullable(),
@@ -28,6 +29,10 @@ const SPECIFIED: (keyof Spec)[] = ['product', 'qty', 'size', 'stock', 'color', '
 const JSON_SCHEMA = {
   type: 'object',
   properties: {
+    // Deliberately not "product plus quantity": the shop's own job jacket leads with a
+    // short human name for the work ("Wedding Menu & Placards"), sometimes broader than the
+    // product and sometimes, in their words, as generic as "Business Cards".
+    description: { type: ['string', 'null'], description: 'a short name for the job as a person would say it, 2-5 words, title case, e.g. "Wedding Menus & Placards", "Trail Map Posters", "Business Cards". No quantities, no sizes.' },
     product: { type: ['string', 'null'], description: 'what is being printed, e.g. business cards, banner, flyers' },
     qty: { type: ['integer', 'null'] },
     size: { type: ['string', 'null'], description: 'trim or finished size as written, e.g. 3.5x2, 24x36' },
@@ -38,7 +43,7 @@ const JSON_SCHEMA = {
     notes: { type: ['string', 'null'], description: 'anything else the rep needs' },
     confidence: { type: 'object', additionalProperties: { type: 'number' } },
   },
-  required: ['product', 'qty', 'size', 'stock', 'color', 'finish', 'rush', 'notes', 'confidence'],
+  required: ['description', 'product', 'qty', 'size', 'stock', 'color', 'finish', 'rush', 'notes', 'confidence'],
 } as const;
 
 const SYSTEM = [
@@ -155,6 +160,10 @@ export async function extractSpecs(env: Env, sql: Sql, orgId: string, leadId: st
   await withOrg(sql, orgId, async (tx) => {
     await tx`
       UPDATE leads SET
+        -- Only ever fills a blank. A rep's description is the shop's own language for the
+        -- job and a later message must not quietly reword it — unlike the spec fields,
+        -- where "actually make that 1000" genuinely should overwrite.
+        description    = COALESCE(description, ${spec.description}),
         product        = COALESCE(${val('product', spec.product)}, product),
         qty            = COALESCE(${val('qty', spec.qty)}, qty),
         size           = COALESCE(${val('size', spec.size)}, size),

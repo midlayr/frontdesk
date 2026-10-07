@@ -1,4 +1,4 @@
-import { simulate, loopingAsks, resume, emptyState } from '../src/flow-engine';
+import { simulate, loopingAsks, resume, emptyState, edgesFrom, asksOf } from '../src/flow-engine';
 import type { Step } from '../src/env';
 
 let pass = 0, fail = 0;
@@ -80,6 +80,45 @@ const mutual: Step[] = [
   { kind: 'ticket', text: 'E' },
 ];
 eq('two questions pointing at each other are reported', [...loopingAsks(mutual)].sort(), ['f1']);
+
+// A typed answer has no chip to key a route on, so before `otherwise` a free-text question
+// could only ever lead to the question after it. This is the case Summer hit.
+const typed: Step[] = [
+  { kind: 'ask', id: 't1', prompt: 'What are we printing?', field: 'product',
+    otherwise: 't3' },
+  { kind: 'ask', id: 't2', prompt: 'Skipped unless something routes here', field: 'unused' },
+  { kind: 'ask', id: 't3', prompt: 'When do you need it?', field: 'deadline' },
+  { kind: 'ask', id: 't4', prompt: 'Your email?', field: 'email', otherwise: 'ticket' },
+  { kind: 'ticket', text: 'Done.' },
+];
+
+console.log('a typed answer with a default destination');
+eq('free text follows otherwise instead of the next question',
+   bot(simulate(typed, ['500 business cards'])),
+   ['What are we printing?', 'When do you need it?']);
+eq('otherwise can end the flow',
+   bot(simulate(typed, ['500 business cards', 'Friday', 'me@co.test'])),
+   ['What are we printing?', 'When do you need it?', 'Your email?', 'Done.']);
+eq('a flow with otherwise still completes', simulate(typed, ['x', 'y', 'z']).completed, true);
+
+// A chip that names a destination still wins; otherwise is only the fallback.
+const mixed: Step[] = [
+  { kind: 'ask', id: 'm1', prompt: 'Which?', field: 'product',
+    chips: 'Banners', next: { Banners: 'm3' }, otherwise: 'm4' },
+  { kind: 'ask', id: 'm2', prompt: 'Never reached in order', field: 'a' },
+  { kind: 'ask', id: 'm3', prompt: 'Banner size?', field: 'size' },
+  { kind: 'ask', id: 'm4', prompt: 'Tell me more', field: 'notes' },
+  { kind: 'ticket', text: 'Done.' },
+];
+eq('a chip edge beats otherwise', bot(simulate(mixed, ['Banners'])), ['Which?', 'Banner size?']);
+eq('anything else takes otherwise', bot(simulate(mixed, ['something typed'])), ['Which?', 'Tell me more']);
+eq('the map shows otherwise as the no-chip route',
+   edgesFrom(mixed, asksOf(mixed)[0]).find((e) => e.label === null)?.to?.prompt, 'Tell me more');
+eq('otherwise pointing at a deleted question falls through',
+   bot(simulate([{ kind: 'ask', id: 'z1', prompt: 'One', field: 'a', otherwise: 'gone' },
+                 { kind: 'ask', id: 'z2', prompt: 'Two', field: 'b' },
+                 { kind: 'ticket', text: 'Done.' }], ['x'])),
+   ['One', 'Two']);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

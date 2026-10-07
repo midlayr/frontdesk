@@ -11,6 +11,12 @@ export type Step =
       skippable?: boolean;
       /** Chip label (or 'Skip') → an ask id, or 'ticket' to finish there. */
       next?: Record<string, string>;
+      /**
+       * Where an answer with no route of its own goes: an ask id, or 'ticket'.
+       * A typed answer matches no chip, so without this a free-text question could only
+       * ever lead to the one after it.
+       */
+      otherwise?: string;
     }
   | { kind: 'rule'; words: string; handoff: string; route: string; afterHours?: boolean }
   | { kind: 'ticket'; text: string };
@@ -113,7 +119,17 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return r.json() as Promise<T>;
 }
 
+export interface FlowSummary {
+  slug: string; name: string; version: number; questions: number;
+  published_at: string | null; updated_at: string; live: boolean;
+}
+
 export const flowsApi = {
+  list: () => call<{ flows: FlowSummary[] }>('/api/flows').then((r) => r.flows),
+  create: (name: string, slug: string) =>
+    call<{ ok: true; slug: string }>('/api/flows', { method: 'POST', body: JSON.stringify({ name, slug }) }),
+  pause: (slug: string) =>
+    call<{ ok: true; live: false }>(`/api/flows/${slug}/pause`, { method: 'POST' }),
   get: (slug: string) => call<Flow>(`/api/flows/${slug}`),
   save: (slug: string, name: string, steps: Step[]) =>
     call<{ ok: true; version: number }>(`/api/flows/${slug}`, { method: 'PUT', body: JSON.stringify({ name, steps }) }),

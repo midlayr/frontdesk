@@ -3,6 +3,8 @@
 export interface Lead {
   id: string; ticket_no: string; channel: string; status: string; rush: boolean;
   deadline_at: string | null; assignee_id: string | null;
+  /** A short human name for the job — the shop's own words, as on their job jacket. */
+  description: string | null;
   product: string | null; qty: number | null; size: string | null;
   stock: string | null; color: string | null; finish: string | null;
   confidence: Record<string, number>; missing_fields: string[];

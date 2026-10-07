@@ -1,8 +1,9 @@
 import { ulid } from 'ulid';
-import type { Env } from '../env';
+import type { Env, Org } from '../env';
 import { connect, withOrg, type Sql, type Tx } from '../db';
 import { sendSms } from '../lib/twilio';
 import { sendEmail } from '../lib/mailgun';
+import { render as letter } from '../lib/email-layout';
 import { enroll } from '../lib/enroll';
 import {
   DEFAULT_WINDOW, evaluate, fill, heldReason, nextOpen, stopReason,
@@ -230,8 +231,10 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
       return 'held';
     }
 
-    const [org] = await tx<{ name: string; comms: Record<string, string> }[]>`
-      SELECT name, comms FROM orgs WHERE id = ${d.org_id}`;
+    // brand, slug and the rest come along because the email layout needs the shop's own
+    // colours and mark — a follow-up should look like the shop, not like the platform.
+    const [org] = await tx<Org[]>`
+      SELECT id, slug, name, brand, comms, widget, features FROM orgs WHERE id = ${d.org_id}`;
 
     let providerId: string | null = null;
     if (kind === 'sms') {
@@ -247,11 +250,19 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
       if (!d.email) { await hold(tx, d, 'missing:{email}'); return 'held'; }
       const display = d.send_as === 'rep' && d.rep_name ? d.rep_name : org.name;
       const sender = org.comms.email_sender || `${d.org_id}@${env.MAILGUN_DOMAIN}`;
+      // 'message' as well: a follow-up is written as if a rep typed it, and dressing it as
+      // a campaign is the fastest way to have it read as one and filed accordingly.
+      const mail = letter({
+        variant: 'message',
+        body: body.text.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean),
+        signature: display,
+      }, org, env);
       const sent = await sendEmail(env, {
         from: `${display} <${sender}>`,
         to: d.email,
         subject: subject.text || `About your enquiry · ${d.ticket_no}`,
         text: body.text,
+        html: mail.html,
         replyTo: org.comms.email_inbound ?? sender,
       });
       providerId = sent.id;

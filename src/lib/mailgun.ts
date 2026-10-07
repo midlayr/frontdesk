@@ -48,6 +48,8 @@ export interface Outgoing {
   to: string;
   subject: string;
   text: string;
+  /** The branded part. Always sent with `text` beside it, never instead of it. */
+  html?: string | null;
   /** Where the customer's reply should go — our inbound address, so it threads back. */
   replyTo?: string | null;
   /** Threading: the message we are answering, so the customer's client nests the reply. */
@@ -73,6 +75,8 @@ export async function sendEmail(env: Env, m: Outgoing): Promise<Sent> {
   form.set('to', m.to);
   form.set('subject', m.subject);
   form.set('text', m.text);
+  // Multipart: clients that prefer plain text, and readers who do, still get a whole letter.
+  if (m.html) form.set('html', m.html);
   if (m.replyTo) form.set('h:Reply-To', m.replyTo);
   if (m.inReplyTo) form.set('h:In-Reply-To', m.inReplyTo);
   if (m.references?.length) form.set('h:References', m.references.join(' '));

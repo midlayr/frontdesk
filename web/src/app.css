@@ -758,3 +758,23 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .hz{grid-template-columns:auto 1fr;row-gap:4px}
   .hz-note,.hz-ms{grid-column:2}
 }
+
+/* ── the list of bots ─────────────────────────────────────────────────── */
+.flowlist{padding:4px 2px 28px}
+.flow-open{background:none;border:0;padding:0;font:600 14.5px var(--font-body);
+           color:var(--ink);cursor:pointer;text-align:left}
+.flow-open:hover{text-decoration:underline;text-underline-offset:2px}
+.flow-embed{margin:12px 0 0;padding:9px 11px;background:var(--paper-2);
+            border:1px solid var(--line);border-radius:var(--radius);
+            font:11.5px/1.5 var(--font-mono);color:var(--ink-2);word-break:break-all}
+
+/* ── drag to reorder questions ────────────────────────────────────────
+   Branches name their target by ask id, so moving a question never
+   reroutes anything — the drop zone is the only thing that has to be
+   clear. */
+.fb-card[draggable="true"]{cursor:grab}
+.fb-card[data-drag="from"]{opacity:.4;cursor:grabbing}
+.fb-card[data-drag="over"]{box-shadow:inset 0 3px 0 var(--accent)}
+.fb-grip{font:13px/1 var(--font-mono);color:var(--ink-3);letter-spacing:-1px;cursor:grab;user-select:none}
+.fb-card[data-on="true"] .fb-grip{color:var(--ink-2)}
+.fb-edge-default .fb-edge-chip{background:var(--paper-2);border-style:dashed;color:var(--ink-2)}

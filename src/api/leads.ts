@@ -6,6 +6,7 @@ import { withOrg, type Sql } from '../db';
 import { sendSms } from '../lib/twilio';
 import { messagingFor, render } from '../lib/messaging';
 import { sendEmail } from '../lib/mailgun';
+import { render as letter } from '../lib/email-layout';
 import { enrollLead } from './sequences';
 
 type Vars = { org: Org; sql: Sql; userId: string };
@@ -22,7 +23,7 @@ leads.get('/', async (c) => {
 
   const rows = await withOrg(c.get('sql'), org.id, (tx) => tx`
     SELECT l.id, l.ticket_no, l.channel, l.status, l.rush, l.deadline_at, l.assignee_id,
-           l.product, l.qty, l.size, l.stock, l.color, l.finish,
+           l.description, l.product, l.qty, l.size, l.stock, l.color, l.finish,
            l.confidence, l.intent_score, l.first_reply_at, l.created_at, l.updated_at, l.archived_at,
            -- newest inbound timestamp: lets the queue pulse a row that just got a reply,
            -- which updated_at alone would miss when only messages changed
@@ -99,6 +100,9 @@ leads.post('/:id/reextract', async (c) => {
 const SPEC_FIELDS = ['product', 'qty', 'size', 'stock', 'color', 'finish'] as const;
 
 const Patch = z.object({
+  // Not in SPEC_FIELDS: those are the things extract_specs competes for, and a rep editing
+  // the description should not lock the extractor out of the product field as a side effect.
+  description: z.string().max(120).nullable().optional(),
   product: z.string().nullable().optional(),
   qty: z.number().int().positive().nullable().optional(),
   size: z.string().nullable().optional(),
@@ -233,6 +237,7 @@ leads.patch('/:id', async (c) => {
     // sending null clears it — which is what an inline editor needs.
     const patch: Record<string, unknown> = {};
     for (const f of SPEC_FIELDS) if (f in p) patch[f] = p[f] ?? null;
+    if (p.description !== undefined) patch.description = p.description?.trim() || null;
     if (p.rush !== undefined) patch.rush = p.rush;
     if (p.deadline_at !== undefined) patch.deadline_at = p.deadline_at;
     if (p.status !== undefined) patch.status = p.status;
@@ -668,10 +673,20 @@ async function replyByEmail(
   // In-Reply-To, which webmail forwarding does more often than you would hope.
   const subject = `Re: [${thread.lead.ticket_no}] ${thread.lead.subject ?? 'Your enquiry'}`;
 
+  // The 'message' variant, deliberately: this is a rep answering a customer, and a branded
+  // header over "that comes to $640" makes a colleague read as a newsletter. The signature
+  // already carries the shop's name, which is all the branding a reply needs. The paragraph
+  // split keeps the rep's own line breaks rather than reflowing what they wrote.
+  const mail = letter({
+    variant: 'message',
+    body: outgoing.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean),
+    signature: org.name,
+  }, org, c.env);
+
   let sent;
   try {
     sent = await sendEmail(c.env, {
-      from, to, subject, text: outgoing, replyTo,
+      from, to, subject, text: outgoing, html: mail.html, replyTo,
       inReplyTo: thread.inReplyTo, references: thread.references,
     });
   } catch (err) {

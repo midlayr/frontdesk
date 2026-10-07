@@ -30,6 +30,7 @@ import {
 } from './auth';
 import { CONSOLE_HTML } from './web-console';
 import { sendEmail } from './lib/mailgun';
+import { render as letter } from './lib/email-layout';
 
 export { ChatSession } from './do/chat-session';
 export { InboxRoom } from './do/inbox-room';
@@ -244,22 +245,47 @@ async function mintToken(
   return token;
 }
 
-/** Redeem one. Null for expired, spent, unknown, or minted for a different tenant. */
+/**
+ * Redeem one, and say which way it failed when that can be said safely.
+ *
+ * 'spent' and 'stale' are only ever returned for a token this tenant actually minted, which
+ * means whoever holds it already proved possession of the mailbox — there is nothing left to
+ * leak by being specific, and "that link has expired" when someone has in fact already
+ * signed in successfully sends them to ask an admin for help they do not need.
+ *
+ * 'unknown' stays deliberately vague: a token we have never seen, or one minted for another
+ * tenant, is the case where a stranger is guessing, and they learn nothing from it.
+ */
+type Redeemed =
+  | { ok: true; userId: string }
+  | { ok: false; why: 'spent' | 'stale' | 'unknown' };
+
 async function redeemToken(
   sql: Sql, purposes: Purpose[], token: string, orgId: string,
-): Promise<string | null> {
+): Promise<Redeemed> {
   const hash = await sha256Hex(token);
   // jsonb, not a bound array: under fetch_types: false an array binds as a string literal
   // that matches nothing, and the row simply fails to be found — see SETUP-LOG.
-  const [row] = await sql<{ user_id: string; org_id: string }[]>`
-    SELECT user_id, org_id FROM auth_tokens
+  const [row] = await sql<{ user_id: string; org_id: string; used_at: string | null;
+                           expired: boolean }[]>`
+    SELECT user_id, org_id, used_at, (expires_at <= now()) AS expired
+      FROM auth_tokens
      WHERE token_hash = ${hash}
-       AND purpose IN (SELECT jsonb_array_elements_text(${sql.json(purposes)}::jsonb))
-       AND used_at IS NULL AND expires_at > now()`;
-  if (!row || row.org_id !== orgId) return null;
+       AND purpose IN (SELECT jsonb_array_elements_text(${sql.json(purposes)}::jsonb))`;
+
+  if (!row || row.org_id !== orgId) return { ok: false, why: 'unknown' };
+  if (row.used_at) return { ok: false, why: 'spent' };
+  if (row.expired) return { ok: false, why: 'stale' };
+
   await sql`UPDATE auth_tokens SET used_at = now() WHERE token_hash = ${hash}`;
-  return row.user_id;
+  return { ok: true, userId: row.user_id };
 }
+
+const WHY: Record<'spent' | 'stale' | 'unknown', string> = {
+  spent: 'That link has already been used. If you are not signed in, ask for a new one below.',
+  stale: 'That link has expired. Ask for a new one below and it will arrive in a moment.',
+  unknown: 'That link is not valid. Ask for a new one below.',
+};
 
 /** The sender a tenant's mail goes out as — see replyByEmail for why it is derived. */
 function mailFrom(org: Org, env: Env) {
@@ -292,15 +318,21 @@ app.post('/api/login-link', async (c) => {
       c.req.header('cf-connecting-ip') ?? null);
     const { from, replyTo } = mailFrom(org, c.env);
     try {
+      const mail = letter({
+        variant: 'notice',
+        heading: 'Your sign-in link',
+        body: [
+          `Hello ${user.name},`,
+          `Here is your link to sign in to ${org.name} Front Desk.`,
+        ],
+        action: { label: 'Sign in', url: `${url.origin}/?login=${token}` },
+        fine: 'It works once and expires in 15 minutes. If you did not ask to sign in, ignore '
+            + 'this — the link does nothing on its own and nobody can use it without this message.',
+      }, org, c.env);
       await sendEmail(c.env, {
         from, to: email, replyTo, inReplyTo: null, references: [],
         subject: `Your ${org.name} Front Desk sign-in link`,
-        text: `Hello ${user.name},\n\n`
-            + `Here is your link to sign in to ${org.name} Front Desk:\n\n`
-            + `${url.origin}/?login=${token}\n\n`
-            + `It works once and expires in 15 minutes. If you did not ask to sign in, `
-            + `ignore this — the link does nothing on its own and nobody can use it `
-            + `without this message.\n`,
+        text: mail.text, html: mail.html,
       });
     } catch (err) {
       // Logged, not surfaced: saying the send failed would confirm the account exists.
@@ -320,10 +352,9 @@ app.post('/api/login-link/consume', async (c) => {
   const org = await resolveOrg(c.env, sql, url);
   if (!org) return c.json({ error: 'unknown tenant' }, 404);
 
-  const userId = await redeemToken(sql, ['login', 'invite'], token, org.id);
-  // One message for expired, spent, unknown and wrong-tenant alike: which it was is not the
-  // sender's business, and the remedy is the same every time.
-  if (!userId) return c.json({ error: 'that link has expired or already been used — ask for a new one' }, 400);
+  const r = await redeemToken(sql, ['login', 'invite'], token, org.id);
+  if (!r.ok) return c.json({ error: WHY[r.why], why: r.why }, 400);
+  const userId = r.userId;
 
   const { token: session, expires } = await createSession(
     sql, userId, org.id, c.req.header('user-agent') ?? null, c.req.header('cf-connecting-ip') ?? null);
@@ -346,14 +377,21 @@ app.post('/api/password-reset', async (c) => {
       c.req.header('cf-connecting-ip') ?? null);
     const { from, replyTo } = mailFrom(org, c.env);
     try {
+      const mail = letter({
+        variant: 'notice',
+        heading: 'Set a new password',
+        body: [
+          `Hello ${user.name},`,
+          `Someone asked to reset the password for this address on ${org.name} Front Desk.`,
+        ],
+        action: { label: 'Choose a new password', url: `${url.origin}/?reset=${token}` },
+        fine: 'The link works once and expires in an hour. If that was not you, ignore this — '
+            + 'your password has not changed, and nobody can use this link without the mail.',
+      }, org, c.env);
       await sendEmail(c.env, {
         from, to: email, replyTo, inReplyTo: null, references: [],
         subject: `Reset your ${org.name} Front Desk password`,
-        text: `Hello ${user.name},\n\n`
-            + `Someone asked to reset the password for this address on ${org.name} Front Desk.\n\n`
-            + `${url.origin}/?reset=${token}\n\n`
-            + `The link works once and expires in an hour. If that was not you, ignore this — `
-            + `your password has not changed, and nobody can use this link without the mail.\n`,
+        text: mail.text, html: mail.html,
       });
     } catch (err) {
       console.error('password reset send failed', err);
@@ -374,8 +412,9 @@ app.post('/api/password-reset/confirm', async (c) => {
   const org = await resolveOrg(c.env, sql, url);
   if (!org) return c.json({ error: 'unknown tenant' }, 404);
 
-  const userId = await redeemToken(sql, ['reset'], token, org.id);
-  if (!userId) return c.json({ error: 'that link has expired or already been used — request a new one' }, 400);
+  const r = await redeemToken(sql, ['reset'], token, org.id);
+  if (!r.ok) return c.json({ error: WHY[r.why], why: r.why }, 400);
+  const userId = r.userId;
 
   const newHash = await hashPassword(password);
   await withOrg(sql, org.id, (tx) => tx`
@@ -666,16 +705,23 @@ async function sendInvite(
 
   const { from, replyTo } = mailFrom(org, c.env);
   try {
+    const mail = letter({
+      variant: 'notice',
+      heading: `You have been added to ${org.name} Front Desk`,
+      body: [
+        `Hello ${name},`,
+        `${inviter?.name ?? 'An administrator'} has set you up on ${org.name} Front Desk — `
+        + `where the shop's calls, texts, emails and website chats arrive as one queue.`,
+      ],
+      action: { label: 'Open Front Desk', url: `${url.origin}/?login=${token}` },
+      fine: 'That link signs you in. It works once and lasts seven days; after that ask for a '
+          + 'new one from the sign-in page. You do not need a password — you can set one later '
+          + 'if you would rather.',
+    }, org, c.env);
     await sendEmail(c.env, {
       from, to: email, replyTo, inReplyTo: null, references: [],
       subject: `${inviter?.name ?? 'Someone'} has added you to ${org.name} Front Desk`,
-      text: `Hello ${name},\n\n`
-          + `${inviter?.name ?? 'An administrator'} has set you up on ${org.name} Front Desk — `
-          + `where the shop's calls, texts, emails and website chats arrive as one queue.\n\n`
-          + `${url.origin}/?login=${token}\n\n`
-          + `That link signs you in. It works once and lasts seven days; after that ask for a `
-          + `new one from the sign-in page. You do not need a password — you can set one later `
-          + `if you would rather.\n`,
+      text: mail.text, html: mail.html,
     });
     return { sent: true };
   } catch (err) {

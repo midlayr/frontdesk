@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, applyBrand, orgSlug, userId, type Attachment, type Lead, type Message, type Org, PIPELINE, STATUS_LABEL, STATUS_DOT, type OrgUser } from './api';
 import { FlowBuilder } from './FlowBuilder';
+import { FlowList } from './FlowList';
 import { Campaigns } from './Campaigns';
 import { History } from './History';
 import { TicketSequences } from './TicketSequences';
@@ -58,7 +59,11 @@ function age(iso: string) {
 
 /** The one-line spec summary under each queue row, in the reference's order. */
 function summarise(l: Lead) {
-  const head = [l.qty ?? null, l.stock ?? l.product ?? null].filter(Boolean).join(' · ');
+  // The description first when a rep (or the extractor) has given the job a name: "Wedding
+  // menus & placards" says more at a glance than "125 · Classic Crest".
+  const head = l.description
+    ? l.description
+    : [l.qty ?? null, l.stock ?? l.product ?? null].filter(Boolean).join(' · ');
   const tail = [l.finish, l.color, l.size].filter(Boolean).join(', ');
   return { head: head || 'no specs yet', tail };
 }
@@ -220,7 +225,7 @@ export function App() {
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return leads.filter((l) => matches(l, view) && (!q ||
-      [l.ticket_no, l.product, l.contact_name, l.contact_phone, l.contact_email]
+      [l.ticket_no, l.description, l.product, l.contact_name, l.contact_phone, l.contact_email]
         .some((v) => v?.toLowerCase().includes(q))));
   }, [leads, view, query]);
 
@@ -322,9 +327,17 @@ export function App() {
     } catch (e) { setError(String(e)); }
   }
 
-  if (needToken) return <Login onDone={() => location.reload()} />;
+  // A link in the address bar outranks whatever session this browser already has. Without
+  // this, clicking an invite while signed in as somebody else silently drops you into THEIR
+  // session and quietly spends nothing — which looks, to the person who clicked, exactly
+  // like a link that did not work.
+  const hasAuthLink = typeof window !== 'undefined'
+    && /[?&](login|reset)=/.test(window.location.search);
+  if (needToken || hasAuthLink) return <Login onDone={() => location.reload()} />;
 
   const flowSlug = path.startsWith('/chat/flows/') ? path.slice('/chat/flows/'.length) : '';
+  // /chat is the list of bots; /chat/flows/<slug> is one of them open in the builder.
+  const onChat = path.startsWith('/chat');
   const onSettings = path.startsWith('/settings');
   const onCampaigns = path.startsWith('/campaigns');
   const brand = (org?.brand ?? {}) as Record<string, string>;
@@ -338,9 +351,9 @@ export function App() {
         <span className="wordmark">{brand.app_name?.replace(/^.*?\s/, '') || 'Front Desk'}</span>
         <span className="powered">powered by Midlayr</span>
         <nav className="nav">
-          <button aria-current={!flowSlug} onClick={() => go('/')}>Inbox</button>
+          <button aria-current={!onChat && !onCampaigns && !onSettings} onClick={() => go('/')}>Inbox</button>
           <button aria-current={onCampaigns} onClick={() => go('/campaigns')}>Campaigns</button>
-          <button aria-current={!!flowSlug} onClick={() => go('/chat/flows/quote-intake')}>Chat</button>
+          <button aria-current={onChat} onClick={() => go('/chat')}>Chat</button>
           <button aria-current={onSettings} onClick={() => go('/settings/messaging')}>Settings</button>
         </nav>
         <div className="search">
@@ -361,6 +374,8 @@ export function App() {
                   go={go} />
       ) : flowSlug ? (
         <FlowBuilder slug={flowSlug} accent={brand.color || '#0B7FA8'} />
+      ) : onChat ? (
+        <FlowList go={go} />
       ) : (
       <div className="panes">
         <aside className="rail">
@@ -599,6 +614,13 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
         </div>
 
         <h1 className="tname">{l.company_name || who}</h1>
+
+        {/* What the job IS, in the shop's own words — the line their job jacket leads with.
+            The extractor only ever fills a blank here, so a rep's wording is never reworded
+            by a later message. */}
+        <EditCell leadId={l.id} label="description" value={l.description}
+                  placeholder="name this job"
+                  onSave={(v) => onPatch({ description: v })} />
         <div className="meta">
           {[l.channel, l.contact_phone, l.contact_email].filter(Boolean).join(' · ').toUpperCase()}
         </div>
@@ -697,6 +719,7 @@ function Login({ onDone }: { onDone: () => void }) {
   // mail clients and scanners fetch links before anyone reads them, and a link that signs
   // you in on GET is already spent by the time it reaches the inbox.
   const [token, setToken] = useState<string | null>(null);
+  const [linkToken, setLinkToken] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   useEffect(() => {
     const u = new URL(window.location.href);
@@ -706,15 +729,22 @@ function Login({ onDone }: { onDone: () => void }) {
     u.searchParams.delete('reset');
     u.searchParams.delete('login');
     window.history.replaceState({}, '', u.pathname + u.search + u.hash);
-    if (reset) { setToken(reset); return; }
-    if (login) {
-      setSigningIn(true);
-      api.consumeLoginLink(login)
-        .then(onDone)
-        .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
-        .finally(() => setSigningIn(false));
-    }
-  }, [onDone]);
+    if (reset) setToken(reset);
+    // Held, not spent. The effect used to redeem on arrival, which means anything that
+    // merely OPENS the page burns the link: a mail client preview, a security scanner that
+    // renders, a reload, a restored tab. One click cannot be made by any of those.
+    else if (login) setLinkToken(login);
+  }, []);
+
+  async function signInWithLink() {
+    if (!linkToken) return;
+    setSigningIn(true); setErr('');
+    try { await api.consumeLoginLink(linkToken); onDone(); }
+    catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setLinkToken(null);   // spent or refused: the button must not offer a second go
+    } finally { setSigningIn(false); }
+  }
 
   const [mode, setMode] = useState<'link' | 'password' | 'forgot'>('link');
   const [email, setEmail] = useState('');
@@ -750,13 +780,21 @@ function Login({ onDone }: { onDone: () => void }) {
     }
   }
 
-  // While a link from the inbox is being exchanged for a session.
-  if (signingIn) {
+  // Arrived from a link. One button, because the click is the safeguard: it is the thing a
+  // preview pane, a link scanner or a restored tab cannot do on the reader's behalf.
+  if (linkToken) {
     return (
       <div className="gate">
         <div>
           <span className="eyebrow">Front Desk</span>
-          <h1 className="display" style={{ fontSize: 'var(--h2)', margin: '2px 0 10px' }}>Signing you in…</h1>
+          <h1 className="display" style={{ fontSize: 'var(--h2)', margin: '2px 0 10px' }}>
+            Welcome back
+          </h1>
+          <p className="appear-note">You opened a sign-in link. Press the button to finish.</p>
+          {err && <p className="err">{err}</p>}
+          <button className="btn-primary" disabled={signingIn} onClick={signInWithLink}>
+            {signingIn ? 'Signing you in…' : 'Sign in'}
+          </button>
         </div>
       </div>
     );

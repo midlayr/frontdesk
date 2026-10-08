@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { flowsApi, ago, type FlowSummary } from './flows-api';
+import { flowsApi, ago, installSnippet, type FlowSummary, type Install } from './flows-api';
 
 /**
  * Every bot this shop has, and whether each is answering customers.
@@ -20,6 +20,10 @@ const slugify = (s: string) =>
 
 export function FlowList({ go }: { go: (to: string) => void }) {
   const [flows, setFlows] = useState<FlowSummary[] | null>(null);
+  // The script tag is written from what the server reports, never from location.origin: in
+  // development this app is served by Vite and proxies to the Worker, so a snippet built here
+  // would point the shop's website at a localhost that exists on one laptop.
+  const [install, setInstall] = useState<Install | null>(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -27,7 +31,9 @@ export function FlowList({ go }: { go: (to: string) => void }) {
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
 
-  const load = () => flowsApi.list().then(setFlows).catch((e) => setErr(String(e)));
+  const load = () => flowsApi.list()
+    .then((r) => { setFlows(r.flows); setInstall(r.install); })
+    .catch((e) => setErr(String(e)));
   useEffect(() => { load(); }, []);
 
   async function run(key: string, what: () => Promise<unknown>) {
@@ -84,10 +90,8 @@ export function FlowList({ go }: { go: (to: string) => void }) {
                          onChange={(e) => { setSlugEdited(true); setSlug(slugify(e.target.value)); }} />
                 </label>
               </div>
-              {slug && (
-                <p className="flow-embed">
-                  {`<script src="/w.js" data-org="…" data-flow="${slug}" async></script>`}
-                </p>
+              {slug && install && (
+                <p className="flow-embed">{installSnippet(install, slug)}</p>
               )}
               <div className="invite-acts">
                 <button className="btn-primary" disabled={busy === 'new'} onClick={create}>
@@ -120,7 +124,10 @@ export function FlowList({ go }: { go: (to: string) => void }) {
                     </button>
                     <span className={`pill ${f.live ? 'ok' : 'off'}`}>{f.live ? 'Live' : 'Paused'}</span>
                   </div>
-                  <div className="person-mail">data-flow="{f.slug}"</div>
+                  <div className="person-mail">
+                    data-flow="{f.slug}"
+                    {f.settings.launcher && <> · button reads “{f.settings.launcher}”</>}
+                  </div>
                   <div className="person-why">
                     {f.questions} question{f.questions === 1 ? '' : 's'} · v{f.version} ·
                     {' '}edited {ago(f.updated_at)}
@@ -130,6 +137,10 @@ export function FlowList({ go }: { go: (to: string) => void }) {
 
                 <div className="person-acts">
                   <button onClick={() => go(`/chat/flows/${f.slug}`)}>Edit</button>
+                  {/* Where the name, the wording and the snippet live. Separate from Edit
+                      because "install this on the site" and "change the questions" are
+                      different jobs, usually done by different people. */}
+                  <button onClick={() => go(`/chat/flows/${f.slug}/setup`)}>Setup</button>
                   {f.live ? (
                     <button className="danger" disabled={busy === f.slug}
                             onClick={() => run(f.slug, () => flowsApi.pause(f.slug))}>
@@ -148,7 +159,8 @@ export function FlowList({ go }: { go: (to: string) => void }) {
 
           {flows && flows.length > 0 && (
             <p className="team-note" style={{ marginTop: 18 }}>
-              Pausing takes the bubble off the website within a minute. A visitor already
+              Setup holds each bot's name, its button label and the line of HTML to paste on
+              your site. Pausing takes the bubble off the website within a minute. A visitor already
               part-way through a conversation keeps theirs — cutting off the one person who
               was engaging would be a strange way to treat them.
             </p>

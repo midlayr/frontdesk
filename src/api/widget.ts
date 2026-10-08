@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { ulid } from 'ulid';
 import type { Env, Org, PublishedFlow } from '../env';
 import { connect } from '../db';
+import { presentation } from '../lib/flow-settings';
 
 /**
  * Public surface for the embedded chat widget. No session cookie — the visitor is anonymous —
@@ -75,7 +76,15 @@ widget.get('/config', async (c) => {
       logo_url: brand.logo_r2_key ? `/widget/logo?org=${encodeURIComponent(org.slug)}` : null,
       mark_url: brand.mark_r2_key ? `/widget/logo?org=${encodeURIComponent(org.slug)}&kind=mark` : null,
     },
-    widget: org.widget,
+    /*
+     * The shop's widget settings with this bot's own wording laid over the top.
+     *
+     * Order matters and the merge is one-directional: a bot may override what its launcher
+     * says, and nothing else. allowed_domains lives on the org and stays there — passed
+     * through presentation(), a flow could not widen the CORS allowlist even if something
+     * had written allowed_domains into its settings column.
+     */
+    widget: { ...org.widget, ...presentation(flow?.settings) },
   });
 });
 

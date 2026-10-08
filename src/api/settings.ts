@@ -5,6 +5,7 @@ import { withOrg, type Sql } from '../db';
 import { TTS_VOICES, defaults, isTtsVoice, messagingFor, render, xmlEscape } from '../lib/messaging';
 import { ulid } from 'ulid';
 import { invalidateOrg } from '../org';
+import { cleanDomains } from '../lib/domains';
 
 type Vars = { org: Org; sql: Sql; userId: string };
 
@@ -158,4 +159,48 @@ settings.put('/messaging', async (c) => {
   await invalidateOrg(c.env, c.get('sql'), org);
 
   return c.json({ ok: true, messaging: parsed.data });
+});
+
+/**
+ * Where the shop's bots and forms are allowed to run.
+ *
+ * This list is the gate on two public, unauthenticated endpoints — /widget/config and
+ * /hooks/form — so it is the one piece of install configuration that can make a correct
+ * script tag do nothing at all. The browser's error is a CORS message in the console of the
+ * shop's own website, which nobody in this app will ever see. Before this it could only be
+ * changed with SQL, which meant every install needed us.
+ *
+ * Org-level rather than per-bot, matching where the check reads it from: a bot cannot be
+ * allowed to widen it (see lib/flow-settings).
+ */
+const Domains = z.object({ allowed_domains: z.array(z.string().max(253)).max(25) });
+
+settings.put('/widget', async (c) => {
+  const org = c.get('org');
+  const parsed = Domains.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: 'bad domains', detail: parsed.error.issues }, 400);
+
+  const { domains: cleaned, rejected } = cleanDomains(parsed.data.allowed_domains);
+
+  const saved = await withOrg(c.get('sql'), org.id, async (tx) => {
+    // Merged, like brand: widget also holds the launcher, nudge and position, and a replace
+    // would quietly drop all three.
+    const [row] = await tx<{ widget: Record<string, unknown> }[]>`
+      UPDATE orgs SET widget = widget || ${tx.json({ allowed_domains: cleaned })}::jsonb
+       WHERE id = ${org.id} RETURNING widget`;
+    return row?.widget ?? null;
+  });
+
+  // The allowlist is read from the cached org on every widget config call, so without this
+  // a domain added here keeps being refused for up to a minute.
+  await invalidateOrg(c.env, c.get('sql'), org);
+
+  const domains = (saved as { allowed_domains?: unknown } | null)?.allowed_domains;
+  return c.json({
+    ok: true,
+    allowed_domains: Array.isArray(domains) ? domains : cleaned,
+    // Reported rather than silently dropped: "I added it and it is not in the list" is a
+    // worse outcome than being told the value made no sense.
+    rejected,
+  });
 });

@@ -409,8 +409,16 @@ export function App() {
     && /[?&](login|reset)=/.test(window.location.search);
   if (needToken || hasAuthLink) return <Login onDone={() => location.reload()} />;
 
-  const flowSlug = path.startsWith('/chat/flows/') ? path.slice('/chat/flows/'.length) : '';
-  // /chat is the list of bots; /chat/flows/<slug> is one of them open in the builder.
+  /*
+   * /chat is the list of bots; /chat/flows/<slug> is one open in the builder, and
+   * /chat/flows/<slug>/setup is its name, wording and install snippet.
+   *
+   * The tab is in the path rather than in component state so that the install page can be
+   * linked — it is the page you send to whoever looks after the website, and they are often
+   * not the person who wrote the questions.
+   */
+  const [flowSlug, flowTab] = (path.startsWith('/chat/flows/')
+    ? path.slice('/chat/flows/'.length) : '').split('/');
   const onChat = path.startsWith('/chat');
   const onSettings = path.startsWith('/settings');
   const onCampaigns = path.startsWith('/campaigns');
@@ -447,7 +455,9 @@ export function App() {
                      : path.startsWith('/settings/appearance') ? 'appearance' : 'messaging'}
                   go={go} />
       ) : flowSlug ? (
-        <FlowBuilder slug={flowSlug} accent={brand.color || '#0B7FA8'} />
+        <FlowBuilder slug={flowSlug} accent={brand.color || '#0B7FA8'}
+                     view={flowTab === 'setup' || flowTab === 'map' ? flowTab : 'steps'}
+                     onView={(v) => go(`/chat/flows/${flowSlug}${v === 'steps' ? '' : `/${v}`}`)} />
       ) : onChat ? (
         <FlowList go={go} />
       ) : (

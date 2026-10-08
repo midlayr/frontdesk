@@ -789,3 +789,28 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .turn.them{color:var(--ink-3);background:var(--paper-2)}
 .row .r3{font:12px var(--font-body);color:var(--ink-3);margin-top:2px}
 .scell .val.late{color:var(--rush);font-weight:500}
+
+/* ── bot setup: name, website wording, install snippet ────────────────
+   Reuses .set-card and .fb-field from the settings and builder panels, so
+   this reads as the same surface rather than a third style of form. */
+.setup-fields { display: flex; flex-direction: column; gap: 16px; margin-bottom: 4px; }
+.setup-fields .fb-field input[readonly] { background: var(--paper-2); color: var(--ink-2); }
+.setup-hint { font-size: 12.5px; line-height: 1.55; color: var(--ink-3); max-width: 62ch; }
+.setup-hint code, .invite-sub code, .setup-warn code {
+  font: 11.5px/1.4 var(--font-mono); background: var(--paper-2);
+  border: 1px solid var(--line); border-radius: 2px; padding: 1px 4px; color: var(--ink-2);
+}
+/* The snippet is for selecting and copying, so it wraps rather than scrolls: a horizontal
+   scrollbar hides the end of the one line that has to be copied whole. */
+.setup-snippet {
+  margin: 4px 0 14px; padding: 12px 13px; background: var(--paper-2);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  font: 12px/1.6 var(--font-mono); color: var(--ink);
+  /* Wraps between attributes rather than through the middle of one: break-all splits
+     data-flow into "data-f / low" and makes the line hard to read back. */
+  white-space: pre-wrap; word-break: normal; overflow-wrap: anywhere; user-select: all;
+}
+.setup-warn {
+  margin: 12px 0 0; padding: 9px 12px; border-left: 2px solid var(--warn);
+  background: var(--paper-2); font-size: 13px; line-height: 1.55; color: var(--ink-2);
+}

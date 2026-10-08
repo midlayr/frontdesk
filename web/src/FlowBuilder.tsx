@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CONTACT_DEFAULTS, FIELDS, FIELD_GROUPS, KIND, ROUTES, TO_TICKET, ago, flowsApi, labelsOf, withIds, type Flow, type SimResult, type Step } from './flows-api';
 import { FlowMap } from './FlowMap';
+import { BotSetup } from './BotSetup';
 
 const SAVE_DEBOUNCE = 500;
 
@@ -18,11 +19,15 @@ function subline(s: Step): string {
 const titleOf = (s: Step) =>
   s.kind === 'ask' ? s.prompt : s.kind === 'rule' ? 'Hand off to a rep' : 'Create job ticket';
 
-export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) {
+type View = 'steps' | 'map' | 'setup';
+
+export function FlowBuilder(
+  { slug, accent, view, onView }:
+  { slug: string; accent: string; view: View; onView: (v: View) => void },
+) {
   const [flow, setFlow] = useState<Flow | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [sel, setSel] = useState(0);
-  const [view, setView] = useState<'steps' | 'map'>('steps');
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [publishedSteps, setPublishedSteps] = useState<string>('');
   const [version, setVersion] = useState(0);
@@ -188,18 +193,27 @@ export function FlowBuilder({ slug, accent }: { slug: string; accent: string }) 
         </div>
         <span className="fb-ver">v{version} · published {ago(publishedAt)}</span>
         <span className="fb-view">
-          <button data-on={view === 'steps'} onClick={() => setView('steps')}>Steps</button>
-          <button data-on={view === 'map'} onClick={() => setView('map')}>Map</button>
+          <button data-on={view === 'steps'} onClick={() => onView('steps')}>Steps</button>
+          <button data-on={view === 'map'} onClick={() => onView('map')}>Map</button>
+          <button data-on={view === 'setup'} onClick={() => onView('setup')}>Setup</button>
         </span>
-        <span className="fb-save">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Draft saved' : ''}</span>
-        <button className={`fb-publish${dirty ? ' dirty' : ''}`} onClick={publish} disabled={!dirty}>
-          {dirty ? 'Publish changes' : 'Published'}
-        </button>
+        <span className="fb-save">
+          {view === 'setup' ? '' : saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Draft saved' : ''}
+        </span>
+        {/* Publish is about the questions. On Setup it would imply the wording there is also
+            waiting to be published, when that saves and applies on its own. */}
+        {view !== 'setup' && (
+          <button className={`fb-publish${dirty ? ' dirty' : ''}`} onClick={publish} disabled={!dirty}>
+            {dirty ? 'Publish changes' : 'Published'}
+          </button>
+        )}
       </header>
 
-      {view === 'map' ? (
+      {view === 'setup' ? (
+        <BotSetup flow={flow} onChange={setFlow} />
+      ) : view === 'map' ? (
         <FlowMap steps={steps} accent={accent} loops={new Set(sim?.loops ?? [])}
-                 onPick={(i) => { setSel(i); setView('steps'); }} />
+                 onPick={(i) => { setSel(i); onView('steps'); }} />
       ) : (
       <div className="fb-grid">
         {/* ── 1 · steps ── */}

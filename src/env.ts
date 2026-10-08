@@ -1,3 +1,6 @@
+import type { FlowSettings } from './lib/flow-settings';
+export type { FlowSettings };
+
 // Bindings and job shapes. Shared by the fetch, queue and scheduled handlers.
 
 export interface Env {
@@ -73,6 +76,11 @@ export interface PublishedFlow {
   id: string;
   version: number;
   steps: Step[];
+  /**
+   * The bot's own launcher and nudge wording, merged over the org's by /widget/config.
+   * Carried here so the widget needs no extra read: KV is already the served artefact.
+   */
+  settings?: FlowSettings;
 }
 
 export interface Org {

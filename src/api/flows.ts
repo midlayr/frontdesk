@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { ulid } from 'ulid';
 import { z } from 'zod';
-import type { Env, Org, Step } from '../env';
+import type { Env, Org, PublishedFlow, Step } from '../env';
 import { withOrg, type Sql } from '../db';
 import { loopingAsks, simulate } from '../flow-engine';
+import { presentation, type FlowSettings } from '../lib/flow-settings';
 
 type Vars = { org: Org; sql: Sql; userId: string };
 
@@ -78,8 +79,8 @@ flows.get('/', async (c) => {
   const org = c.get('org');
   const rows = await withOrg(c.get('sql'), org.id, (tx) =>
     tx<{ slug: string; name: string; version: number; published_at: string | null;
-         updated_at: string; steps: Step[] }[]>`
-      SELECT slug, name, version, published_at, updated_at, steps
+         updated_at: string; steps: Step[]; settings: unknown }[]>`
+      SELECT slug, name, version, published_at, updated_at, steps, settings
         FROM chat_flows WHERE org_id = ${org.id} ORDER BY name`);
 
   const list = await Promise.all(rows.map(async (r) => ({
@@ -90,9 +91,33 @@ flows.get('/', async (c) => {
     published_at: r.published_at,
     updated_at: r.updated_at,
     live: (await c.env.CONFIG.get(`flow:${org.id}:${r.slug}`)) !== null,
+    settings: presentation(r.settings),
   })));
-  return c.json({ flows: list });
+
+  return c.json({ flows: list, install: installFacts(c.env, org) });
 });
+
+/**
+ * Everything needed to write the script tag, answered by the server rather than guessed
+ * at in the browser.
+ *
+ * The admin app cannot work this out from location.origin: in development it is served by
+ * Vite on :5173 and proxies to the Worker, so a snippet built there would point the shop's
+ * own website at a localhost that only exists on one laptop. PUBLIC_ORIGIN is the address
+ * the Worker actually answers on, which is the address the tag has to name.
+ *
+ * `domains` comes along because it is the difference between a snippet that works and one
+ * that silently does nothing: /widget/config refuses an Origin that is not on the list, and
+ * the failure is a console message on the shop's site that nobody here will ever see.
+ */
+function installFacts(env: Env, org: Org) {
+  const domains = (org.widget as { allowed_domains?: unknown }).allowed_domains;
+  return {
+    origin: env.PUBLIC_ORIGIN?.replace(/\/$/, '') ?? '',
+    org: org.slug,
+    domains: Array.isArray(domains) ? domains.filter((d): d is string => typeof d === 'string') : [],
+  };
+}
 
 const NewFlow = z.object({
   name: z.string().min(1).max(80),
@@ -159,6 +184,89 @@ flows.post('/:slug/pause', async (c) => {
   return c.json({ ok: true, live: false });
 });
 
+const SettingsBody = z.object({
+  // The internal name. Renaming is free: nothing points at it. The address is a different
+  // matter and is not editable here — see below.
+  name: z.string().min(1).max(80).optional(),
+  // Blank is meaningful: it clears the override and falls back to the shop's own wording,
+  // which is why these are '' rather than optional-undefined.
+  launcher: z.string().max(40).optional(),
+  nudge: z.string().max(160).optional(),
+});
+
+/**
+ * Change what a bot is called and what it says on the website.
+ *
+ * Separate from PUT /:slug on purpose. That route is the builder's debounced autosave of the
+ * step list, firing every half-second while someone types a question; folding a settings
+ * form into the same body would have the two racing to overwrite each other's field.
+ *
+ * The two also differ in when they take effect, and the split makes that honest:
+ *
+ *   steps     — draft until published. A half-finished question must not be put in front of
+ *               a customer because the editor lost focus.
+ *   launcher  — live immediately. It is a button label, not conversation logic; there is
+ *   nudge       nothing to review, and a Save that visibly does nothing until you find the
+ *               Publish button reads as a broken Save.
+ *
+ * Which is why the KV refresh below splices the new wording into the copy that is already
+ * published rather than republishing the row: the draft steps stay in the draft.
+ *
+ * NOT here: the address (slug). It is in the KV key, in UNIQUE (org_id, slug) and — the one
+ * that matters — in the <script> tag already pasted into the shop's website. Renaming it
+ * from this panel would take their chat bubble off their site with no hint as to why.
+ */
+flows.patch('/:slug/settings', async (c) => {
+  const org = c.get('org');
+  const slug = c.req.param('slug');
+
+  const parsed = SettingsBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'bad settings' }, 400);
+  }
+  const body = parsed.data;
+
+  const saved = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [row] = await tx<{ name: string; settings: unknown }[]>`
+      SELECT name, settings FROM chat_flows WHERE org_id = ${org.id} AND slug = ${slug}`;
+    if (!row) return null;
+
+    // Read, merge, write — rather than a jsonb || in SQL. Only the keys actually present in
+    // the body are touched, so this stays a patch; a '' present in the body deletes its key,
+    // because presentation() drops blanks.
+    const merged: Record<string, unknown> = { ...presentation(row.settings) };
+    for (const k of ['launcher', 'nudge'] as const) {
+      if (body[k] === undefined) continue;
+      if (body[k]!.trim()) merged[k] = body[k]!.trim(); else delete merged[k];
+    }
+    const settings = presentation(merged);
+
+    // Decided here rather than with a CASE in SQL: the row is already in hand, and an
+    // all-whitespace name should leave the existing one alone rather than blank it.
+    const name = body.name?.trim() || row.name;
+
+    const [out] = await tx<{ name: string }[]>`
+      UPDATE chat_flows
+         SET name = ${name},
+             settings = ${tx.json(settings as Record<string, string>)}::jsonb,
+             updated_at = now()
+       WHERE org_id = ${org.id} AND slug = ${slug}
+      RETURNING name`;
+    return { name: out.name, settings };
+  });
+
+  if (!saved) return c.json({ error: 'not found' }, 404);
+
+  // Wording applies at once, but only to a bot that is already answering customers. Reading
+  // the published copy and putting it back keeps the live steps exactly as they were — the
+  // draft may well contain a question half-written.
+  const key = `flow:${org.id}:${slug}`;
+  const live = await c.env.CONFIG.get<PublishedFlow>(key, 'json');
+  if (live) await c.env.CONFIG.put(key, JSON.stringify({ ...live, settings: saved.settings }));
+
+  return c.json({ ok: true, ...saved, live: live !== null });
+});
+
 flows.post('/:slug/simulate', async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = z.object({
@@ -185,11 +293,20 @@ flows.get('/:slug', async (c) => {
   const org = c.get('org');
   const slug = c.req.param('slug');
   const row = await withOrg(c.get('sql'), org.id, async (tx) => {
-    const [f] = await tx`SELECT id, slug, name, steps, settings, version, published_at, updated_at
-                           FROM chat_flows WHERE slug = ${slug}`;
+    const [f] = await tx<{ settings: unknown }[]>`
+      SELECT id, slug, name, steps, settings, version, published_at, updated_at
+        FROM chat_flows WHERE slug = ${slug}`;
     return f ?? null;
   });
-  return row ? c.json(row) : c.json({ error: 'not found' }, 404);
+  if (!row) return c.json({ error: 'not found' }, 404);
+  return c.json({
+    ...row,
+    settings: presentation(row.settings),
+    install: installFacts(c.env, org),
+    // From KV, not published_at: KV is what the widget fetches, so it is the only honest
+    // answer to "would the script tag show anything right now".
+    live: (await c.env.CONFIG.get(`flow:${org.id}:${slug}`)) !== null,
+  });
 });
 
 /** Save a draft. Does not affect the live widget until it is published. */
@@ -227,18 +344,25 @@ flows.post('/:slug/publish', async (c) => {
   const slug = c.req.param('slug');
 
   const published = await withOrg(c.get('sql'), org.id, async (tx) => {
-    const [row] = await tx<{ id: string; version: number; steps: Step[] }[]>`
+    const [row] = await tx<{ id: string; version: number; steps: Step[]; settings: unknown }[]>`
       UPDATE chat_flows SET version = version + 1, published_at = now()
        WHERE slug = ${slug}
-       RETURNING id, version, steps`;
+       RETURNING id, version, steps, settings`;
     return row ?? null;
   });
 
   if (!published) return c.json({ error: 'not found' }, 404);
 
+  // Wording ships with the steps so a first publish starts with the right button label, and
+  // so a bot that was paused and brought back does not revert to the shop's default wording.
   await c.env.CONFIG.put(
     `flow:${org.id}:${slug}`,
-    JSON.stringify({ id: published.id, version: published.version, steps: published.steps }),
+    JSON.stringify({
+      id: published.id,
+      version: published.version,
+      steps: published.steps,
+      settings: presentation(published.settings),
+    } satisfies PublishedFlow),
   );
 
   return c.json({ ok: true, version: published.version, key: `flow:${org.id}:${slug}` });

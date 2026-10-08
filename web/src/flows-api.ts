@@ -43,6 +43,33 @@ export function withIds(steps: Step[]): Step[] {
   });
 }
 
+/**
+ * Rewrite a question's quick replies, carrying any branch across a rename.
+ *
+ * A route is keyed by the answer TEXT, so editing a chip in place used to orphan its branch
+ * without a word: the old key stayed in `next` matching nothing a visitor could now say, the
+ * new label had no route, and the conversation fell through to the following question
+ * instead of the branch. Correcting a typo in a chip was enough to silently reroute a flow —
+ * which is exactly how "Window & Wall Grpahics" came to be unfixable without breaking it.
+ *
+ * Only a one-for-one change counts as a rename. Remove two and add two in the same edit and
+ * there is no way to tell which became which, so the routes are left alone rather than
+ * guessed at. Typing one character at a time is a sequence of one-for-one renames, so a
+ * route follows a label through an ordinary edit.
+ */
+export function withChips(step: Extract<Step, { kind: 'ask' }>, chips: string): Step {
+  const before = labelsOf(step);
+  const after = labelsOf({ ...step, chips });
+  const gone = before.filter((l) => !after.includes(l));
+  const added = after.filter((l) => !before.includes(l));
+
+  if (step.next && gone.length === 1 && added.length === 1 && step.next[gone[0]] !== undefined) {
+    const { [gone[0]]: route, ...rest } = step.next;
+    return { ...step, chips, next: { ...rest, [added[0]]: route } };
+  }
+  return { ...step, chips };
+}
+
 /** The answer labels that get their own destination: the quick replies, plus Skip. */
 export function labelsOf(s: Extract<Step, { kind: 'ask' }>): string[] {
   const chips = (s.chips ?? '').split(',').map((c) => c.trim()).filter(Boolean);

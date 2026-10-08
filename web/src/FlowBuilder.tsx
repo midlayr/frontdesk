@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CONTACT_DEFAULTS, FIELDS, FIELD_GROUPS, KIND, ROUTES, TO_TICKET, ago, flowsApi, labelsOf, withIds, type Flow, type SimResult, type Step } from './flows-api';
+import { CONTACT_DEFAULTS, FIELDS, FIELD_GROUPS, KIND, ROUTES, TO_TICKET, ago, flowsApi, labelsOf, withChips, withIds, type Flow, type SimResult, type Step } from './flows-api';
 import { FlowMap } from './FlowMap';
 import { BotSetup } from './BotSetup';
 
@@ -81,6 +81,11 @@ export function FlowBuilder(
   }, [steps, said, slug]);
 
   useEffect(() => { threadRef.current?.scrollTo(0, threadRef.current.scrollHeight); }, [sim]);
+
+  /** Chips need their own setter: a rename has to take the question's branch with it. */
+  const setChips = useCallback((chips: string) => {
+    setSteps((prev) => prev.map((s, i) => (i === sel && s.kind === 'ask' ? withChips(s, chips) : s)));
+  }, [sel]);
 
   const update = useCallback((patch: Partial<Step>) => {
     setSteps((prev) => prev.map((s, i) => (i === sel ? ({ ...s, ...patch } as Step) : s)));
@@ -302,7 +307,7 @@ export function FlowBuilder(
                   </Field>
                   <Field label="Quick replies" hint="comma separated · shown as chips">
                     <input value={current.chips ?? ''} placeholder="100, 250, 500"
-                           onChange={(e) => update({ chips: e.target.value })} />
+                           onChange={(e) => setChips(e.target.value)} />
                   </Field>
                   <label className="fb-check">
                     <input type="checkbox" checked={!!current.skippable}

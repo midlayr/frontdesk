@@ -1,4 +1,4 @@
-import { simulate, loopingAsks, resume, emptyState, edgesFrom, asksOf } from '../src/flow-engine';
+import { simulate, loopingAsks, resume, emptyState, edgesFrom, asksOf, composeCaptured } from '../src/flow-engine';
 import type { Step } from '../src/env';
 
 let pass = 0, fail = 0;
@@ -119,6 +119,81 @@ eq('otherwise pointing at a deleted question falls through',
                  { kind: 'ask', id: 'z2', prompt: 'Two', field: 'b' },
                  { kind: 'ticket', text: 'Done.' }], ['x'])),
    ['One', 'Two']);
+
+/*
+ * Several questions landing on one field.
+ *
+ * `notes` is a catch-all, so a shop reasonably points half its questions at it. Keying the
+ * store by field meant each answer overwrote the last and only the final one reached the
+ * ticket — silently, with no error and nothing in the transcript to suggest anything had
+ * gone missing.
+ */
+console.log('several questions on one field');
+{
+  const shared: Step[] = [
+    { kind: 'ask', id: 'n0', prompt: 'What are we printing?', field: 'product' },
+    { kind: 'ask', id: 'n1', prompt: "What's the artwork like?", field: 'notes' },
+    { kind: 'ask', id: 'n2', prompt: 'Any special finishing?', field: 'notes' },
+    { kind: 'ask', id: 'n3', prompt: 'Anything else we should know?', field: 'notes' },
+    { kind: 'ticket', text: 'Done.' },
+  ];
+  const r = simulate(shared, ['Business cards', 'Print-ready PDF', 'Spot UV on the logo', 'Back dock']);
+
+  eq('every answer survives, labelled by its question', r.next.captured.notes,
+     "What's the artwork like — Print-ready PDF\n" +
+     'Any special finishing — Spot UV on the logo\n' +
+     'Anything else we should know — Back dock');
+  // The whole point: nothing is quietly dropped on the way to leads.spec.
+  eq('nothing is lost',
+     ['Print-ready PDF', 'Spot UV on the logo', 'Back dock'].every((a) => r.next.captured.notes.includes(a)),
+     true);
+  // A field only one question feeds must look exactly as it did before, or every consumer
+  // of captured.email and captured.qty would start seeing a labelled blob.
+  eq('a single-question field is untouched', r.next.captured.product, 'Business cards');
+
+  eq('one entry per question, keyed by ask id', r.next.answers,
+     { n0: 'Business cards', n1: 'Print-ready PDF', n2: 'Spot UV on the logo', n3: 'Back dock' });
+
+  // Skip must not create an entry, or the ticket fills with empty labelled lines.
+  const skipped = simulate(shared, ['Business cards', 'Print-ready PDF', 'Skip', 'Back dock']);
+  eq('a skipped question contributes nothing', skipped.next.captured.notes,
+     "What's the artwork like — Print-ready PDF\nAnything else we should know — Back dock");
+}
+
+console.log('ordering and repeats');
+{
+  const steps: Step[] = [
+    { kind: 'ask', id: 'b1', prompt: 'First note?', field: 'notes' },
+    { kind: 'ask', id: 'b2', prompt: 'Second note?', field: 'notes' },
+    { kind: 'ticket', text: 'Done.' },
+  ];
+  // Composed in step order, not answer order, so the ticket reads the way the flow asks
+  // however the visitor got there.
+  eq('composed in step order',
+     composeCaptured(steps, { b2: 'second', b1: 'first' }),
+     { notes: 'First note — first\nSecond note — second' });
+
+  // A branch can loop back to a question already answered. That is the SAME question, so it
+  // replaces rather than appending — otherwise looping twice would triple the ticket.
+  eq('re-answering one question replaces its entry',
+     composeCaptured(steps, { b1: 'corrected', b2: 'second' }),
+     { notes: 'First note — corrected\nSecond note — second' });
+}
+
+console.log('sessions that predate per-question answers');
+{
+  const steps: Step[] = [
+    { kind: 'ask', id: 'c1', prompt: 'What are we printing?', field: 'product' },
+    { kind: 'ask', id: 'c2', prompt: 'Any notes?', field: 'notes' },
+    { kind: 'ticket', text: 'Done.' },
+  ];
+  // Mid-conversation when this shipped: only the field map was saved. Without the backfill
+  // the next answer would recompose from an empty record and wipe what was already said.
+  const old = { stepId: 'c2', captured: { product: 'Flyers' }, turns: [], state: 'bot' as const };
+  const back = resume(steps, old as never);
+  eq('an in-flight session keeps what it had', back.captured.product, 'Flyers');
+  eq('and it is attributed to the question that asked it', back.answers, { c1: 'Flyers' });
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

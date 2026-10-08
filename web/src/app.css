@@ -185,6 +185,9 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .fb-cap { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0;
           border-bottom: 1px solid var(--line); font-size: var(--text-md); }
 .fb-cap:last-child { border-bottom: 0; }
+/* A field several questions feed holds one labelled line each, so the newlines have to
+   survive — collapsed, the entries run together into one unreadable sentence. */
+.fb-cap b { font-weight: 500; text-align: right; white-space: pre-line; }
 .fb-cap span { font: 400 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
 
 /* ── live and just-changed rows ──

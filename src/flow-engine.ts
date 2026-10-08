@@ -20,6 +20,16 @@ export interface Turn { who: 'visitor' | 'bot' | 'rep'; text: string; at: number
 export interface FlowState {
   /** null before the first question has been chosen. */
   stepId: string | null;
+  /**
+   * One entry per question, keyed by ask id. The record of what was actually said.
+   *
+   * `captured` is derived from this and is keyed by FIELD, which is lossy on purpose —
+   * downstream wants one email, one quantity. It cannot be the store, because a field is a
+   * destination, not an identity: several questions legitimately pour into `notes`, and
+   * keying the store by field threw all but the last of them away.
+   */
+  answers: Record<string, string>;
+  /** Derived from `answers`. Field → value, for the ticket, the contact and the search index. */
   captured: Record<string, string>;
   turns: Turn[];
   state: 'bot' | 'live' | 'done';
@@ -82,7 +92,40 @@ export function nextAfter(steps: Step[], cur: Ask | null, answer: string): Ask |
 }
 
 export function emptyState(): FlowState {
-  return { stepId: null, captured: {}, turns: [], state: 'bot' };
+  return { stepId: null, answers: {}, captured: {}, turns: [], state: 'bot' };
+}
+
+/**
+ * Fold the per-question answers down onto their fields.
+ *
+ * A field with one question behind it is written exactly as before, so `email`, `qty` and
+ * every other single-answer field are byte-identical to what they were — nothing downstream
+ * sees a change.
+ *
+ * A field with several questions behind it keeps all of them, each labelled with the
+ * question that produced it, because "Spot UV on the logo" is not worth much on a job
+ * ticket without "Any special finishing?" in front of it.
+ *
+ * Walked in step order rather than in answer order, so the ticket reads in the order the
+ * flow asks — stable no matter which branch the visitor took, or how often they looped back.
+ */
+export function composeCaptured(steps: Step[], answers: Record<string, string>): Record<string, string> {
+  const byField = new Map<string, { prompt: string; text: string }[]>();
+  for (const a of asksOf(steps)) {
+    const text = answers[idOf(steps, a)];
+    if (typeof text !== 'string' || !text) continue;
+    const list = byField.get(a.field) ?? [];
+    list.push({ prompt: a.prompt, text });
+    byField.set(a.field, list);
+  }
+
+  const out: Record<string, string> = {};
+  for (const [field, list] of byField) {
+    out[field] = list.length === 1
+      ? list[0].text
+      : list.map((e) => `${e.prompt.replace(/\s*[?:]\s*$/, '')} — ${e.text}`).join('\n');
+  }
+  return out;
 }
 
 /**
@@ -93,9 +136,25 @@ export function emptyState(): FlowState {
  * question instead of silently restarting.
  */
 export function resume(steps: Step[], s: FlowState & { stepIdx?: number }): FlowState {
-  if (s.stepId || typeof s.stepIdx !== 'number') return s;
-  const a = asksOf(steps)[s.stepIdx];
-  return { ...s, stepId: a ? idOf(steps, a) : null };
+  let out = s;
+
+  // Sessions saved before answers were kept per question have only the field map. Attribute
+  // each value to the first question that asks for that field: it is the best reading
+  // available, and without it the next answer would recompose `captured` from an empty
+  // record and wipe everything the visitor had already said.
+  if (!out.answers) {
+    const answers: Record<string, string> = {};
+    for (const a of asksOf(steps)) {
+      const v = out.captured?.[a.field];
+      const id = idOf(steps, a);
+      if (typeof v === 'string' && v && !Object.values(answers).includes(v)) answers[id] = v;
+    }
+    out = { ...out, answers };
+  }
+
+  if (out.stepId || typeof out.stepIdx !== 'number') return out;
+  const a = asksOf(steps)[out.stepIdx];
+  return { ...out, stepId: a ? idOf(steps, a) : null };
 }
 
 /** Quick replies for the question the visitor is on; none once a rep is live or it is over. */
@@ -127,11 +186,17 @@ export interface Advance {
 
 /** Apply one visitor message. */
 export function advance(steps: Step[], s: FlowState, text: string, now = Date.now()): Advance {
-  let next: FlowState = { ...s, captured: { ...s.captured }, turns: [...s.turns, { who: 'visitor', text, at: now }] };
+  let next: FlowState = { ...s, answers: { ...s.answers }, captured: { ...s.captured },
+                          turns: [...s.turns, { who: 'visitor', text, at: now }] };
   if (next.state !== 'bot') return { next, handedOff: false, completed: false };
 
   const cur = currentAsk(steps, next);
-  if (cur && text !== 'Skip') next.captured[cur.field] = text;
+  if (cur && text !== 'Skip') {
+    // Keyed by the question, not by the field. Answering the same question twice — which a
+    // branch looping back makes possible — still replaces, because it is the same question.
+    next.answers[idOf(steps, cur)] = text;
+    next.captured = composeCaptured(steps, next.answers);
+  }
 
   const rule = ruleOf(steps);
   const words = rule ? rule.words.split(',').map((w) => w.trim().toLowerCase()).filter(Boolean) : [];

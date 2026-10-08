@@ -6,7 +6,7 @@ import { advance as engineAdvance, askById, asksOf, chipsFor, idOf, resume, type
 
 type Turn = { who: 'visitor' | 'bot' | 'rep'; text: string; at: number };
 type Step = { kind: 'ask'; prompt: string; field: string; chips?: string; skippable?: boolean } | { kind: 'rule'; words: string; handoff: string; route: string } | { kind: 'ticket'; text: string };
-type SessionState = { sid: string; orgId: string; flowSlug: string; flowId: string; flowVersion: number; steps: Step[]; stepId: string | null; captured: Record<string, string>; turns: Turn[]; state: 'bot' | 'live' | 'done'; leadId?: string; repId?: string; visitor: Record<string, unknown> };
+type SessionState = { sid: string; orgId: string; flowSlug: string; flowId: string; flowVersion: number; steps: Step[]; stepId: string | null; answers: Record<string, string>; captured: Record<string, string>; turns: Turn[]; state: 'bot' | 'live' | 'done'; leadId?: string; repId?: string; visitor: Record<string, unknown> };
 
 export class ChatSession extends DurableObject<Env> {
   private s!: SessionState;
@@ -100,6 +100,7 @@ export class ChatSession extends DurableObject<Env> {
     const before = this.s.turns.length;
     const r = engineAdvance(this.s.steps, this.s as unknown as FlowState, text);
     this.s.turns = r.next.turns as Turn[];
+    this.s.answers = r.next.answers;
     this.s.captured = r.next.captured;
     this.s.stepId = r.next.stepId;
     this.s.state = r.next.state;
@@ -153,7 +154,7 @@ export class ChatSession extends DurableObject<Env> {
     const sid = url.searchParams.get('sid') ?? this.ctx.id.toString();
     const cfg = await this.env.CONFIG.get<{ id: string; version: number; steps: Step[] }>(`flow:${orgId}:${flowSlug}`, 'json');
     if (!cfg) throw new Error('flow not published');
-    this.s = { sid, orgId, flowSlug, flowId: cfg.id, flowVersion: cfg.version, steps: cfg.steps, stepId: null, captured: {}, turns: [], state: 'bot', visitor: { referrer: url.searchParams.get('ref'), landing: url.searchParams.get('page'), ua: url.searchParams.get('ua') } };
+    this.s = { sid, orgId, flowSlug, flowId: cfg.id, flowVersion: cfg.version, steps: cfg.steps, stepId: null, answers: {}, captured: {}, turns: [], state: 'bot', visitor: { referrer: url.searchParams.get('ref'), landing: url.searchParams.get('page'), ua: url.searchParams.get('ua') } };
     await this.save();
   }
   private save() { return this.ctx.storage.put('s', this.s); }
@@ -189,6 +190,7 @@ export class ChatSession extends DurableObject<Env> {
     this.s.flowVersion = cfg.version;
     this.s.steps = cfg.steps;
     this.s.stepId = null;
+    this.s.answers = {};
     this.s.captured = {};
     this.s.turns = [];   // cleared so the new opening question is asked on connect
     await this.save();

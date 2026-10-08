@@ -44,7 +44,10 @@ leads.get('/', async (c) => {
        AND (${status ?? null}::text IS NULL OR l.status = ${status ?? null}::lead_status)
        AND (${assignee ?? null}::text IS NULL OR l.assignee_id = ${assignee ?? null})
        AND (${q ?? null}::text IS NULL OR l.search @@ plainto_tsquery('simple', ${q ?? null}))
-     ORDER BY (l.status = 'live') DESC, l.rush DESC, l.deadline_at NULLS LAST, l.created_at
+     -- Newest arrival first. The client regroups anyway, but this decides WHICH 200 come
+     -- back: ascending created_at meant that past 200 leads a shop would be served the
+     -- oldest ones and a brand-new enquiry would not be in the payload at all.
+     ORDER BY (l.status = 'live') DESC, l.created_at DESC
      LIMIT 200`);
 
   return c.json({ leads: rows });

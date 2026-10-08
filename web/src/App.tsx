@@ -123,7 +123,6 @@ function rowFacts(l: Lead, users: OrgUser[]): string {
   const out: string[] = [];
   const owner = users.find((u) => u.id === l.assignee_id);
   if (owner) out.push((owner.name || owner.email).split(/\s+/)[0]);
-  else out.push('Unassigned');
   if (l.quote_amount != null) {
     out.push('$' + Number(l.quote_amount).toLocaleString('en-US', { maximumFractionDigits: 0 }));
   }
@@ -306,30 +305,45 @@ export function App() {
   }, [leads, view, query]);
 
   /**
-   * Headings that are true.
+   * Headings that are true, ordered by when the work ARRIVED.
    *
-   * The last bucket was labelled "Today" and held everything that was neither live nor
-   * rush — including jobs 265 days old. A heading that confidently misreports is worse
-   * than none, so the rest of the queue is now split by when something last came in.
+   * Two rules, both learned the hard way:
+   *
+   * 1. A new request goes to the top, always. It used to land underneath the whole rush
+   *    block, so the one thing nobody has looked at yet was the one thing you had to
+   *    scroll past three amber bars to find. Rush still has its own group, just below —
+   *    plus its tag and its coloured edge, so nothing about it got quieter.
+   *
+   * 2. Position is set by arrival, never by the last message. Bucketing on last_in_at
+   *    meant a three-week-old thread jumped the queue the moment anyone touched it, and
+   *    pushed a genuinely new enquiry down. A reply is not a new request.
    */
   const groups = useMemo(() => {
-    const when = (l: Lead) => new Date(l.last_in_at ?? l.created_at).getTime();
+    const arrived = (l: Lead) => new Date(l.created_at).getTime();
     const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
     const weekAgo = Date.now() - 7 * 86_400_000;
 
     const inChat = shown.filter((l) => l.status === 'live');
     const open = shown.filter((l) => l.status !== 'live');
-    const rush = open.filter((l) => l.rush);
-    const rest = open.filter((l) => !l.rush);
+    // Nobody here has answered yet. The clearest definition of work not yet started, and
+    // it survives a page reload in a way "arrived since you last looked" does not.
+    const fresh = open.filter((l) => !l.first_reply_at);
+    const seen = open.filter((l) => l.first_reply_at);
+    const rush = seen.filter((l) => l.rush);
+    const rest = seen.filter((l) => !l.rush);
 
     return [
-      { title: `In chat now · ${inChat.length}`, rows: inChat },
-      { title: `Rush · ${rush.length}`, rows: rush },
-      { title: 'Today', rows: rest.filter((l) => when(l) >= startOfToday.getTime()) },
-      { title: 'This week', rows: rest.filter((l) => when(l) < startOfToday.getTime() && when(l) >= weekAgo) },
-      { title: 'Older', rows: rest.filter((l) => when(l) < weekAgo) },
+      { title: 'In chat now', rows: inChat },
+      { title: 'New', rows: fresh },
+      { title: 'Rush', rows: rush },
+      { title: 'Today', rows: rest.filter((l) => arrived(l) >= startOfToday.getTime()) },
+      { title: 'This week', rows: rest.filter((l) => arrived(l) < startOfToday.getTime() && arrived(l) >= weekAgo) },
+      { title: 'Older', rows: rest.filter((l) => arrived(l) < weekAgo) },
     ]
-      .map((g) => ({ ...g, title: g.title.includes('·') ? g.title : `${g.title} · ${g.rows.length}` }))
+      // Newest arrival first inside every group, for the same reason the groups are
+      // ordered this way: the question a rep is asking is "what has come in".
+      .map((g) => ({ title: `${g.title} · ${g.rows.length}`,
+                     rows: [...g.rows].sort((a, b) => arrived(b) - arrived(a)) }))
       .filter((g) => g.rows.length);
   }, [shown]);
 
@@ -517,7 +531,7 @@ export function App() {
             </button>
           )}
           {groups.map((g) => (
-            <div key={g.title}>
+            <div key={g.title} className="qblock">
               <div className="qgroup">{g.title}</div>
               {g.rows.map((l) => {
                 const s = summarise(l);
@@ -534,9 +548,13 @@ export function App() {
                       <span className={`dot${hot ? ' ok pulse' : ''}`} style={hot ? undefined : { background: u.color }} />
                       {l.rush && <span className="tag rush">Rush</span>}
                       {l.status === 'live' && <span className="tag live">Live</span>}
-                      <span className="name">{l.contact_name ?? l.contact_email ?? l.contact_phone ?? 'Anonymous'}</span>
-                      {t.who && <span className={`turn ${t.who}`}>{t.label}</span>}
-                      <span className="age">{age(l.last_in_at ?? l.created_at)}</span>
+                      {/* Company first: it is what a rep recognises, and it is already on
+                          the row object. Falling straight to "Anonymous" with a company
+                          sitting right there gave a queue of identical grey rows. */}
+                      <span className="name">
+                        {l.company_name ?? l.contact_name ?? l.contact_email ?? l.contact_phone ?? 'Unknown caller'}
+                      </span>
+                      <span className="age">{age(l.created_at)}</span>
                     </div>
                     <div className="r2">
                       <span className="tag" style={{ marginRight: 6 }}>{CHANNEL_TAG[l.channel] ?? l.channel}</span>
@@ -545,7 +563,12 @@ export function App() {
                     {/* Owner, money and due date rather than a second line of spec: the
                         finish and the trim size are visible the moment the ticket opens,
                         and none of them help decide whether to open it. */}
-                    <div className="r3">{rowFacts(l, users)}</div>
+                    <div className="r3">
+                      {/* Down here with the other facts rather than beside the name: on a
+                          320px pane it was truncating the company to "Golden State Wa…". */}
+                      {t.who && <span className={`turn ${t.who}`}>{t.label}</span>}
+                      {rowFacts(l, users)}
+                    </div>
                   </button>
                 );
               })}

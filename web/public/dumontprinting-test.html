@@ -258,6 +258,9 @@
   })();
 </script>
 
-<script src="/w.js" data-org="dumont" data-flow="quote-intake" async></script>
+<!-- simplebot, because it is the bot that is actually published. Pointing this at an
+     unpublished flow does not hide the widget: the launcher and the nudge still appear,
+     the socket then fails, and the visitor is left looking at an empty panel. -->
+<script src="/w.js" data-org="dumont" data-flow="simplebot" async></script>
 </body>
 </html>

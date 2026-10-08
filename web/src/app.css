@@ -817,3 +817,16 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   margin: 12px 0 0; padding: 9px 12px; border-left: 2px solid var(--warn);
   background: var(--paper-2); font-size: 13px; line-height: 1.55; color: var(--ink-2);
 }
+
+/* ── answers with no column of their own ─────────────────────────────
+   A field several questions feed holds one labelled line each, and the
+   newlines carry the meaning, so they have to survive. */
+.spec .val.answer { white-space: pre-line; }
+
+/* Multi-line answers take the whole row and stack under their label. In
+   the two-column grid each entry wrapped mid-sentence, so a wrap looked
+   exactly like the start of the next answer — which defeats the point of
+   keeping them apart. */
+.scell.stacked { grid-column: 1 / -1; flex-direction: column; align-items: stretch; gap: 5px; }
+.scell.stacked .label { width: auto; }
+.scell.stacked .val.answer { line-height: 1.55; }

@@ -6,6 +6,7 @@ import { Campaigns } from './Campaigns';
 import { History } from './History';
 import { TicketSequences } from './TicketSequences';
 import { Settings } from './Settings';
+import { FIELDS } from './flows-api';
 
 const VIEWS = ['All', 'New', 'Mine', 'Rush', 'Working', 'Quoted', 'Won', 'Lost', 'Spam', 'Archived'] as const;
 type View = (typeof VIEWS)[number];
@@ -67,6 +68,24 @@ function age(iso: string) {
   if (m < 60) return `${m}m`;
   if (m < 1440) return `${Math.round(m / 60)}h`;
   return `${Math.round(m / 1440)}d`;
+}
+
+/**
+ * Fields the ticket already shows in a column of their own, so the Answers section does not
+ * repeat them. Everything else the bot collected has nowhere else to appear — which is most
+ * of what a shop points at Notes.
+ */
+const SPEC_HAS_A_HOME = new Set([
+  'product', 'qty', 'size', 'stock', 'color', 'finish', 'deadline',
+  'name', 'company', 'email', 'phone', 'contact',
+]);
+
+/** The bot's answers that no column covers, in the order the flow collected them. */
+function looseAnswers(l: Lead): [string, string][] {
+  const captured = l.spec?.captured;
+  if (!captured) return [];
+  return Object.entries(captured)
+    .filter(([k, v]) => !SPEC_HAS_A_HOME.has(k) && typeof v === 'string' && v.trim());
 }
 
 /** The one-line spec summary under each queue row, in the reference's order. */
@@ -756,6 +775,25 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
           <EditCell leadId={l.id} label="color" value={l.color} placeholder={miss.includes('color') ? '— ?' : ''}
                     onSave={(v) => onPatch({ color: v })} />
         </div>
+
+        {/* Everything the bot collected that no column above covers. Without this the
+            answers were stored and searchable but invisible: a rep had to read the whole
+            transcript back to find what the customer said about artwork or delivery. */}
+        {looseAnswers(l).length > 0 && (
+          <>
+            <div className="section">Answers</div>
+            <div className="spec">
+              {looseAnswers(l).map(([k, v]) => (
+                // Several questions on one field produce one line each; that needs the
+                // full width, or every entry wraps and they stop being tellable apart.
+                <div key={k} className={`scell${v.includes('\n') ? ' stacked' : ''}`}>
+                  <span className="label">{FIELDS[k] ?? k}</span>
+                  <span className="val answer">{v}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="section">What they asked for</div>
         {live && (

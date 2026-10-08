@@ -14,6 +14,12 @@ export interface Lead {
   contact_name: string | null; contact_phone: string | null; contact_email: string | null;
   company_name?: string | null;
   chat_sid: string | null;
+  /**
+   * Long-tail fields. `captured` is what the bot's questions collected, keyed by field —
+   * the only home for answers that have no column of their own, such as everything pointed
+   * at Notes.
+   */
+  spec?: { captured?: Record<string, string> } | null;
 }
 
 export interface Message {

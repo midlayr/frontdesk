@@ -24,6 +24,7 @@ import { sequences } from './api/sequences';
 import { settings } from './api/settings';
 import { CHAT_JS } from './widget-asset';
 import { mailFrom } from './lib/mail-from';
+import { aiProvider } from './lib/ai-json';
 import { MEDIA_TTL_MS, mintTicket, readTicket } from './ws-ticket';
 import {
   COOKIE, clearCookie, createSession, destroySession, hashPassword,
@@ -791,6 +792,31 @@ app.get('/api/health/providers', async (c) => {
   };
 
   const results = await Promise.all([
+    /*
+     * Which model writes the ticket summaries.
+     *
+     * Worth stating plainly: the only other way to tell Claude from the Workers AI
+     * fallback was to read a summary and judge the prose, and a key that quietly failed to
+     * save looks exactly like one that worked.
+     *
+     * The call is a real one, deliberately — a key can be present and rejected, which is
+     * the failure this panel exists to catch. One token of output, so it costs nothing.
+     */
+    check('Summaries', aiProvider(env), async () => {
+      if (!env.ANTHROPIC_API_KEY) {
+        return 'Using the Workers AI fallback — set ANTHROPIC_API_KEY to use Claude';
+      }
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY,
+                   'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: env.ANTHROPIC_MODEL || 'claude-haiku-5-5',
+                               max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+      });
+      if (r.ok) return null;
+      const detail = (await r.text()).slice(0, 160);
+      return r.status === 401 ? `Key rejected (401) — ${detail}` : `${r.status} — ${detail}`;
+    }),
     check('Database', 'Postgres via Hyperdrive', async () => {
       const [row] = await c.get('sql')<{ n: number }[]>`SELECT 1 AS n`;
       return row?.n === 1 ? null : 'unexpected reply';

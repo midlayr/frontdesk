@@ -47,6 +47,10 @@ function stateOf(u: OrgUser): State {
    * at all. Calling that "Invited · waiting on them to open their link" was a plain untruth:
    * nothing was sent, so no amount of waiting would change it, and an admin chasing the
    * silence had no way to discover why.
+   *
+   * The server reads this from the invite tokens, which are swept once they expire — so a
+   * link sent weeks ago and never opened reads as "Not invited" rather than "Invited". The
+   * label is wrong in that corner; what it tells you to do is still right.
    */
   if (!u.invited_at) {
     return { label: 'Not invited', tone: 'off', why: 'Can be assigned work — no sign-in sent' };

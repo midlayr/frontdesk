@@ -842,3 +842,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .scell.stacked { grid-column: 1 / -1; flex-direction: column; align-items: stretch; gap: 5px; }
 .scell.stacked .label { width: auto; }
 .scell.stacked .val.answer { line-height: 1.55; }
+
+/* "Fill from team" under a rep question's chips. Quiet until it has something to do. */
+.fb-fill { align-self: flex-start; margin-top: 8px; font-size: 12.5px; padding: 6px 11px; }
+.fb-fill:disabled { opacity: .55; cursor: default; }

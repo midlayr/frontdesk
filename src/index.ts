@@ -587,8 +587,9 @@ app.get('/api/users', async (c) => {
   const org = c.get('org');
   const users = await withOrg(c.get('sql'), org.id, (tx) =>
     tx<{ id: string; name: string; email: string; role: string; disabled_at: string | null;
-         last_seen_at: string | null; password_set_at: string | null }[]>`
-      SELECT id, name, email, role, disabled_at, last_seen_at, password_set_at
+         last_seen_at: string | null; password_set_at: string | null;
+         invited_at: string | null }[]>`
+      SELECT id, name, email, role, disabled_at, last_seen_at, password_set_at, invited_at
         FROM users WHERE org_id = ${org.id}
        ORDER BY disabled_at NULLS FIRST, name`);
   return c.json({ users });
@@ -723,6 +724,10 @@ async function sendInvite(
       subject: `${inviter?.name ?? 'Someone'} has added you to ${org.name} Front Desk`,
       text: mail.text, html: mail.html,
     });
+    // Stamped after the send, not before: "Invited" has to mean a link actually left, or
+    // the Team page tells an admin to wait on an email that was never delivered.
+    await withOrg(sql, org.id, (tx) =>
+      tx`UPDATE users SET invited_at = now() WHERE id = ${userId}`);
     return { sent: true };
   } catch (err) {
     // Surfaced, unlike the public routes: an admin who has just added a colleague needs to

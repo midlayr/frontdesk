@@ -490,7 +490,8 @@ export function App() {
       ) : flowSlug ? (
         <FlowBuilder slug={flowSlug} accent={brand.color || '#0B7FA8'}
                      view={flowTab === 'setup' || flowTab === 'map' ? flowTab : 'steps'}
-                     onView={(v) => go(`/chat/flows/${flowSlug}${v === 'steps' ? '' : `/${v}`}`)} />
+                     onView={(v) => go(`/chat/flows/${flowSlug}${v === 'steps' ? '' : `/${v}`}`)}
+                     users={users} />
       ) : onChat ? (
         <FlowList go={go} />
       ) : (

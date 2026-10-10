@@ -4,6 +4,7 @@ import type { Env, Job } from '../env';
 import { withOrg, type Sql, type Tx } from '../db';
 import { ticketPrefix } from '../org';
 import { onLeadCreated } from '../lib/enroll';
+import { matchRep } from '../lib/rep-match';
 
 /**
  * Routes the Durable Objects call back into, because a DO has no Hyperdrive binding of its
@@ -197,9 +198,40 @@ internal.post('/leads/from-chat', async (c) => {
 
     const id = ulid();
     const ticketNo = await nextTicket(tx, body.orgId, prefix);
-    await tx`INSERT INTO leads (id, org_id, ticket_no, contact_id, company_id, channel, status, spec)
+
+    /*
+     * "Who is your account rep?" — if the bot asked and the answer names somebody real, the
+     * ticket opens already assigned to them instead of landing in the general pile.
+     *
+     * Disabled people are left out of the candidates: somebody who has left the shop should
+     * not keep being handed work because their name is still a chip in the flow.
+     *
+     * A name that matches nobody is not an error. The ticket stays unassigned, which is
+     * exactly where it would have been had the question never been asked — but the attempt
+     * is recorded below, because a chip that has drifted from the Team page is invisible
+     * otherwise, and the symptom is simply that routing quietly stops working.
+     */
+    const people = await tx<{ id: string; name: string; email: string }[]>`
+      SELECT id, name, email FROM users
+       WHERE org_id = ${body.orgId} AND disabled_at IS NULL`;
+    const rep = matchRep(body.captured.rep, people);
+
+    await tx`INSERT INTO leads (id, org_id, ticket_no, contact_id, company_id, channel, status, assignee_id, spec)
              VALUES (${id}, ${body.orgId}, ${ticketNo}, ${contactId}, ${companyId}, 'chat', 'live',
+                     ${rep.ok ? rep.id : null},
                      ${tx.json({ captured: body.captured })})`;
+
+    if (rep.ok) {
+      await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+               VALUES (${ulid()}, ${body.orgId}, ${id}, 'system', 'assigned',
+                       ${tx.json({ to: rep.id, name: rep.name, why: 'named in chat' })})`;
+    } else if (rep.why !== 'blank') {
+      // Says what the customer picked and why it did not land, so "the rep never got it"
+      // has an answer on the ticket rather than needing someone to read the flow.
+      await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+               VALUES (${ulid()}, ${body.orgId}, ${id}, 'system', 'assign_failed',
+                       ${tx.json({ said: rep.said, why: rep.why })})`;
+    }
 
     await tx`INSERT INTO chat_sessions (id, org_id, flow_id, flow_version, lead_id, visitor_id, state, visitor, captured, do_id)
              VALUES (${body.sessionId}, ${body.orgId}, ${body.flowId}, ${body.flowVersion}, ${id},

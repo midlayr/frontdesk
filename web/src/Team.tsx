@@ -40,7 +40,18 @@ function stateOf(u: OrgUser): State {
     return { label: 'Active', tone: 'ok', why: `Last here ${ago(u.last_seen_at)}` };
   }
   if (u.password_set_at) return { label: 'Never signed in', tone: 'wait', why: 'Has a password but has not used it' };
-  return { label: 'Invited', tone: 'wait', why: 'Waiting on them to open their link' };
+  /*
+   * Added, but never asked to log in.
+   *
+   * A sales rep exists here so the bot can hand them a job — they may never want an account
+   * at all. Calling that "Invited · waiting on them to open their link" was a plain untruth:
+   * nothing was sent, so no amount of waiting would change it, and an admin chasing the
+   * silence had no way to discover why.
+   */
+  if (!u.invited_at) {
+    return { label: 'Not invited', tone: 'off', why: 'Can be assigned work — no sign-in sent' };
+  }
+  return { label: 'Invited', tone: 'wait', why: `Link sent ${ago(u.invited_at)} — waiting on them to open it` };
 }
 
 export function Team({ me }: { me: { id: string; role: string } | null }) {

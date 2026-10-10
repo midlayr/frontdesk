@@ -42,6 +42,8 @@ export interface History { activity: Event[]; created_at: string; status: string
 export interface OrgUser {
   id: string; name: string; email: string; role: 'sales' | 'admin';
   disabled_at?: string | null; last_seen_at?: string | null; password_set_at?: string | null;
+  /** When a sign-in link was last sent. Null means they were never asked to log in. */
+  invited_at?: string | null;
 }
 
 export type ProviderCheck = { name: string; detail: string; ok: boolean; note: string; ms: number };

@@ -149,6 +149,9 @@ export const FIELDS: Record<string, string> = {
   // `contact` is the older free-text catch-all the server still has to sniff
   name: 'Name', company: 'Company', email: 'Email', phone: 'Phone',
   contact: 'Contact (email or phone)',
+  // Who at the shop already looks after this customer. Matched to a real person on the
+  // Team page, so the ticket lands with them instead of in the general pile.
+  rep: 'Account rep',
   notes: 'Notes',
 };
 
@@ -156,6 +159,7 @@ export const FIELDS: Record<string, string> = {
 export const FIELD_GROUPS: { label: string; fields: string[] }[] = [
   { label: 'Job', fields: ['product', 'qty', 'size', 'stock', 'color', 'finish', 'deadline'] },
   { label: 'Contact', fields: ['name', 'company', 'email', 'phone', 'contact'] },
+  { label: 'Routing', fields: ['rep'] },
   { label: 'Other', fields: ['notes'] },
 ];
 

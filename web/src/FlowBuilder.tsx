@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CONTACT_DEFAULTS, FIELDS, FIELD_GROUPS, KIND, ROUTES, TO_TICKET, ago, flowsApi, labelsOf, withChips, withIds, type Flow, type SimResult, type Step } from './flows-api';
 import { FlowMap } from './FlowMap';
 import { BotSetup } from './BotSetup';
+import type { OrgUser } from './api';
 
 const SAVE_DEBOUNCE = 500;
 
@@ -22,8 +23,8 @@ const titleOf = (s: Step) =>
 type View = 'steps' | 'map' | 'setup';
 
 export function FlowBuilder(
-  { slug, accent, view, onView }:
-  { slug: string; accent: string; view: View; onView: (v: View) => void },
+  { slug, accent, view, onView, users = [] }:
+  { slug: string; accent: string; view: View; onView: (v: View) => void; users?: OrgUser[] },
 ) {
   const [flow, setFlow] = useState<Flow | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -167,6 +168,11 @@ export function FlowBuilder(
     } catch (e) { setError(String(e)); }
   }
 
+  /* Everyone who can be handed a ticket, spelled exactly as their record spells it. */
+  const teamNames = useMemo(
+    () => users.filter((u) => !u.disabled_at).map((u) => u.name).sort((a, b) => a.localeCompare(b)),
+    [users]);
+
   const current = steps[sel];
   const askCount = useMemo(() => steps.filter(isAsk).length, [steps]);
 
@@ -308,6 +314,19 @@ export function FlowBuilder(
                   <Field label="Quick replies" hint="comma separated · shown as chips">
                     <input value={current.chips ?? ''} placeholder="100, 250, 500"
                            onChange={(e) => setChips(e.target.value)} />
+                    {/* A rep question routes by matching the answer to a person on the Team
+                        page, so the two have to agree. Typing seven names by hand is how
+                        they stop agreeing — and a misspelt one does not fail loudly, it
+                        just quietly stops routing. */}
+                    {current.field === 'rep' && teamNames.length > 0 && (
+                      <button type="button" className="btn-ghost fb-fill"
+                              disabled={teamNames.join(', ') === (current.chips ?? '').trim()}
+                              onClick={() => setChips(teamNames.join(', '))}>
+                        {teamNames.join(', ') === (current.chips ?? '').trim()
+                          ? `Matches the team · ${teamNames.length} people`
+                          : `Fill from team · ${teamNames.length} people`}
+                      </button>
+                    )}
                   </Field>
                   <label className="fb-check">
                     <input type="checkbox" checked={!!current.skippable}

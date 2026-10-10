@@ -27,6 +27,18 @@ export interface Env {
   /** Where providers call us back. Needed because a Worker cannot know its own hostname
    *  from a cron-triggered job, which is where drips are sent from. */
   PUBLIC_ORIGIN?: string;
+  /**
+   * Where a "new job from the chat" notice goes. Three settings, and the default is silence:
+   *
+   *   unset            nothing is sent. Notifications are off.
+   *   an address       every notice goes THERE instead of to the rep, whoever was named.
+   *                    How this gets tested without mailing a print shop's sales team.
+   *   the word "rep"   live routing: the rep the customer named, or the shop's admins.
+   *
+   * Unset means off rather than live on purpose. A var dropped from a future wrangler.toml
+   * should make the shop quieter, never start mailing seven people who were not expecting it.
+   */
+  LEAD_NOTIFY_TO?: string;
 }
 
 // Every job carries orgId: the consumer has no request to resolve a tenant from.

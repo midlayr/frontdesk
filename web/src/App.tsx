@@ -264,6 +264,30 @@ export function App() {
     return () => { stop = true; clearTimeout(timer); ws?.close(); };
   }, [org, refresh]);
 
+  /**
+   * Open the ticket named in the address bar, once.
+   *
+   * A notification email is only worth sending if its button lands on the thing it is
+   * about. Without this, ?lead=… was ignored and every link dropped the reader at the top
+   * of the queue to go and find it.
+   *
+   * The id is dropped from the URL afterwards, so a refresh does not keep yanking the rep
+   * back to the same ticket when they have moved on. Kept separate from the queue's own
+   * loading: the ticket opens by id, whether or not it is in the view they happen to be on.
+   */
+  const openLeadRef = useRef<((id: string) => void) | null>(null);
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (deepLinked.current) return;
+    const id = new URLSearchParams(location.search).get('lead');
+    if (!id) return;
+    deepLinked.current = true;
+    openLeadRef.current?.(id);
+    const u = new URL(location.href);
+    u.searchParams.delete('lead');
+    history.replaceState({}, '', u.toString() + u.hash);
+  });
+
   const openLead = useCallback(async (id: string) => {
     setSelId(id);
     setLive(false);
@@ -294,6 +318,7 @@ export function App() {
       };
     }
   }, []);
+  openLeadRef.current = openLead;
 
   useEffect(() => { threadEnd.current?.scrollIntoView({ block: 'end' }); }, [detail?.messages.length]);
 

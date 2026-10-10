@@ -23,6 +23,7 @@ import { flows } from './api/flows';
 import { sequences } from './api/sequences';
 import { settings } from './api/settings';
 import { CHAT_JS } from './widget-asset';
+import { mailFrom } from './lib/mail-from';
 import { MEDIA_TTL_MS, mintTicket, readTicket } from './ws-ticket';
 import {
   COOKIE, clearCookie, createSession, destroySession, hashPassword,
@@ -287,11 +288,6 @@ const WHY: Record<'spent' | 'stale' | 'unknown', string> = {
   unknown: 'That link is not valid. Ask for a new one below.',
 };
 
-/** The sender a tenant's mail goes out as — see replyByEmail for why it is derived. */
-function mailFrom(org: Org, env: Env) {
-  const sender = org.comms.email_sender || `${org.slug}@${env.MAILGUN_DOMAIN}`;
-  return { from: `${org.name} <${sender}>`, replyTo: org.comms.email_inbound ?? sender };
-}
 
 /** The account behind an address on this tenant, if it can sign in at all. */
 async function signInUser(sql: Sql, orgId: string, email: string) {

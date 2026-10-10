@@ -112,6 +112,17 @@ export class ChatSession extends DurableObject<Env> {
     if (r.handedOff || r.completed) await this.ensureLead();
     await this.save();
 
+    /*
+     * Only on completion, and after save() — so the transcript is written before anybody is
+     * told to come and read it.
+     *
+     * Not folded into ensureLead: that returns early when a lead already exists, which is
+     * exactly what happens when the visitor asked for a human earlier in the conversation.
+     * Hanging the notice off lead creation would mean the one enquiry that reached the end
+     * properly is the one nobody hears about.
+     */
+    if (r.completed && this.s.leadId) await this.notifyLead();
+
     // Tell the inbox about every turn, not only handoff and takeover. Without this a rep
     // watching the queue sees nothing when a visitor keeps typing, and the row never moves.
     if (this.s.leadId) {
@@ -210,6 +221,23 @@ export class ChatSession extends DurableObject<Env> {
     await this.persist();
     await this.env.JOBS.send({ kind: 'extract_specs', orgId: this.s.orgId, leadId: this.s.leadId });
   }
+  /**
+   * Tell the Worker a conversation finished. Never fatal: the ticket is already saved and
+   * the visitor has already been thanked, so a mail problem must not surface as a broken
+   * chat window.
+   */
+  private async notifyLead() {
+    try {
+      await this.env.INTERNAL.fetch('https://internal/internal/leads/notify', {
+        method: 'POST',
+        headers: this.internalHeaders(),
+        body: JSON.stringify({ orgId: this.s.orgId, leadId: this.s.leadId }),
+      });
+    } catch (err) {
+      console.error('notify failed', err);
+    }
+  }
+
   private internalHeaders() {
     return { 'content-type': 'application/json', 'x-internal-token': this.env.SESSION_SECRET };
   }

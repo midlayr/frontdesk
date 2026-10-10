@@ -1,10 +1,14 @@
 import { Hono } from 'hono';
 import { ulid } from 'ulid';
-import type { Env, Job } from '../env';
+import type { Env, Job, Org } from '../env';
 import { withOrg, type Sql, type Tx } from '../db';
 import { ticketPrefix } from '../org';
 import { onLeadCreated } from '../lib/enroll';
 import { matchRep } from '../lib/rep-match';
+import { leadNotice } from '../lib/lead-notice';
+import { render } from '../lib/email-layout';
+import { mailFrom } from '../lib/mail-from';
+import { sendEmail } from '../lib/mailgun';
 
 /**
  * Routes the Durable Objects call back into, because a DO has no Hyperdrive binding of its
@@ -304,3 +308,105 @@ internal.post('/leads/chat-turns', async (c) => {
 });
 
 export type { Job };
+
+/**
+ * Tell the shop a job has come in.
+ *
+ * Called by the chat DO the moment a conversation reaches its ticket step — not when the
+ * lead row is first written, which can happen much earlier if the visitor asks for a human
+ * halfway through. A rep mailed about a half-finished enquiry learns to ignore the mail.
+ *
+ * Where it goes is LEAD_NOTIFY_TO, and the default is silence (see env.ts). While a shop is
+ * trying this out, every notice is redirected to one address and says plainly who it would
+ * have gone to — so the routing can be watched working without seven people being emailed
+ * about test conversations.
+ */
+internal.post('/leads/notify', async (c) => {
+  const body = await c.req.json<{ orgId: string; leadId: string }>();
+  const dest = (c.env.LEAD_NOTIFY_TO ?? '').trim();
+  if (!dest) return c.json({ ok: true, sent: false, why: 'notifications are off' });
+
+  const sql = c.get('sql');
+  const [org] = await sql<Org[]>`
+    SELECT id, slug, name, brand, comms, widget, features FROM orgs WHERE id = ${body.orgId}`;
+  if (!org) return c.json({ error: 'unknown org' }, 404);
+
+  const facts = await withOrg(sql, body.orgId, async (tx) => {
+    // Written before the send and checked here, so a retried DO call cannot mail twice.
+    const [already] = await tx<{ id: string }[]>`
+      SELECT id FROM activity
+       WHERE lead_id = ${body.leadId} AND kind = 'lead_notified' LIMIT 1`;
+    if (already) return null;
+
+    const [l] = await tx<{
+      ticket_no: string; description: string | null; product: string | null; qty: number | null;
+      spec: { captured?: Record<string, string> } | null;
+      contact_name: string | null; contact_email: string | null; contact_phone: string | null;
+      company_name: string | null; rep_name: string | null; rep_email: string | null;
+    }[]>`
+      SELECT l.ticket_no, l.description, l.product, l.qty, l.spec,
+             ct.name AS contact_name, ct.email AS contact_email, ct.phone AS contact_phone,
+             co.name AS company_name, u.name AS rep_name, u.email AS rep_email
+        FROM leads l
+        LEFT JOIN contacts ct ON ct.id = l.contact_id
+        LEFT JOIN companies co ON co.id = l.company_id
+        LEFT JOIN users u ON u.id = l.assignee_id
+       WHERE l.id = ${body.leadId}`;
+    if (!l) return null;
+
+    // Admins are the fallback: somebody has to see a job nobody was named on, and they are
+    // the people who can hand it out.
+    const admins = await tx<{ email: string }[]>`
+      SELECT email FROM users
+       WHERE org_id = ${body.orgId} AND role = 'admin' AND disabled_at IS NULL`;
+
+    await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
+             VALUES (${ulid()}, ${body.orgId}, ${body.leadId}, 'system', 'lead_notified',
+                     ${tx.json({ to: dest === 'rep' ? (l.rep_email ?? 'admins') : dest })})`;
+    return { l, admins: admins.map((a) => a.email) };
+  });
+
+  if (!facts) return c.json({ ok: true, sent: false, why: 'already notified, or no such lead' });
+  const { l, admins } = facts;
+
+  // Only the answers with no column of their own — the rest is already in the letter.
+  const HOME = new Set(['product', 'qty', 'size', 'stock', 'color', 'finish', 'deadline',
+                        'name', 'company', 'email', 'phone', 'contact', 'rep']);
+  const answers = Object.entries(l.spec?.captured ?? {})
+    .filter(([k, v]) => !HOME.has(k) && typeof v === 'string' && v.trim()) as [string, string][];
+
+  const origin = c.env.PUBLIC_ORIGIN?.replace(/\/$/, '') ?? '';
+  const letter = leadNotice({
+    ticketNo: l.ticket_no, company: l.company_name, contactName: l.contact_name,
+    contactEmail: l.contact_email, contactPhone: l.contact_phone,
+    description: l.description, product: l.product, qty: l.qty, answers,
+    repName: l.rep_name,
+    ticketUrl: `${origin}/?lead=${encodeURIComponent(body.leadId)}`,
+  });
+
+  const live = dest === 'rep';
+  const to = live ? (l.rep_email ?? admins.join(',')) : dest;
+  if (!to) return c.json({ ok: true, sent: false, why: 'nobody to send to' });
+
+  if (!live) {
+    // Says what would have happened, so a redirected notice is still worth reading.
+    letter.fine = `Test copy — redirected here. Live, this would have gone to `
+      + `${l.rep_email ?? `the shop's admins (${admins.join(', ') || 'none set'})`}.`;
+  }
+
+  const mail = render(letter, org, c.env);
+  const { from, replyTo } = mailFrom(org, c.env);
+  try {
+    await sendEmail(c.env, {
+      from, to, replyTo, inReplyTo: null, references: [],
+      subject: `${l.ticket_no} · ${l.company_name ?? l.contact_name ?? 'New job'} — from the website chat`,
+      text: mail.text, html: mail.html,
+    });
+  } catch (err) {
+    // The activity row is already written, so this will not retry on its own. Loud in the
+    // log rather than failing the DO's turn: the ticket exists and the visitor is fine.
+    console.error('lead notify failed', err);
+    return c.json({ ok: true, sent: false, why: String(err) });
+  }
+  return c.json({ ok: true, sent: true, to });
+});

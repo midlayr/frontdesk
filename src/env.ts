@@ -23,6 +23,9 @@ export interface Env {
   SESSION_SECRET: string;
   PLATFORM_DOMAIN: string;
   AI_MODEL?: string;
+  /** Set to use Claude for extraction and the chat summary; without it, Workers AI. */
+  ANTHROPIC_API_KEY?: string;
+  ANTHROPIC_MODEL?: string;
   WIDGET_ORIGIN: string;
   /** Where providers call us back. Needed because a Worker cannot know its own hostname
    *  from a cron-triggered job, which is where drips are sent from. */

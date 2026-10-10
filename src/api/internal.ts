@@ -375,11 +375,25 @@ internal.post('/leads/notify', async (c) => {
   const answers = Object.entries(l.spec?.captured ?? {})
     .filter(([k, v]) => !HOME.has(k) && typeof v === 'string' && v.trim()) as [string, string][];
 
+  /*
+   * Fall back to what the bot captured when the spec columns are still empty.
+   *
+   * extract_specs is a queued job and this notice goes out the moment the conversation
+   * ends, so the email usually wins the race — the first one sent said nothing about
+   * quantity even though the visitor had typed 250 into the chat a second earlier. The
+   * columns are better when they exist (a number, reconciled across the conversation);
+   * captured is what we already know for certain.
+   */
+  const cap = l.spec?.captured ?? {};
+  const capQty = Number(String(cap.qty ?? '').replace(/[^0-9]/g, ''));
+  const qty = l.qty ?? (Number.isFinite(capQty) && capQty > 0 ? capQty : null);
+  const product = l.product ?? (cap.product?.trim() || null);
+
   const origin = c.env.PUBLIC_ORIGIN?.replace(/\/$/, '') ?? '';
   const letter = leadNotice({
     ticketNo: l.ticket_no, company: l.company_name, contactName: l.contact_name,
     contactEmail: l.contact_email, contactPhone: l.contact_phone,
-    description: l.description, product: l.product, qty: l.qty, answers,
+    description: l.description, product, qty, answers,
     repName: l.rep_name,
     ticketUrl: `${origin}/?lead=${encodeURIComponent(body.leadId)}`,
   });

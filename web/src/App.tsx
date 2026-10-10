@@ -782,6 +782,18 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
           {[l.channel, l.contact_phone, l.contact_email].filter(Boolean).join(' · ').toUpperCase()}
         </div>
 
+        {/* Above everything, because it is the one thing that answers "what is this?"
+            without reading. The spec is fields and the chat is a transcript; neither tells
+            a rep in a sentence what the customer wants. Absent until the extractor has
+            run — a few seconds after the conversation ends — and the block simply is not
+            there until then rather than showing an empty frame. */}
+        {l.spec?.summary && (
+          <div className="summary">
+            <span className="summary-tag">Summary</span>
+            <p>{l.spec.summary}</p>
+          </div>
+        )}
+
         <div className="section">Contact</div>
         <div className="spec">
           <EditCell leadId={l.id} label="name" value={l.contact_name} placeholder="who called?"

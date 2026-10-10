@@ -846,3 +846,20 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 /* "Fill from team" under a rep question's chips. Quiet until it has something to do. */
 .fb-fill { align-self: flex-start; margin-top: 8px; font-size: 12.5px; padding: 6px 11px; }
 .fb-fill:disabled { opacity: .55; cursor: default; }
+
+/* ── the chat, in a sentence ──────────────────────────────────────────
+   Sits above the spec and the transcript. Tinted rather than bordered
+   like everything else on the ticket: it is the one block a rep should
+   land on without looking for it, and a 1px line would make it another
+   section among sections. */
+.summary {
+  margin: 20px 0 4px; padding: 15px 17px 16px;
+  background: var(--accent-tint); border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+}
+.summary-tag {
+  display: block; margin-bottom: 7px;
+  font: 500 10px var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent-tint-fg);
+}
+.summary p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink); max-width: 68ch; }

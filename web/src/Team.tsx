@@ -79,15 +79,28 @@ export function Team({ me }: { me: { id: string; role: string } | null }) {
     finally { setBusy(''); }
   }
 
-  const addAndInvite = () => run('add', async () => {
+  /**
+   * Add somebody, with or without mailing them.
+   *
+   * Two buttons because there are two genuinely different reasons to put a name here, and
+   * for a while there was only one. A sales rep exists so the bot can hand them a job —
+   * they may never want a login at all, and sending seven people a sign-in link they did
+   * not ask for is a poor way to introduce the shop to a new tool. Somebody who will work
+   * the queue needs the link.
+   *
+   * The account is created first either way, in its own call: it then exists even if the
+   * mail fails, so a send failure is "invite them again" rather than "they were never
+   * added".
+   */
+  const addPerson = (invite: boolean) => run('add', async () => {
     const name = draft.name.trim(), email = draft.email.trim();
     if (!name || !email) throw new Error('Name and email are both needed');
     const created = await api.addUser({ name, email, role: draft.role });
-    // Two calls rather than one: the account exists even if the mail does not go out, so a
-    // send failure is "invite them again", not "they were never added".
-    await api.inviteUser(created.user.id);
+    if (invite) await api.inviteUser(created.user.id);
     setDraft(BLANK); setAdding(false);
-  }, 'Added, and their sign-in link is on its way.');
+  }, invite
+    ? 'Added, and their sign-in link is on its way.'
+    : 'Added. Nothing was emailed — you can invite them whenever they need a login.');
 
   const savePassword = (id: string) => run('pw', async () => {
     if (pw.length < 12) throw new Error('A password needs at least 12 characters');
@@ -103,7 +116,7 @@ export function Team({ me }: { me: { id: string; role: string } | null }) {
         <div className="section" style={{ margin: 0 }}>People</div>
         {isAdmin && !adding && (
           <button className="btn-primary" onClick={() => { setAdding(true); setError(''); setNote(''); }}>
-            Invite someone
+            Add someone
           </button>
         )}
       </div>
@@ -114,10 +127,12 @@ export function Team({ me }: { me: { id: string; role: string } | null }) {
 
       {isAdmin && adding && (
         <div className="invite-card">
-          <div className="label">Invite someone</div>
+          <div className="label">Add someone</div>
           <p className="invite-sub">
-            They get an email with a link that signs them in. It lasts seven days and works once.
-            No password needed — they can set one later if they want.
+            A sign-in link lasts seven days and works once — no password needed, they can set
+            one later. Adding without emailing is for a rep the chat bot should be able to
+            hand a job to: they can own tickets straight away, and you can send them a link
+            whenever they actually want to log in.
           </p>
           <div className="invite-grid">
             <label className="fb-field">
@@ -140,8 +155,14 @@ export function Team({ me }: { me: { id: string; role: string } | null }) {
             ))}
           </div>
           <div className="invite-acts">
-            <button className="btn-primary" disabled={busy === 'add'} onClick={addAndInvite}>
-              {busy === 'add' ? 'Sending…' : 'Send invite'}
+            <button className="btn-primary" disabled={busy === 'add'} onClick={() => addPerson(true)}>
+              {busy === 'add' ? 'Working…' : 'Add and send a sign-in link'}
+            </button>
+            {/* The quieter of the two, deliberately: most people being added do want a
+                login. The ones who do not are reps the bot routes to, and mailing them
+                anyway is the mistake this exists to prevent. */}
+            <button className="btn-ghost" disabled={busy === 'add'} onClick={() => addPerson(false)}>
+              Add without emailing them
             </button>
             <button className="btn-ghost" onClick={() => { setAdding(false); setDraft(BLANK); }}>Cancel</button>
           </div>
@@ -187,7 +208,11 @@ export function Team({ me }: { me: { id: string; role: string } | null }) {
                     <button disabled={busy === `inv-${u.id}`}
                             onClick={() => run(`inv-${u.id}`, () => api.inviteUser(u.id),
                               `Sign-in link sent to ${u.email}.`)}>
-                      {busy === `inv-${u.id}` ? 'Sending…' : u.last_seen_at ? 'Send sign-in link' : 'Resend invite'}
+                      {/* "Resend" only when there was a send. Somebody added as a routing
+                          target has had nothing, and offering to resend it invites an admin
+                          to wonder where the first one went. */}
+                      {busy === `inv-${u.id}` ? 'Sending…'
+                        : u.last_seen_at || !u.invited_at ? 'Send sign-in link' : 'Resend invite'}
                     </button>
                   )}
                   <button onClick={() => { setPwFor(pwFor === u.id ? null : u.id); setPw(''); }}>

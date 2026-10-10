@@ -591,24 +591,22 @@ app.get('/api/users', async (c) => {
          invited_at: string | null }[]>`
       SELECT u.id, u.name, u.email, u.role, u.disabled_at, u.last_seen_at, u.password_set_at,
              /*
-              * Whether a sign-in link was ever sent, read from the tokens themselves rather
-              * than a column on the user.
+              * Whether a sign-in link was ever sent.
               *
-              * The Team page needs to tell two states apart that looked identical: somebody
-              * waiting on an invite, and somebody who was added purely as a routing target —
-              * a sales rep the bot can hand a job to, who was never asked to log in. Calling
-              * the second "Invited · waiting on them to open their link" is untrue, and an
-              * admin chasing that silence has no way to find out why.
+              * The Team page needs to tell two states apart that used to look identical:
+              * somebody waiting on an invite, and somebody added purely as a routing target
+              * — a sales rep the bot can hand a job to, who was never asked to log in.
+              * Calling the second "Invited · waiting on them to open their link" is untrue,
+              * and an admin chasing that silence has no way to find out why.
               *
-              * The honest version of this is a users.invited_at column. This derives it
-              * instead, and is wrong in one corner: the nightly sweep deletes expired
-              * unredeemed tokens, so an invite sent three weeks ago and never opened leaves
-              * no trace and the person reads as "Not invited". The action that label implies
-              * — send them a fresh link — happens to be the right one, because the old link
-              * is long dead. Worth replacing with the column if that corner ever bites.
+              * The column is the record; the token is a fallback for invites sent before the
+              * column existed. auth_tokens alone cannot answer it, because the nightly sweep
+              * deletes expired unredeemed rows — losing the evidence exactly when somebody
+              * starts wondering why that person never appeared.
               */
-             (SELECT max(t.created_at) FROM auth_tokens t
-               WHERE t.user_id = u.id AND t.purpose = 'invite') AS invited_at
+             COALESCE(u.invited_at,
+                      (SELECT max(t.created_at) FROM auth_tokens t
+                        WHERE t.user_id = u.id AND t.purpose = 'invite')) AS invited_at
         FROM users u WHERE u.org_id = ${org.id}
        ORDER BY u.disabled_at NULLS FIRST, u.name`);
   return c.json({ users });
@@ -743,6 +741,10 @@ async function sendInvite(
       subject: `${inviter?.name ?? 'Someone'} has added you to ${org.name} Front Desk`,
       text: mail.text, html: mail.html,
     });
+    // After the send, not before: "Invited" has to mean a link actually left, or the Team
+    // page tells an admin to wait on an email that was never delivered.
+    await withOrg(sql, org.id, (tx) =>
+      tx`UPDATE users SET invited_at = now() WHERE id = ${userId}`);
     return { sent: true };
   } catch (err) {
     // Surfaced, unlike the public routes: an admin who has just added a colleague needs to

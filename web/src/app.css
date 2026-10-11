@@ -881,3 +881,10 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .hours-day[data-on='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
 .hours-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
 .hours-row .fb-field { max-width: 190px; }
+
+/* Open / after-hours switch above the builder's preview. */
+.fb-when { margin-left: auto; }
+.fb-when button { padding: 4px 9px; font-size: 11px; }
+.fb-when-note { margin: 0; padding: 7px 12px; background: var(--paper-2);
+                border-bottom: 1px solid var(--line);
+                font: 400 11.5px var(--font-mono); color: var(--ink-3); }

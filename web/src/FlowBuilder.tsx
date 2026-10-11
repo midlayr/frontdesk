@@ -48,6 +48,8 @@ export function FlowBuilder(
   const [said, setSaid] = useState<string[]>([]);
   const [sim, setSim] = useState<SimResult | null>(null);
   const [draft, setDraft] = useState('');
+  /** null = follow the shop's real hours; true/false = pretend, for writing the wording. */
+  const [asOpen, setAsOpen] = useState<boolean | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
 
   const dirty = publishedSteps !== '' && JSON.stringify(steps) !== publishedSteps;
@@ -84,11 +86,11 @@ export function FlowBuilder(
   useEffect(() => {
     if (!steps.length) return;
     let cancelled = false;
-    flowsApi.simulate(slug, steps, said)
+    flowsApi.simulate(slug, steps, said, asOpen ?? undefined)
       .then((r) => { if (!cancelled) setSim(r); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [steps, said, slug]);
+  }, [steps, said, slug, asOpen]);
 
   useEffect(() => { threadRef.current?.scrollTo(0, threadRef.current.scrollHeight); }, [sim]);
 
@@ -442,8 +444,25 @@ export function FlowBuilder(
         <div className="fb-preview">
           <div className="fb-prev-head">
             <span className="label">Live preview · unsaved draft</span>
+            {/* Nobody writes their closing message at six in the evening to check it reads
+                properly, so the preview can be told to pretend. Follows the real clock
+                until it is touched — then says so, because a preview quietly running at a
+                different hour from the bot would be worse than no preview. */}
+            <span className="fb-view fb-when">
+              <button data-on={asOpen === null}
+                      title="Run the preview the way the shop is right now"
+                      onClick={() => setAsOpen(null)}>Now</button>
+              <button data-on={asOpen === true} onClick={() => setAsOpen(true)}>Open</button>
+              <button data-on={asOpen === false} onClick={() => setAsOpen(false)}>After hours</button>
+            </span>
             <button className="fb-restart" onClick={() => { setSaid([]); setDraft(''); }}>Restart</button>
           </div>
+          {asOpen === null && sim && (
+            <p className="fb-when-note">
+              Running as the shop is now — <b>{sim.open ? 'open' : 'closed'}</b>
+              {hours && <> · {hours.described}</>}
+            </p>
+          )}
 
           <div className="fb-widget">
             <div className="fb-wbar" style={{ background: 'var(--ink)' }}>

@@ -140,6 +140,8 @@ export interface SimResult {
   completed: boolean;
   /** Ids of questions a branch can loop back to. Computed server-side by the engine. */
   loops: string[];
+  /** Whether this run treated the shop as open. */
+  open: boolean;
 }
 
 /** Mirrors the prototype's vocabulary so the builder reads like the design. */
@@ -237,8 +239,10 @@ export const flowsApi = {
   saveHours: (h: { days: number[]; start: string; end: string; tz: string }) =>
     call<{ ok: true; hours: unknown; described: string; open: boolean }>(
       '/api/settings/hours', { method: 'PUT', body: JSON.stringify(h) }),
-  simulate: (slug: string, steps: Step[], said: string[]) =>
-    call<SimResult>(`/api/flows/${slug}/simulate`, { method: 'POST', body: JSON.stringify({ steps, said }) }),
+  /** `open` omitted means "use the shop's real hours", which is what the preview defaults to. */
+  simulate: (slug: string, steps: Step[], said: string[], open?: boolean) =>
+    call<SimResult>(`/api/flows/${slug}/simulate`,
+      { method: 'POST', body: JSON.stringify({ steps, said, open }) }),
 };
 
 export function ago(iso: string | null): string {

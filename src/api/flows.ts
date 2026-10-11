@@ -5,6 +5,7 @@ import type { Env, Org, PublishedFlow, Step } from '../env';
 import { withOrg, type Sql } from '../db';
 import { loopingAsks, simulate } from '../flow-engine';
 import { presentation, type FlowSettings } from '../lib/flow-settings';
+import { hoursOf, openAt } from '../lib/hours';
 
 type Vars = { org: Org; sql: Sql; userId: string };
 
@@ -272,10 +273,20 @@ flows.post('/:slug/simulate', async (c) => {
   const parsed = z.object({
     steps: z.array(StepSchema).min(1),
     said: z.array(z.string()).max(50).default([]),
+    /*
+     * Whether to run the preview as though the shop is open.
+     *
+     * Defaults to the shop's real hours, so the preview matches what a visitor would get
+     * right now. The builder can override it, because otherwise the only way to check the
+     * out-of-hours wording is to still be at your desk after five — and nobody writes
+     * their closing message at six in the evening to see whether it reads properly.
+     */
+    open: z.boolean().optional(),
   }).safeParse(body);
   if (!parsed.success) return c.json({ error: 'bad draft', detail: parsed.error.issues }, 400);
 
-  const r = simulate(parsed.data.steps, parsed.data.said);
+  const open = parsed.data.open ?? openAt(hoursOf((c.get('org').comms as { hours?: unknown }).hours));
+  const r = simulate(parsed.data.steps, parsed.data.said, open);
   return c.json({
     turns: r.next.turns,
     chips: r.chips,
@@ -286,6 +297,8 @@ flows.post('/:slug/simulate', async (c) => {
     // Reported from here rather than recomputed in the builder, so the warning and the
     // behaviour cannot disagree — the same reason the preview runs this engine at all.
     loops: [...loopingAsks(parsed.data.steps)],
+    // Echoed back so the builder can say which way it ran rather than assuming.
+    open,
   });
 });
 

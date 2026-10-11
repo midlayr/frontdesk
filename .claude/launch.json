@@ -1,15 +1,31 @@
 {
   "_comment": [
-    "Attach-only, deliberately. There is no separate front-end dev server to start: the",
-    "Worker serves web/dist itself, so the app and the API share an origin and the session",
-    "cookie works. Run the Worker yourself with",
+    "Two ways to run this locally.",
+    "",
+    "frontdesk-ui is the usual one: Vite serves the app from source with hot reload and",
+    "proxies /api, /widget and /w.js to the deployed Worker, so you are editing the UI",
+    "against REAL production data. Anything you save there saves for real.",
+    "",
+    "frontdesk-local is the whole Worker on your machine, API included. It needs a database",
+    "to talk to, so start it yourself with",
     "  npx wrangler dev -c wrangler.dev.toml --port 8787",
-    "and these entries point the preview pane at it. An earlier entry here tried to launch",
-    "`npm run dev --prefix web` on 5173, which starts a Vite server nothing serves the API",
-    "from — and fails outright in sessions where launching dev servers is not permitted."
+    "and this entry attaches the preview pane to it.",
+    "",
+    "frontdesk-prod just points at production."
   ],
   "version": "0.0.1",
   "configurations": [
+    {
+      "name": "frontdesk-ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "web"
+      ],
+      "port": 5173
+    },
     {
       "name": "frontdesk-local",
       "url": "http://localhost:8787",

@@ -184,8 +184,17 @@ export interface Advance {
   completed: boolean;   // reached the ticket step
 }
 
-/** Apply one visitor message. */
-export function advance(steps: Step[], s: FlowState, text: string, now = Date.now()): Advance {
+/**
+ * Apply one visitor message.
+ *
+ * `open` is whether the shop is open right now. It only changes the closing line — a
+ * customer who reaches the end at 9pm should be told when somebody will actually look at
+ * this, rather than "we will reach out soon" from an empty building. Defaults to true so
+ * every existing caller, and every flow with no out-of-hours wording, behaves as before.
+ */
+export function advance(
+  steps: Step[], s: FlowState, text: string, now = Date.now(), open = true,
+): Advance {
   let next: FlowState = { ...s, answers: { ...s.answers }, captured: { ...s.captured },
                           turns: [...s.turns, { who: 'visitor', text, at: now }] };
   if (next.state !== 'bot') return { next, handedOff: false, completed: false };
@@ -214,18 +223,24 @@ export function advance(steps: Step[], s: FlowState, text: string, now = Date.no
   }
 
   const t = ticketOf(steps);
-  next.turns = [...next.turns, { who: 'bot', text: t?.text ?? 'Thanks — your request is in.', at: now }];
+  // Falls back to the normal wording when a shop has not written an out-of-hours line, so
+  // turning hours on cannot leave anyone with a blank goodbye.
+  const closing = (!open && t?.after_hours_text?.trim()) || t?.text
+    || 'Thanks — your request is in.';
+  next.turns = [...next.turns, { who: 'bot', text: closing, at: now }];
   next.state = 'done';
   return { next, handedOff: false, completed: true };
 }
 
 /** Replay a whole conversation from scratch — what the builder's preview needs. */
-export function simulate(steps: Step[], said: string[]): Advance & { chips: string[] } {
+export function simulate(
+  steps: Step[], said: string[], open = true,
+): Advance & { chips: string[] } {
   let s = greet(steps, emptyState());
   let handedOff = false;
   let completed = false;
   for (const text of said) {
-    const r = advance(steps, s, text);
+    const r = advance(steps, s, text, Date.now(), open);
     s = r.next;
     handedOff = handedOff || r.handedOff;
     completed = completed || r.completed;

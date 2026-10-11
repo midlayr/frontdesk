@@ -22,6 +22,11 @@ const titleOf = (s: Step) =>
 
 type View = 'steps' | 'map' | 'setup';
 
+/** Summer's own words, as the placeholder — the wording a shop is most likely to want. */
+const hoursHint = 'Thanks — your request is in. Our normal operating hours are 8:30 AM – '
+  + '5:00 PM PST Monday through Friday and we are closed Saturday and Sunday. We will reach '
+  + 'out soon to discuss your project in more detail by email or phone.';
+
 export function FlowBuilder(
   { slug, accent, view, onView, users = [] }:
   { slug: string; accent: string; view: View; onView: (v: View) => void; users?: OrgUser[] },
@@ -34,6 +39,10 @@ export function FlowBuilder(
   const [version, setVersion] = useState(0);
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [error, setError] = useState('');
+  /* The shop's hours, so the builder can say what "outside opening hours" actually means
+     rather than leaving someone to guess at it. */
+  const [hours, setHours] = useState<{ described: string; open: boolean } | null>(null);
+  useEffect(() => { flowsApi.hours().then(setHours).catch(() => {}); }, []);
 
   // preview
   const [said, setSaid] = useState<string[]>([]);
@@ -402,9 +411,26 @@ export function FlowBuilder(
               )}
 
               {current.kind === 'ticket' && (
-                <Field label="Confirmation">
-                  <textarea rows={4} value={current.text} onChange={(e) => update({ text: e.target.value })} />
-                </Field>
+                <>
+                  <Field label="Confirmation" hint="during opening hours">
+                    <textarea rows={4} value={current.text} onChange={(e) => update({ text: e.target.value })} />
+                  </Field>
+                  {/* Separate wording for a visitor who finishes at 9pm. "We will reach out
+                      soon" is a promise the shop cannot keep from an empty building, and
+                      somebody expecting a call that evening is a complaint waiting to
+                      happen. Left empty, the line above is used around the clock. */}
+                  <Field label="Outside opening hours"
+                         hint="optional · leave empty to say the same thing at any time">
+                    <textarea rows={4} value={current.after_hours_text ?? ''}
+                              placeholder={hoursHint}
+                              onChange={(e) => update({ after_hours_text: e.target.value })} />
+                  </Field>
+                  <p className="fb-note">
+                    Opening hours are set once for the whole shop in{' '}
+                    <a href="/settings/messaging">Settings</a>
+                    {hours && <> — currently {hours.described}, and the shop is {hours.open ? 'open' : 'closed'} right now</>}.
+                  </p>
+                </>
               )}
 
               {error && <p className="fb-err">{error}</p>}

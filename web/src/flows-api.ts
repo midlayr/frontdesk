@@ -19,7 +19,15 @@ export type Step =
       otherwise?: string;
     }
   | { kind: 'rule'; words: string; handoff: string; route: string; afterHours?: boolean }
-  | { kind: 'ticket'; text: string };
+  | {
+      kind: 'ticket';
+      text: string;
+      /**
+       * What the bot says instead when the shop is shut. Empty or absent means `text` is
+       * used around the clock, which is what every flow written before this did.
+       */
+      after_hours_text?: string;
+    };
 
 /** Where an answer can lead. Absent from `next` means "the following question". */
 export const FALL_THROUGH = '';
@@ -224,6 +232,11 @@ export const flowsApi = {
   saveDomains: (allowed_domains: string[]) =>
     call<{ ok: true; allowed_domains: string[]; rejected: string[] }>(
       '/api/settings/widget', { method: 'PUT', body: JSON.stringify({ allowed_domains }) }),
+  /** The shop's opening hours, for the builder's out-of-hours field. */
+  hours: () => call<{ hours: unknown; described: string; open: boolean }>('/api/settings/hours'),
+  saveHours: (h: { days: number[]; start: string; end: string; tz: string }) =>
+    call<{ ok: true; hours: unknown; described: string; open: boolean }>(
+      '/api/settings/hours', { method: 'PUT', body: JSON.stringify(h) }),
   simulate: (slug: string, steps: Step[], said: string[]) =>
     call<SimResult>(`/api/flows/${slug}/simulate`, { method: 'POST', body: JSON.stringify({ steps, said }) }),
 };

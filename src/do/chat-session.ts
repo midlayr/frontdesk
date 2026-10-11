@@ -3,6 +3,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../index';
 import { advance as engineAdvance, askById, asksOf, chipsFor, idOf, resume, type FlowState } from '../flow-engine';
+import { hoursKey, hoursOf, openAt } from '../lib/hours';
 
 type Turn = { who: 'visitor' | 'bot' | 'rep'; text: string; at: number };
 type Step = { kind: 'ask'; prompt: string; field: string; chips?: string; skippable?: boolean } | { kind: 'rule'; words: string; handoff: string; route: string } | { kind: 'ticket'; text: string };
@@ -98,7 +99,8 @@ export class ChatSession extends DurableObject<Env> {
     }
 
     const before = this.s.turns.length;
-    const r = engineAdvance(this.s.steps, this.s as unknown as FlowState, text);
+    const r = engineAdvance(this.s.steps, this.s as unknown as FlowState, text,
+                            Date.now(), await this.openNow());
     this.s.turns = r.next.turns as Turn[];
     this.s.answers = r.next.answers;
     this.s.captured = r.next.captured;
@@ -235,6 +237,27 @@ export class ChatSession extends DurableObject<Env> {
       });
     } catch (err) {
       console.error('notify failed', err);
+    }
+  }
+
+  /**
+   * Is the shop open right now?
+   *
+   * From KV, because a Durable Object has no Hyperdrive binding and cannot read the org
+   * row. Settings writes the key whenever the hours change, and the edge cache means this
+   * costs nothing on the hot path.
+   *
+   * Open is the answer when anything goes wrong — an unset key, a bad read. Telling a
+   * customer at 2pm on a Tuesday that the shop is shut is a worse failure than missing the
+   * out-of-hours line once.
+   */
+  private async openNow(): Promise<boolean> {
+    try {
+      const raw = await this.env.CONFIG.get(hoursKey(this.s.orgId), 'json');
+      if (!raw) return true;
+      return openAt(hoursOf(raw));
+    } catch {
+      return true;
     }
   }
 

@@ -863,3 +863,21 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   color: var(--accent-tint-fg);
 }
 .summary p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink); max-width: 68ch; }
+
+/* A pointer from the builder to where hours actually live. */
+.fb-note { margin: 10px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-3); max-width: 62ch; }
+.fb-note a { color: var(--accent); }
+
+/* ── opening hours ───────────────────────────────────────────────────
+   A row of day toggles reads faster than seven checkboxes, and the
+   shape of the week is the thing being checked at a glance. */
+.hours-days { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.hours-day {
+  min-width: 52px; padding: 8px 10px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--paper); color: var(--ink-2);
+  font: 500 12px var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+}
+.hours-day[data-on='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.hours-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+.hours-row .fb-field { max-width: 190px; }

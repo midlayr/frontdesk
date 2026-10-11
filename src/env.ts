@@ -85,7 +85,15 @@ export type Step =
       otherwise?: string;
     }
   | { kind: 'rule'; words: string; handoff: string; route: string }
-  | { kind: 'ticket'; text: string };
+  | {
+      kind: 'ticket';
+      text: string;
+      /**
+       * What the bot says instead when the shop is shut. Empty or absent means `text` is
+       * used around the clock, which is what every flow written before this did.
+       */
+      after_hours_text?: string;
+    };
 
 export interface PublishedFlow {
   id: string;

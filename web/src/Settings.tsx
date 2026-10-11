@@ -1,6 +1,7 @@
 import { Appearance } from './Appearance';
 import { Team } from './Team';
 import { useEffect, useState } from 'react';
+import { Hours } from './Hours';
 import { orgSlug } from './api';
 
 interface Voice { id: string; label: string; neural: boolean }
@@ -148,6 +149,8 @@ function Messaging({ tab, go }: { tab: string; go: (to: string) => void }) {
       </header>
 
       <div className="set-scroll">
+        <Hours />
+
         <section className="set-card">
           <div className="set-head">
             <h3 className="fb-edit-title">Voicemail</h3>

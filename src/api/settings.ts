@@ -6,6 +6,7 @@ import { TTS_VOICES, defaults, isTtsVoice, messagingFor, render, xmlEscape } fro
 import { ulid } from 'ulid';
 import { invalidateOrg } from '../org';
 import { cleanDomains } from '../lib/domains';
+import { describe as describeHours, hoursKey, hoursOf, openAt } from '../lib/hours';
 
 type Vars = { org: Org; sql: Sql; userId: string };
 
@@ -203,4 +204,55 @@ settings.put('/widget', async (c) => {
     // worse outcome than being told the value made no sense.
     rejected,
   });
+});
+
+/**
+ * When the shop is open.
+ *
+ * Read by the chat bot, to decide which closing line a visitor gets, and by the campaign
+ * sender, which has always had its own copy of this idea. One set of hours, one answer.
+ */
+const HoursBody = z.object({
+  days: z.array(z.number().int().min(1).max(7)).max(7),
+  start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'use a 24-hour time like 08:30'),
+  end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'use a 24-hour time like 17:00'),
+  tz: z.string().min(1).max(64),
+});
+
+settings.get('/hours', (c) => {
+  const h = hoursOf((c.get('org').comms as { hours?: unknown }).hours);
+  return c.json({ hours: h, described: describeHours(h), open: openAt(h) });
+});
+
+settings.put('/hours', async (c) => {
+  const org = c.get('org');
+  const parsed = HoursBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0]?.message ?? 'bad hours' }, 400);
+  }
+  const h = parsed.data;
+  // Closing before opening is not a short day, it is a typo that would shut the shop
+  // permanently — and the symptom would be customers quietly getting the wrong message.
+  if (h.start >= h.end) return c.json({ error: 'the closing time has to be after the opening time' }, 400);
+  // Rejected rather than accepted and silently ignored: Intl is the only thing that knows
+  // which zone names are real, so ask it.
+  try { new Intl.DateTimeFormat('en-US', { timeZone: h.tz }); }
+  catch { return c.json({ error: `"${h.tz}" is not a time zone I recognise` }, 400); }
+
+  const hours = hoursOf({ ...h, days: [...new Set(h.days)].sort((a, b) => a - b) });
+
+  await withOrg(c.get('sql'), org.id, (tx) =>
+    tx`UPDATE orgs SET comms = comms || ${tx.json({
+         hours: { days: hours.days, start: hours.start, end: hours.end, tz: hours.tz },
+       })}::jsonb WHERE id = ${org.id}`);
+
+  /*
+   * Also to KV, which is the copy the chat bot actually reads: a Durable Object has no
+   * database binding. Written after the row, so a failure here leaves the stored hours
+   * right and the bot a minute behind, rather than the other way round.
+   */
+  await c.env.CONFIG.put(hoursKey(org.id), JSON.stringify(hours));
+  await invalidateOrg(c.env, c.get('sql'), org);
+
+  return c.json({ ok: true, hours, described: describeHours(hours), open: openAt(hours) });
 });

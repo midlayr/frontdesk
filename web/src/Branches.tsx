@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ACTIONS, CONDITIONS, campaigns, type Branch } from './campaigns-api';
 import { api, type OrgUser } from './api';
 
@@ -13,22 +13,42 @@ import { api, type OrgUser } from './api';
  * Branches are evaluated when the *next* step falls due, which is why the heading says
  * "checked when step N+1 is due" rather than implying they run on send.
  */
+/** Long enough to outrun typing, short enough that a dropdown feels immediate. */
+const SAVE_DEBOUNCE = 500;
+
 export function Branches({ seqId, stepId, stepCount, position, branches, readOnly, onSaved }: {
   seqId: string; stepId: string; stepCount: number; position: number;
   branches: Branch[]; readOnly: boolean; onSaved: () => void;
 }) {
-  const [rows, setRows] = useState<Branch[]>(branches.length ? branches : [{ if: 'replied', then: 'stop' }]);
+  const withLocked = (b: Branch[]): Branch[] =>
+    (b.length ? b : [{ if: 'replied', then: 'stop' }]) as Branch[];
+
+  const [rows, setRows] = useState<Branch[]>(withLocked(branches));
   const [users, setUsers] = useState<OrgUser[]>([]);
   const [error, setError] = useState('');
   const [state, setState] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   useEffect(() => { api.users().then(setUsers).catch(() => {}); }, []);
-  useEffect(() => {
-    setRows(branches.length ? branches : [{ if: 'replied', then: 'stop' }]);
-  }, [stepId, branches]);
 
-  async function save(next: Branch[]) {
-    setRows(next);
+  /*
+   * Resync only when a different step is opened.
+   *
+   * This used to also depend on `branches`, which made the config inputs impossible to type
+   * in. Every keystroke saved, every save called onSaved(), the parent refetched, and the
+   * new array came back down and overwrote `rows` — including the characters typed while
+   * the request was in flight. You would get a letter or two in and watch the rest vanish.
+   *
+   * `branches` is a fresh array on every parent render too, so the effect fired constantly
+   * rather than only when the branches had genuinely changed.
+   */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setRows(withLocked(branches)); }, [stepId]);
+
+  /* Typing is local and immediate; the write is debounced behind it. */
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+
+  async function persist(next: Branch[]) {
     setState('saving'); setError('');
     try {
       // Sent without the locked row: the server puts it back, which keeps one authority for
@@ -37,6 +57,13 @@ export function Branches({ seqId, stepId, stepCount, position, branches, readOnl
       setState('saved');
       onSaved();
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); setState('idle'); }
+  }
+
+  function save(next: Branch[]) {
+    setRows(next);
+    if (timer.current) clearTimeout(timer.current);
+    setState('saving');
+    timer.current = setTimeout(() => void persist(next), SAVE_DEBOUNCE);
   }
 
   const set = (i: number, patch: Partial<Branch>) =>

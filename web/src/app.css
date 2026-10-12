@@ -921,3 +921,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
                font-size: 13px; line-height: 1.5; color: var(--ink-2); }
 .sig-preview div:first-child { color: var(--ink); font-weight: 600; }
 @media (max-width: 720px) { .sig-fields { grid-template-columns: 1fr; } }
+
+/* What to do about an unresolved token, under the warning that names it. */
+.camp-missing-how { margin: 6px 0 0; padding-left: 18px; }
+.camp-missing-how li { margin-top: 3px; line-height: 1.5; }

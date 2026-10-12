@@ -189,6 +189,44 @@ export function Campaigns({ me }: { me: { id: string; role: string } | null }) {
   );
 }
 
+/**
+ * Where an unresolved token is actually fixed.
+ *
+ * Grouped rather than listed one per line: three ticket fields missing is one errand, not
+ * three. Anything unrecognised falls through to the ticket, which is where most things
+ * live and is a safe thing to be vague about.
+ */
+const ON_CONTACT = ['first_name', 'company'];
+const ON_TICKET = ['qty', 'product', 'size', 'stock', 'deadline', 'quote_amount', 'estimate_no'];
+
+function fixes(missing: string[]): string[] {
+  const out: string[] = [];
+  const has = (set: string[]) => missing.filter((m) => set.includes(m));
+
+  const ticket = has(ON_TICKET);
+  if (ticket.length) {
+    out.push(`Fill in ${ticket.join(', ')} on the ticket.`);
+  }
+  const contact = has(ON_CONTACT);
+  if (contact.length) {
+    out.push(`Add the customer's ${contact.includes('first_name') ? 'name' : ''}`
+      .trim() + `${contact.length > 1 ? ' and company' : contact.includes('company') ? ' company' : ''} on the ticket.`);
+  }
+  // The rep ones are the reason this exists: neither is edited on the ticket.
+  const fromOwner = missing.filter((m) => m === 'rep_name' || m === 'sender_signature');
+  if (fromOwner.length) {
+    out.push(`Assign the ticket to somebody — ${fromOwner.length > 1 ? 'these come' : 'that comes'}`
+      + ' from whoever owns it.');
+  }
+  if (missing.includes('rep_phone')) {
+    out.push("Add that person's phone to their signature in Settings → People.");
+  }
+  const known = [...ON_TICKET, ...ON_CONTACT, 'rep_name', 'rep_phone', 'sender_signature'];
+  const other = missing.filter((m) => !known.includes(m));
+  if (other.length) out.push(`Fill in ${other.join(', ')} on the ticket.`);
+  return out;
+}
+
 function StepEditor({ seqId, step, stepCount, readOnly, onSaved, onDelete }: {
   seqId: string; step: Step; stepCount: number; readOnly: boolean;
   onSaved: () => void; onDelete: () => void;
@@ -373,10 +411,20 @@ function StepEditor({ seqId, step, stepCount, readOnly, onSaved, onDelete }: {
         )}
 
         {sends && preview && preview.missing.length > 0 && (
-          <p className="camp-missing">
-            Nothing behind {preview.missing.map((m) => `{${m}}`).join(', ')} on this ticket.
-            A send would hold here until a rep fills it in.
-          </p>
+          <div className="camp-missing">
+            <p style={{ margin: 0 }}>
+              Nothing behind {preview.missing.map((m) => `{${m}}`).join(', ')} on this ticket —
+              a send would hold here.
+            </p>
+            {/* What to actually do, which is different per token. "A rep fills it in" is
+                true of a quantity and wrong about everything to do with the rep: a blank
+                {rep_name} means the ticket is unassigned, and {rep_phone} is not on the
+                ticket at all. Telling somebody to go and edit a field that does not exist
+                is worse than saying nothing. */}
+            <ul className="camp-missing-how">
+              {fixes(preview.missing).map((f) => <li key={f}>{f}</li>)}
+            </ul>
+          </div>
         )}
         {sends && preview && !preview.missing.length && preview.against && (
           <p className="camp-ok">Every token resolves against {preview.against.ticket_no}.</p>

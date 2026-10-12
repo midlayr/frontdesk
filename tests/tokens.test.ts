@@ -43,5 +43,29 @@ console.log('what Summer actually typed');
   eq('and is not even reported missing', r.missing, []);
 }
 
+console.log('every offered token must actually resolve');
+{
+  /*
+   * A token in this list is a chip in the editor. If nothing fills it, fill() refuses to
+   * substitute a blank, the enrolment is held at missing:{that}, and the campaign silently
+   * never sends — which is how {quote_link} sat there for months doing nothing.
+   *
+   * This is the shape the sender builds. Pinning the key set here means removing a value
+   * without removing its chip fails the suite rather than a customer's campaign.
+   */
+  const supplied = [
+    'first_name', 'company', 'qty', 'product', 'size', 'stock', 'deadline',
+    'quote_amount', 'ticket_no', 'rep_name', 'rep_phone', 'estimate_no', 'sender_signature',
+  ];
+  const offered = [...TOKENS];
+  eq('nothing is offered that nothing fills',
+     offered.filter((t) => !supplied.includes(t)), []);
+  eq('and nothing is filled that is not offered',
+     supplied.filter((t) => !offered.includes(t)), []);
+  // The two that were never real.
+  eq('{quote_link} is no longer offered', offered.includes('quote_link' as never), false);
+  eq('{rep_phone} still is, because it is real now', offered.includes('rep_phone'), true);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

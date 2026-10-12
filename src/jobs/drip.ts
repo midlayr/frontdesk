@@ -33,7 +33,7 @@ interface Due {
   qty: number | null; product: string | null; size: string | null; stock: string | null;
   deadline_at: string | null; quote_amount: string | null;
   first_name: string | null; company: string | null; email: string | null; phone: string | null;
-  opted_out: boolean; rep_name: string | null; rep_phone: string | null;
+  opted_out: boolean; rep_name: string | null;
   estimate_no: string | null; rep_id: string | null; rep_email: string | null;
 }
 
@@ -86,7 +86,7 @@ function load(tx: Tx, orgId: string): Promise<Due[]> {
            l.qty, l.product, l.size, l.stock, l.deadline_at, l.quote_amount,
            split_part(COALESCE(c.name, ''), ' ', 1) AS first_name,
            co.name AS company, c.email, c.phone, c.opted_out,
-           u.name AS rep_name, u.email AS rep_email, ${''} AS rep_phone,
+           u.name AS rep_name, u.email AS rep_email,
            l.spec->>'estimate_no' AS estimate_no,
            u.id AS rep_id
       FROM enrollments e
@@ -239,12 +239,21 @@ async function step(
     const [org] = await tx<Org[]>`
       SELECT id, slug, name, brand, comms, widget, features FROM orgs WHERE id = ${d.org_id}`;
 
+    // The rep's own details, read once: the phone feeds {rep_phone} and the whole lot
+    // feeds {sender_signature}, and they must not disagree.
+    const repSig = signatureFields(
+      d.rep_id ? (org.comms as { signatures?: Record<string, unknown> }).signatures?.[d.rep_id] : null);
+
     const values = {
       first_name: d.first_name, company: d.company, qty: d.qty, product: d.product,
       size: d.size, stock: d.stock, deadline: d.deadline_at?.slice(0, 10) ?? null,
       quote_amount: d.quote_amount ? `$${Number(d.quote_amount).toLocaleString('en-US')}` : null,
-      quote_link: null, ticket_no: d.ticket_no,
-      rep_name: d.rep_name, rep_phone: d.rep_phone,
+      ticket_no: d.ticket_no,
+      rep_name: d.rep_name,
+      // From the rep's signature, which is where their phone number is actually kept.
+      // It was hardcoded to an empty string, so any step using {rep_phone} was held and
+      // never sent.
+      rep_phone: repSig.phone ?? null,
       estimate_no: d.estimate_no,
       /*
        * The rep's own sign-off, built from the same helper the settings page previews with
@@ -257,8 +266,7 @@ async function step(
         ? renderSignature(
             { name: d.rep_name, email: d.rep_email ?? '' },
             org.name,
-            signatureFields((org.comms as { signatures?: Record<string, unknown> })
-              .signatures?.[d.rep_id]),
+            repSig,
           )
         : null) || org.comms.signature || null,
     };

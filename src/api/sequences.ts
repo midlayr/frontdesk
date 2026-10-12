@@ -3,6 +3,7 @@ import { ulid } from 'ulid';
 import { z } from 'zod';
 import type { Env, Org } from '../env';
 import { withOrg, type Sql } from '../db';
+import { renderSignature, signatureFields } from '../lib/signature';
 import { CONDITIONS, ACTIONS, fill, normalise, validate, type Branch } from '../lib/drip';
 import { TRIGGERS, enroll } from '../lib/enroll';
 import { SPANS, compute, store, type Span } from '../jobs/sequence-stats';
@@ -265,7 +266,8 @@ sequences.post('/:id/steps/:stepId/preview', async (c) => {
       SELECT l.ticket_no, l.qty, l.product, l.size, l.stock, l.quote_amount,
              to_char(l.deadline_at, 'Mon DD') AS deadline,
              split_part(COALESCE(c.name,''), ' ', 1) AS first_name,
-             co.name AS company, c.email, c.phone, u.name AS rep_name
+             co.name AS company, c.email, c.phone, u.name AS rep_name,
+             u.id AS rep_id, u.email AS rep_email, l.spec->>'estimate_no' AS estimate_no
         FROM leads l
    LEFT JOIN contacts c ON c.id = l.contact_id
    LEFT JOIN companies co ON co.id = l.company_id
@@ -274,10 +276,25 @@ sequences.post('/:id/steps/:stepId/preview', async (c) => {
          AND (${body.leadId ?? null}::text IS NULL OR l.id = ${body.leadId ?? null})
        ORDER BY l.created_at DESC LIMIT 1`;
 
+    /*
+     * The preview must fill the same tokens the sender does, from the same helpers.
+     * rep_phone and the signature were hardcoded null here, so the preview showed a step
+     * as broken that would have sent fine — and the other way round once the sender
+     * learned to fill them.
+     */
+    const repId = lead?.rep_id ? String(lead.rep_id) : null;
+    const repSig = signatureFields(
+      repId ? (org.comms as { signatures?: Record<string, unknown> }).signatures?.[repId] : null);
+
     const values = {
       ...lead,
       quote_amount: lead?.quote_amount ? `$${Number(lead.quote_amount).toLocaleString('en-US')}` : null,
-      quote_link: null, rep_phone: null,
+      rep_phone: repSig.phone ?? null,
+      sender_signature: (lead?.rep_name
+        ? renderSignature(
+            { name: String(lead.rep_name), email: String(lead.rep_email ?? '') },
+            org.name, repSig)
+        : null) || org.comms.signature || null,
     };
     const rendered = fill(step.body, values);
     const subject = fill(step.subject ?? '', values);

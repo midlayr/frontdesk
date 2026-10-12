@@ -132,9 +132,18 @@ export function stopReason(s: Standing): Stop | null {
   return null;
 }
 
+/*
+ * What a campaign may say back to a customer.
+ *
+ * Everything here must actually resolve. A token offered in the editor and then filled
+ * with nothing does not degrade — fill() refuses to substitute a blank, so the enrolment
+ * is held at missing:{that} and the campaign silently never sends. {quote_link} sat in
+ * this list for months hardcoded to null for exactly that reason; it comes back when
+ * there is a quote URL to put in it.
+ */
 export const TOKENS = [
   'first_name', 'company', 'qty', 'product', 'size', 'stock', 'deadline',
-  'quote_amount', 'quote_link', 'ticket_no', 'rep_name', 'rep_phone',
+  'quote_amount', 'ticket_no', 'rep_name', 'rep_phone',
   // The shop's own estimate number from Pace, which is how they actually refer to a job
   // when the customer rings up. One word, because a token is \w+ — {estimate #} cannot
   // work and would be sent literally.

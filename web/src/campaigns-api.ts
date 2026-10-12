@@ -36,10 +36,15 @@ export const STATE_COLOR: Record<string, string> = {
   opted_out: 'var(--danger)', removed: 'var(--ink-3)',
 };
 
-export const TOKENS = [
-  'first_name', 'company', 'qty', 'product', 'size', 'stock',
-  'deadline', 'quote_amount', 'quote_link', 'ticket_no', 'rep_name', 'rep_phone',
-] as const;
+/*
+ * The one list, imported from the engine that fills them.
+ *
+ * There used to be a copy here, and the two drifted the day a token was added: the server
+ * knew about {estimate_no} and this did not, so the editor flagged it as unknown and
+ * refused to save a step that would have sent perfectly well. lib/drip has no imports of
+ * its own, so the browser can take it as it is.
+ */
+export { TOKENS } from '../../src/lib/drip';
 
 export interface Branch {
   if: string; value?: number; then: string;

@@ -100,6 +100,37 @@ leads.get('/:id', async (c) => {
  * Needed whenever the prompt or model changes, or a job died into the DLQ — otherwise the
  * only way to re-extract is to ask the customer to text again.
  */
+/**
+ * Everything outstanding across the shop.
+ *
+ * One list rather than a tab per person: in a shop this size the useful question is "what
+ * is not done", and who it belongs to is a column rather than a separate page. Sorting is
+ * left to the client — a few hundred rows at most, and re-sorting without a round trip is
+ * the point of a list you are working through.
+ *
+ * Done ones come back too, most recent first and capped: ticking something off and having
+ * it vanish leaves you unsure whether it worked, and the record is worth keeping.
+ */
+leads.get('/tasks/all', async (c) => {
+  const org = c.get('org');
+  const rows = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx`SELECT t.id, t.lead_id, t.text, t.due_at, t.done_at, t.source, t.assignee_id,
+              u.name AS assignee_name,
+              l.ticket_no, l.status AS lead_status,
+              COALESCE(co.name, ct.name, '') AS customer
+         FROM tasks t
+         JOIN leads l      ON l.id = t.lead_id
+    LEFT JOIN users u      ON u.id = t.assignee_id
+    LEFT JOIN contacts ct  ON ct.id = l.contact_id
+    LEFT JOIN companies co ON co.id = l.company_id
+        WHERE t.org_id = ${org.id}
+          AND l.archived_at IS NULL
+          AND (t.done_at IS NULL OR t.done_at > now() - interval '14 days')
+        ORDER BY (t.done_at IS NOT NULL), t.due_at NULLS LAST, t.created_at DESC
+        LIMIT 500`);
+  return c.json({ tasks: rows });
+});
+
 leads.post('/:id/tasks', async (c) => {
   const org = c.get('org');
   const id = c.req.param('id');

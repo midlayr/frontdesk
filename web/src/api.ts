@@ -157,6 +157,9 @@ export const api = {
     get<{ lead: Lead; messages: Message[]; attachments: Attachment[]; activity: unknown[];
           tasks: Task[] }>(`/api/leads/${id}`),
 
+  allTasks: () => get<{ tasks: (Task & { ticket_no: string; customer: string; lead_id: string;
+                                          assignee_name: string | null })[] }>('/api/leads/tasks/all'),
+
   addTask: async (leadId: string, text: string) => {
     const r = await fetch(url(`/api/leads/${leadId}/tasks`),
       { method: 'POST', headers: headers(), body: JSON.stringify({ text }) });

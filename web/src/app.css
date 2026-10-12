@@ -925,3 +925,28 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 /* What to do about an unresolved token, under the warning that names it. */
 .camp-missing-how { margin: 6px 0 0; padding-left: 18px; }
 .camp-missing-how li { margin-top: 3px; line-height: 1.5; }
+
+/* ── the to-do list ───────────────────────────────────────────────────
+   A table because the questions are "whose" and "which job", and those
+   are columns you compare down rather than read across. */
+.todo { width: 100%; border-collapse: collapse; font-size: var(--text-md); }
+.todo th { text-align: left; padding: 0 10px 8px; border-bottom: 1px solid var(--line);
+           font: 500 10px var(--font-mono); letter-spacing: .1em; text-transform: uppercase;
+           color: var(--ink-3); }
+.todo td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.todo td:first-child, .todo th:first-child { width: 28px; padding-right: 0; }
+.todo tr[data-done='true'] .todo-text { text-decoration: line-through; color: var(--ink-3); }
+.todo tr[data-done='true'] td { color: var(--ink-3); }
+/* The task takes what is left; the other three are sized to their content so Due is never
+   the column that falls off the right-hand edge — which is the one that says it is late. */
+.todo { table-layout: fixed; }
+.todo-text { width: auto; }
+.todo th:nth-child(3), .todo td:nth-child(3) { width: 150px; }
+.todo th:nth-child(4), .todo td:nth-child(4) { width: 150px; }
+.todo th:nth-child(5), .todo td:nth-child(5) { width: 100px; }
+.todo td { overflow-wrap: anywhere; }
+.todo-text .task-src { margin-left: 8px; }
+.todo-when { margin-left: 8px; font: 400 11px var(--font-mono); color: var(--ink-3); }
+.todo-cust { margin-top: 2px; font-size: 12px; color: var(--ink-3); }
+.todo-late { color: var(--warn); }
+.todo-nobody { color: var(--warn); }

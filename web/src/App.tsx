@@ -3,6 +3,7 @@ import { api, applyBrand, orgSlug, userId, type Attachment, type Lead, type Mess
 import { FlowBuilder } from './FlowBuilder';
 import { FlowList } from './FlowList';
 import { Campaigns } from './Campaigns';
+import { Todo } from './Todo';
 import { History } from './History';
 import { TicketSequences } from './TicketSequences';
 import { Settings } from './Settings';
@@ -481,6 +482,7 @@ export function App() {
   const onChat = path.startsWith('/chat');
   const onSettings = path.startsWith('/settings');
   const onCampaigns = path.startsWith('/campaigns');
+  const onTodo = path.startsWith('/todo');
   const brand = (org?.brand ?? {}) as Record<string, string>;
   const logo = brand.logo_url ? `${brand.logo_url}` : '/brand/dumont/logo-horizontal.png';
 
@@ -492,7 +494,8 @@ export function App() {
         <span className="wordmark">{brand.app_name?.replace(/^.*?\s/, '') || 'Front Desk'}</span>
         <span className="powered">powered by Midlayr</span>
         <nav className="nav">
-          <button aria-current={!onChat && !onCampaigns && !onSettings} onClick={() => go('/')}>Inbox</button>
+          <button aria-current={!onChat && !onCampaigns && !onSettings && !onTodo} onClick={() => go('/')}>Inbox</button>
+          <button aria-current={onTodo} onClick={() => go('/todo')}>To do</button>
           <button aria-current={onCampaigns} onClick={() => go('/campaigns')}>Campaigns</button>
           <button aria-current={onChat} onClick={() => go('/chat')}>Chat</button>
           <button aria-current={onSettings} onClick={() => go('/settings/messaging')}>Settings</button>
@@ -506,7 +509,9 @@ export function App() {
         </span>
       </header>
 
-      {onCampaigns ? (
+      {onTodo ? (
+        <Todo go={go} />
+      ) : onCampaigns ? (
         <Campaigns me={me} />
       ) : onSettings ? (
         <Settings me={me} org={org}

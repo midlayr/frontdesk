@@ -6,6 +6,7 @@ import { Performance } from './Performance';
 import {
   KINDS, TOKENS, TRIGGER_LABEL, campaigns, hours,
   type Preview, type Sequence, type Step,
+  insertToken,
 } from './campaigns-api';
 
 /**
@@ -236,6 +237,18 @@ function StepEditor({ seqId, step, stepCount, readOnly, onSaved, onDelete }: {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState('');
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  /*
+   * Which box a token chip should land in.
+   *
+   * It always went to the body, whatever you had been typing in — so clicking {product}
+   * while writing a subject put it somewhere else entirely, and the reasonable conclusion
+   * was that subjects do not take tokens. They always did.
+   *
+   * A ref rather than state: it is read inside the click handler and changing it must not
+   * re-render the editor mid-type.
+   */
+  const lastFocus = useRef<'subject' | 'body'>('body');
 
   // A token the engine does not know would be sent literally, so it blocks the save rather
   // than being written and discovered by a customer.
@@ -274,19 +287,19 @@ function StepEditor({ seqId, step, stepCount, readOnly, onSaved, onDelete }: {
     return () => { dead = true; clearTimeout(t); };
   }, [seqId, step.id, draft.body, draft.subject, draft.kind, saving]);
 
-  /** Insert at the cursor, not at the end — the wireframe's "click to insert". */
+  /** Insert at the cursor, in whichever box was last being typed in. */
   function insert(token: string) {
-    const el = bodyRef.current;
-    const tag = `{${token}}`;
-    if (!el) { setDraft({ ...draft, body: draft.body + tag }); return; }
-    const a = el.selectionStart ?? draft.body.length;
-    const b = el.selectionEnd ?? a;
-    const next = draft.body.slice(0, a) + tag + draft.body.slice(b);
-    setDraft({ ...draft, body: next });
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(a + tag.length, a + tag.length);
+    const wanted = lastFocus.current;
+    const el: HTMLInputElement | HTMLTextAreaElement | null =
+      wanted === 'subject' && draft.kind === 'email' ? subjectRef.current : bodyRef.current;
+    const r = insertToken({
+      token, into: wanted, kind: draft.kind,
+      subject: draft.subject ?? '', body: draft.body,
+      start: el?.selectionStart ?? undefined, end: el?.selectionEnd ?? undefined,
     });
+    setDraft({ ...draft, [r.field]: r.text });
+    if (!el) return;
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(r.caret, r.caret); });
   }
 
   const sends = draft.kind === 'email' || draft.kind === 'sms';
@@ -334,8 +347,9 @@ function StepEditor({ seqId, step, stepCount, readOnly, onSaved, onDelete }: {
         {draft.kind === 'email' && (
           <label className="fb-field">
             <span className="label">Subject</span>
-            <input value={draft.subject ?? ''} disabled={readOnly}
+            <input ref={subjectRef} value={draft.subject ?? ''} disabled={readOnly}
                    placeholder="Checking in on your {product} quote"
+                   onFocus={() => { lastFocus.current = 'subject'; }}
                    onChange={(e) => setDraft({ ...draft, subject: e.target.value })} />
           </label>
         )}
@@ -343,6 +357,7 @@ function StepEditor({ seqId, step, stepCount, readOnly, onSaved, onDelete }: {
         <label className="fb-field">
           <span className="label">{draft.kind === 'task' ? 'What the rep should do' : 'Body'}</span>
           <textarea ref={bodyRef} rows={9} value={draft.body} disabled={readOnly}
+                    onFocus={() => { lastFocus.current = 'body'; }}
                     className={unknown.length ? 'bad' : undefined}
                     onChange={(e) => setDraft({ ...draft, body: e.target.value })} />
         </label>
@@ -354,7 +369,12 @@ function StepEditor({ seqId, step, stepCount, readOnly, onSaved, onDelete }: {
                 <button key={t} disabled={readOnly} onClick={() => insert(t)}>{`{${t}}`}</button>
               ))}
             </div>
-            <p className="camp-hint">Click to insert at the cursor. An unknown token blocks saving.</p>
+            {/* Says the subject out loud: the previous wording left somebody to discover
+                that these work there, and the chips used to prove the opposite. */}
+            <p className="camp-hint">
+              Click to insert at the cursor — in the subject or the body, whichever you were
+              last typing in. An unknown token blocks saving.
+            </p>
           </>
         )}
 

@@ -46,6 +46,27 @@ export const STATE_COLOR: Record<string, string> = {
  */
 export { TOKENS } from '../../src/lib/drip';
 
+/**
+ * Where a clicked token chip should go, and what the field becomes.
+ *
+ * Pulled out of the editor so it can be tested: it always wrote to the body, whatever you
+ * had been typing in, so clicking {product} while writing a subject put it in the wrong
+ * box — and the reasonable conclusion was that subjects do not accept tokens.
+ *
+ * An SMS or a task has no subject, so those always take the body however focus landed.
+ */
+export function insertToken(
+  opts: { token: string; into: 'subject' | 'body'; kind: string; subject: string; body: string;
+          start?: number; end?: number },
+): { field: 'subject' | 'body'; text: string; caret: number } {
+  const tag = `{${opts.token}}`;
+  const field = opts.into === 'subject' && opts.kind === 'email' ? 'subject' : 'body';
+  const current = field === 'subject' ? opts.subject : opts.body;
+  const a = opts.start ?? current.length;
+  const b = opts.end ?? a;
+  return { field, text: current.slice(0, a) + tag + current.slice(b), caret: a + tag.length };
+}
+
 export interface Branch {
   if: string; value?: number; then: string;
   config?: { subject?: string; step?: number; user_id?: string; text?: string; tag?: string };

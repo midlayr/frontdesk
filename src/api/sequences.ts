@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Env, Org } from '../env';
 import { withOrg, type Sql } from '../db';
 import { renderSignature, signatureFields } from '../lib/signature';
+import { describe as describeHours, hoursOf, openAt } from '../lib/hours';
 import { CONDITIONS, ACTIONS, fill, normalise, validate, type Branch } from '../lib/drip';
 import { TRIGGERS, enroll } from '../lib/enroll';
 import { SPANS, compute, store, type Span } from '../jobs/sequence-stats';
@@ -45,6 +46,87 @@ const StepBody = z.object({
   delay_hours: z.number().min(0).max(24 * 365).optional(),
   attach_quote: z.boolean().optional(),
   branches: z.array(BranchSchema).optional(),
+});
+
+/**
+ * Why is a campaign not sending?
+ *
+ * Read-only, and deliberately blunt. "I switched it on and nothing happened" has half a
+ * dozen causes — nothing is enrolled, the trigger never fires for that channel, the step
+ * is not due yet, the window is shut, a token has no value — and they are invisible from
+ * the campaign page, which shows what a campaign IS rather than what it is DOING.
+ *
+ * Everything here is already on screen somewhere or derivable; the value is having it in
+ * one place at the moment somebody is asking the question.
+ */
+sequences.get('/diagnose', async (c) => {
+  const org = c.get('org');
+  const now = new Date();
+
+  const out = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const seqs = await tx<{
+      id: string; name: string; trigger: string; active: boolean;
+      steps: number; first_delay: number | null; attaches: boolean;
+    }[]>`
+      SELECT s.id, s.name, s.trigger, s.active,
+             (SELECT count(*)::int FROM sequence_steps st WHERE st.sequence_id = s.id) AS steps,
+             (SELECT st.delay_hours FROM sequence_steps st
+               WHERE st.sequence_id = s.id ORDER BY st.position LIMIT 1) AS first_delay,
+             EXISTS (SELECT 1 FROM sequence_steps st
+                      WHERE st.sequence_id = s.id AND st.attach_quote) AS attaches
+        FROM sequences s WHERE s.org_id = ${org.id} ORDER BY s.name`;
+
+    const counts = await tx<{ sequence_id: string; state: string; n: number }[]>`
+      SELECT e.sequence_id, e.state, count(*)::int AS n
+        FROM enrollments e JOIN sequences s ON s.id = e.sequence_id
+       WHERE s.org_id = ${org.id} GROUP BY 1, 2`;
+
+    const recent = await tx<{
+      sequence_id: string; ticket_no: string; state: string;
+      held_reason: string | null; next_send_at: string | null; next_step: number;
+    }[]>`
+      SELECT e.sequence_id, l.ticket_no, e.state, e.held_reason, e.next_send_at, e.next_step
+        FROM enrollments e
+        JOIN sequences s ON s.id = e.sequence_id
+        JOIN leads l     ON l.id = e.lead_id
+       WHERE s.org_id = ${org.id}
+       ORDER BY e.created_at DESC LIMIT 12`;
+
+    return { seqs, counts, recent };
+  });
+
+  const hours = hoursOf((org.comms as { hours?: unknown }).hours);
+  return c.json({
+    now: now.toISOString(),
+    shop_open_now: openAt(hours),
+    shop_hours: describeHours(hours),
+    note: openAt(hours) ? undefined
+      : 'The shop is shut, so campaigns are waiting for the next opening rather than sending.',
+    campaigns: out.seqs.map((s) => ({
+      name: s.name,
+      live: s.active,
+      starts_on: s.trigger,
+      steps: s.steps,
+      first_step_delay_hours: s.first_delay,
+      attaches_a_quote: s.attaches,
+      enrolled: Object.fromEntries(
+        out.counts.filter((c2) => c2.sequence_id === s.id).map((c2) => [c2.state, c2.n])),
+      // The commonest answer by far, and the one the campaign page cannot show.
+      diagnosis: !s.active ? 'not switched on'
+        : out.counts.filter((c2) => c2.sequence_id === s.id).reduce((n, c2) => n + c2.n, 0) === 0
+          ? `nothing is enrolled — it starts on "${s.trigger}", so nothing has met that yet`
+          : undefined,
+    })),
+    recent_enrolments: out.recent.map((r) => ({
+      ticket: r.ticket_no,
+      campaign: out.seqs.find((s) => s.id === r.sequence_id)?.name,
+      state: r.state,
+      on_step: r.next_step,
+      due: r.next_send_at,
+      overdue: r.next_send_at ? new Date(r.next_send_at) < now : null,
+      held_because: r.held_reason,
+    })),
+  });
 });
 
 /** The list, with the rolled-up numbers alongside so the page needs one request. */

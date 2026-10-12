@@ -108,6 +108,13 @@ const Patch = z.object({
   // Not in SPEC_FIELDS: those are the things extract_specs competes for, and a rep editing
   // the description should not lock the extractor out of the product field as a side effect.
   description: z.string().max(120).nullable().optional(),
+  /*
+   * The shop's own estimate number from Pace — how they refer to a job on the phone, and
+   * the {estimate_no} token in campaigns. Lives in spec rather than its own column: it is
+   * a reference the rep types in, nothing queries or sorts on it, and a jsonb key needs no
+   * migration. Worth promoting to a column if it ever needs an index.
+   */
+  estimate_no: z.string().max(40).nullable().optional(),
   product: z.string().nullable().optional(),
   qty: z.number().int().positive().nullable().optional(),
   size: z.string().nullable().optional(),
@@ -247,6 +254,14 @@ leads.patch('/:id', async (c) => {
     if (p.deadline_at !== undefined) patch.deadline_at = p.deadline_at;
     if (p.status !== undefined) patch.status = p.status;
     if (p.assignee_id !== undefined) patch.assignee_id = p.assignee_id;
+
+    if (p.estimate_no !== undefined) {
+      const v = p.estimate_no?.trim() || null;
+      await tx`UPDATE leads
+                  SET spec = CASE WHEN ${v}::text IS NULL THEN spec - 'estimate_no'
+                                  ELSE spec || ${tx.json({ estimate_no: v ?? '' })}::jsonb END
+                WHERE id = ${id}`;
+    }
 
     if (Object.keys(patch).length) {
       await tx`UPDATE leads SET ${tx(patch)} WHERE id = ${id}`;

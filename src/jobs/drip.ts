@@ -6,9 +6,10 @@ import { sendEmail } from '../lib/mailgun';
 import { render as letter } from '../lib/email-layout';
 import { enroll } from '../lib/enroll';
 import {
-  DEFAULT_WINDOW, evaluate, fill, heldReason, nextOpen, stopReason,
+  evaluate, fill, heldReason, nextOpen, stopReason,
   type Branch, type LastSend, type SendWindow, type Standing,
 } from '../lib/drip';
+import { hoursOf } from '../lib/hours';
 
 /**
  * The drip runner, on the five-minute cron.
@@ -32,6 +33,7 @@ interface Due {
   deadline_at: string | null; quote_amount: string | null;
   first_name: string | null; company: string | null; email: string | null; phone: string | null;
   opted_out: boolean; rep_name: string | null; rep_phone: string | null;
+  estimate_no: string | null; rep_id: string | null;
 }
 
 const MAX_PER_RUN = 50;
@@ -42,15 +44,26 @@ export async function runDrips(env: Env, now = new Date()): Promise<{ sent: numb
   try {
     // orgs sits outside RLS, so the sweep for work happens before any tenant context opens;
     // everything after this runs inside withOrg for the org that owns the row.
-    const orgs = await sql<{ id: string }[]>`
-      SELECT DISTINCT s.org_id AS id
-        FROM enrollments e JOIN sequences s ON s.id = e.sequence_id
+    const orgs = await sql<{ id: string; comms: { hours?: unknown } }[]>`
+      SELECT DISTINCT s.org_id AS id, o.comms
+        FROM enrollments e
+        JOIN sequences s ON s.id = e.sequence_id
+        JOIN orgs o      ON o.id = s.org_id
        WHERE e.state = 'active' AND e.next_send_at <= now() AND s.active`;
 
     for (const org of orgs) {
+      /*
+       * The shop's own opening hours are the default send window.
+       *
+       * They used to be DEFAULT_WINDOW — Mon–Fri 8 to 5 Pacific, hardcoded here and
+       * invisible. A shop that set its hours in Settings would still have campaigns
+       * sending on its own schedule, and a shop open on Saturdays would never send then.
+       * One set of hours for the business; a sequence can still override it.
+       */
+      const shopHours = hoursOf(org.comms?.hours);
       const due = await withOrg(sql, org.id, (tx) => load(tx, org.id));
       for (const row of due) {
-        const outcome = await step(env, sql, row, now);
+        const outcome = await step(env, sql, row, now, shopHours);
         tally[outcome] += 1;
       }
     }
@@ -72,7 +85,9 @@ function load(tx: Tx, orgId: string): Promise<Due[]> {
            l.qty, l.product, l.size, l.stock, l.deadline_at, l.quote_amount,
            split_part(COALESCE(c.name, ''), ' ', 1) AS first_name,
            co.name AS company, c.email, c.phone, c.opted_out,
-           u.name AS rep_name, ${''} AS rep_phone
+           u.name AS rep_name, ${''} AS rep_phone,
+           l.spec->>'estimate_no' AS estimate_no,
+           u.id AS rep_id
       FROM enrollments e
       JOIN sequences s  ON s.id = e.sequence_id
       JOIN leads l      ON l.id = e.lead_id
@@ -89,7 +104,9 @@ function load(tx: Tx, orgId: string): Promise<Due[]> {
      LIMIT ${MAX_PER_RUN}`;
 }
 
-async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'held' | 'stopped'> {
+async function step(
+  env: Env, sql: Sql, d: Due, now: Date, shopHours: SendWindow,
+): Promise<'sent' | 'held' | 'stopped'> {
   return withOrg(sql, d.org_id, async (tx) => {
     // Re-read the things that can change under a running sequence. Checked here rather than
     // at enrolment because the whole point is that a week may pass between the two.
@@ -120,7 +137,7 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
 
     // Outside the window, the step is not skipped — it is moved to the next opening. A
     // window that can never open holds the enrollment rather than looping over candidates.
-    const window = d.send_window ?? DEFAULT_WINDOW;
+    const window = d.send_window ?? shopHours;
     const when = nextOpen(now, window);
     if (!when) {
       await hold(tx, d, 'window_never_opens');
@@ -216,12 +233,27 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
       return 'sent';
     }
 
+    // brand, slug and the rest come along because the email layout needs the shop's own
+    // colours and mark — a follow-up should look like the shop, not like the platform.
+    const [org] = await tx<Org[]>`
+      SELECT id, slug, name, brand, comms, widget, features FROM orgs WHERE id = ${d.org_id}`;
+
     const values = {
       first_name: d.first_name, company: d.company, qty: d.qty, product: d.product,
       size: d.size, stock: d.stock, deadline: d.deadline_at?.slice(0, 10) ?? null,
       quote_amount: d.quote_amount ? `$${Number(d.quote_amount).toLocaleString('en-US')}` : null,
       quote_link: null, ticket_no: d.ticket_no,
       rep_name: d.rep_name, rep_phone: d.rep_phone,
+      estimate_no: d.estimate_no,
+      /*
+       * The rep's own sign-off, falling back to the shop's.
+       *
+       * Kept as a map on the org rather than a column on users: it needs no migration, and
+       * a signature is tenant copy of the same kind as the SMS footer already stored there.
+       */
+      sender_signature: (d.rep_id
+        && (org.comms as { signatures?: Record<string, string> }).signatures?.[d.rep_id])
+        || org.comms.signature || null,
     };
     const body = fill(body0, values);
     const subject = fill(subject0 ?? '', values);
@@ -230,11 +262,6 @@ async function step(env: Env, sql: Sql, d: Due, now: Date): Promise<'sent' | 'he
       await hold(tx, d, heldReason(missing));
       return 'held';
     }
-
-    // brand, slug and the rest come along because the email layout needs the shop's own
-    // colours and mark — a follow-up should look like the shop, not like the platform.
-    const [org] = await tx<Org[]>`
-      SELECT id, slug, name, brand, comms, widget, features FROM orgs WHERE id = ${d.org_id}`;
 
     let providerId: string | null = null;
     if (kind === 'sms') {

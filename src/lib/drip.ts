@@ -135,6 +135,13 @@ export function stopReason(s: Standing): Stop | null {
 export const TOKENS = [
   'first_name', 'company', 'qty', 'product', 'size', 'stock', 'deadline',
   'quote_amount', 'quote_link', 'ticket_no', 'rep_name', 'rep_phone',
+  // The shop's own estimate number from Pace, which is how they actually refer to a job
+  // when the customer rings up. One word, because a token is \w+ — {estimate #} cannot
+  // work and would be sent literally.
+  'estimate_no',
+  // The rep's own sign-off, so a mail about Sean's customer ends the way Sean ends one.
+  // Falls back to the shop's signature when that rep has not written one.
+  'sender_signature',
 ] as const;
 
 export type Token = (typeof TOKENS)[number];

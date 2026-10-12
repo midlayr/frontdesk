@@ -19,7 +19,7 @@ export interface Lead {
    * the only home for answers that have no column of their own, such as everything pointed
    * at Notes.
    */
-  spec?: { captured?: Record<string, string>; summary?: string } | null;
+  spec?: { captured?: Record<string, string>; summary?: string; estimate_no?: string } | null;
 }
 
 export interface Message {

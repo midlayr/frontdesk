@@ -821,6 +821,15 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
           </div>
         </div>
 
+        {/* The shop's own reference for this job. Not extracted — a rep types it in once
+            Pace has one, and campaigns can then say it back with {estimate_no}. */}
+        <div className="section">Estimate</div>
+        <div className="spec">
+          <EditCell leadId={l.id} label="estimate #" value={l.spec?.estimate_no ?? null}
+                    placeholder="from Pace"
+                    onSave={(v) => onPatch({ estimate_no: v })} />
+        </div>
+
         <div className="section">Spec</div>
         <div className="spec">
           <EditCell leadId={l.id} label="qty" value={l.qty} placeholder={miss.includes('qty') ? '— ?' : ''}

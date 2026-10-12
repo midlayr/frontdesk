@@ -286,6 +286,13 @@ function StepEditor({ seqId, step, stepCount, readOnly, onSaved, onDelete }: {
           </span>
         </label>
 
+        {readOnly && (
+          <p className="camp-hint" style={{ marginBottom: 14 }}>
+            You can read this campaign but not change it — editing is for admins. Ask one of
+            them to make the change, or to give you admin.
+          </p>
+        )}
+
         {draft.kind === 'email' && (
           <label className="fb-field">
             <span className="label">Subject</span>

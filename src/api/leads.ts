@@ -156,16 +156,37 @@ leads.post('/:id/tasks', async (c) => {
 /** Tick a task off, or put it back. */
 leads.patch('/:leadId/tasks/:taskId', async (c) => {
   const org = c.get('org');
-  const body = await c.req.json<{ done?: boolean }>().catch(() => null);
-  if (!body || typeof body.done !== 'boolean') return c.json({ error: 'done is required' }, 400);
+  const body = await c.req.json<{ done?: boolean; assignee_id?: string | null }>()
+    .catch(() => null);
+  if (!body || (body.done === undefined && body.assignee_id === undefined)) {
+    return c.json({ error: 'nothing to change' }, 400);
+  }
 
   const row = await withOrg(c.get('sql'), org.id, async (tx) => {
+    /*
+     * Handing a task to somebody, separately from who owns the ticket.
+     *
+     * A task starts with the ticket's owner, but the two part company the moment somebody
+     * else picks a job up — and the admin looking at a task with nobody on it wants to
+     * hand it over from where they are standing, not open the ticket to do it.
+     */
+    if (body.assignee_id !== undefined && body.assignee_id !== null) {
+      const [who] = await tx<{ id: string }[]>`
+        SELECT id FROM users WHERE id = ${body.assignee_id} AND org_id = ${org.id}`;
+      if (!who) return 'bad_user' as const;
+    }
+
     const [t] = await tx`
-      UPDATE tasks SET done_at = ${body.done ? new Date().toISOString() : null}
+      UPDATE tasks SET
+        done_at = CASE WHEN ${body.done ?? null}::boolean IS NULL THEN done_at
+                       WHEN ${body.done ?? false} THEN now() ELSE NULL END,
+        assignee_id = CASE WHEN ${body.assignee_id === undefined} THEN assignee_id
+                           ELSE ${body.assignee_id ?? null} END
        WHERE id = ${c.req.param('taskId')} AND lead_id = ${c.req.param('leadId')}
       RETURNING id, text, due_at, done_at, source, assignee_id`;
     return t ?? null;
   });
+  if (row === 'bad_user') return c.json({ error: 'that person is not in this shop' }, 400);
   return row ? c.json({ ok: true, task: row }) : c.json({ error: 'not found' }, 404);
 });
 

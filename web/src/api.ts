@@ -167,6 +167,13 @@ export const api = {
     return r.json() as Promise<{ ok: true; task: Task }>;
   },
 
+  setTaskAssignee: async (leadId: string, taskId: string, assignee_id: string | null) => {
+    const r = await fetch(url(`/api/leads/${leadId}/tasks/${taskId}`),
+      { method: 'PATCH', headers: headers(), body: JSON.stringify({ assignee_id }) });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json() as Promise<{ ok: true; task: Task }>;
+  },
+
   setTaskDone: async (leadId: string, taskId: string, done: boolean) => {
     const r = await fetch(url(`/api/leads/${leadId}/tasks/${taskId}`),
       { method: 'PATCH', headers: headers(), body: JSON.stringify({ done }) });

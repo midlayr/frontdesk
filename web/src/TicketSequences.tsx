@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { orgSlug } from './api';
-import { STATE_COLOR, STATE_LABEL, campaigns, when, type Sequence } from './campaigns-api';
+import { STATE_COLOR, STATE_LABEL, TRIGGER_LABEL, campaigns, when, type Sequence } from './campaigns-api';
 
 /**
  * Campaign control in the ticket header (wireframe 1f, relocated).
@@ -59,7 +59,19 @@ export function TicketSequences({ leadId }: { leadId: string }) {
 
   const running = rows.filter((r) => ['active', 'held', 'paused'].includes(r.state));
   const onIds = new Set(running.map((r) => r.sequence_id));
-  const offerable = all.filter((s) => s.active && s.trigger === 'manual' && !onIds.has(s.id));
+  /*
+   * Any live campaign, not only the ones whose trigger is literally "manual".
+   *
+   * Restricting it to manual made sense on paper — an automatic campaign picks its own
+   * leads — and was wrong in practice. Putting one ticket on a campaign by hand is how
+   * anybody tests one, and how a rep says "this customer should be in that sequence". The
+   * effect of the old rule was an empty, disabled box for every campaign a shop actually
+   * had, with no way to tell that was deliberate.
+   *
+   * The trigger is shown on each, so starting one by hand is a visible choice rather than
+   * an accident.
+   */
+  const offerable = all.filter((s) => s.active && !onIds.has(s.id));
   const lead = running[0];
 
   async function enroll(sequenceId: string) {
@@ -95,7 +107,7 @@ export function TicketSequences({ leadId }: { leadId: string }) {
     <div className="tseq-wrap" ref={box}>
       <button className="pick tseq-btn" onClick={() => setOpen(!open)} disabled={nothingToOffer}
               title={nothingToOffer
-                ? 'No campaign is switched on that a rep can start by hand'
+                ? 'No campaign is switched on yet'
                 : 'Campaigns this ticket is on'}>
         {lead
           ? <>
@@ -140,14 +152,18 @@ export function TicketSequences({ leadId }: { leadId: string }) {
               <span className="label tseq-add-lbl">{running.length ? 'Also add to' : 'Add to a campaign'}</span>
               {offerable.map((s) => (
                 <button key={s.id} className="tseq-offer" disabled={busy} onClick={() => enroll(s.id)}>
-                  {s.name} <i>{s.steps} step{s.steps === 1 ? '' : 's'}</i>
+                  {s.name}{' '}
+                  <i>
+                    {s.steps} step{s.steps === 1 ? '' : 's'}
+                    {s.trigger !== 'manual' && ` · normally starts on ${TRIGGER_LABEL[s.trigger] ?? s.trigger}`}
+                  </i>
                 </button>
               ))}
             </>
           )}
 
           {!running.length && !offerable.length && (
-            <p className="tseq-sub">No campaign is switched on that a rep can start by hand.</p>
+            <p className="tseq-sub">No campaign is switched on yet.</p>
           )}
           {error && <p className="team-err">{error}</p>}
         </div>

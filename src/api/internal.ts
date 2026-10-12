@@ -246,6 +246,16 @@ internal.post('/leads/from-chat', async (c) => {
     await tx`INSERT INTO activity (id, org_id, lead_id, actor, kind, detail)
              VALUES (${ulid()}, ${body.orgId}, ${id}, 'system', 'lead_created',
                      ${tx.json({ channel: 'chat', ticket_no: ticketNo })})`;
+
+    /*
+     * Put it on any campaign that starts on a new lead.
+     *
+     * Every other way a lead arrives already did this — email, the website form, SMS —
+     * and chat did not, so a campaign triggered on lead_created never fired for the one
+     * channel this shop has been building all month. Switching a campaign on and watching
+     * nothing happen is exactly what that looks like from the outside.
+     */
+    await onLeadCreated(tx, body.orgId, id);
     return id;
   });
 

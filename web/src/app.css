@@ -170,7 +170,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 
 .fb-preview { border-left: 1px solid var(--line); background: var(--paper-2);
               padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; }
-.fb-prev-head { display: flex; justify-content: space-between; align-items: baseline; }
+.fb-prev-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .fb-restart { border: 0; background: none; color: var(--accent); font: 400 12px var(--font-body); text-decoration: underline; }
 .fb-widget { display: flex; flex-direction: column; background: var(--paper);
              border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-float);
@@ -883,9 +883,13 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .hours-row .fb-field { max-width: 190px; }
 
 /* Open / after-hours switch above the builder's preview. */
+/* Pushed right when there is room, wrapping under the label when there is not. The
+   buttons never wrap their own text: a fixed-height control with a wrapped label spills
+   out of itself. */
 .fb-when { margin-left: auto; }
-.fb-when button { padding: 4px 9px; font-size: 11px; }
+.fb-when button { padding: 0 10px; font-size: 10.5px; letter-spacing: .06em; white-space: nowrap; }
 .fb-when-note { margin: 0; padding: 7px 12px; background: var(--paper-2);
+                line-height: 1.5;
                 border-bottom: 1px solid var(--line);
                 font: 400 11.5px var(--font-mono); color: var(--ink-3); }
 

@@ -443,7 +443,7 @@ export function FlowBuilder(
         {/* ── 3 · live preview ── */}
         <div className="fb-preview">
           <div className="fb-prev-head">
-            <span className="label">Live preview · unsaved draft</span>
+            <span className="label">Live preview</span>
             {/* Nobody writes their closing message at six in the evening to check it reads
                 properly, so the preview can be told to pretend. Follows the real clock
                 until it is touched — then says so, because a preview quietly running at a
@@ -453,13 +453,13 @@ export function FlowBuilder(
                       title="Run the preview the way the shop is right now"
                       onClick={() => setAsOpen(null)}>Now</button>
               <button data-on={asOpen === true} onClick={() => setAsOpen(true)}>Open</button>
-              <button data-on={asOpen === false} onClick={() => setAsOpen(false)}>After hours</button>
+              <button data-on={asOpen === false} onClick={() => setAsOpen(false)}>Closed</button>
             </span>
             <button className="fb-restart" onClick={() => { setSaid([]); setDraft(''); }}>Restart</button>
           </div>
           {asOpen === null && sim && (
             <p className="fb-when-note">
-              Running as the shop is now — <b>{sim.open ? 'open' : 'closed'}</b>
+              Following the clock — <b>{sim.open ? 'open' : 'closed'}</b> now
               {hours && <> · {hours.described}</>}
             </p>
           )}

@@ -99,6 +99,8 @@ export interface FlowSettings {
  * the Worker, so a snippet built in the browser would point the shop's website at a
  * localhost that exists on one laptop.
  */
+export interface SignatureFields { title?: string; phone?: string }
+
 export interface Install {
   /** The origin the Worker answers on — where /w.js and /widget/config live. */
   origin: string;
@@ -236,12 +238,15 @@ export const flowsApi = {
       '/api/settings/widget', { method: 'PUT', body: JSON.stringify({ allowed_domains }) }),
   /** The shop's opening hours, for the builder's out-of-hours field. */
   hours: () => call<{ hours: unknown; described: string; open: boolean }>('/api/settings/hours'),
+  /** Only title and phone are stored; name, company and email come from the records. */
   signatures: () => call<{
     people: { id: string; name: string; email: string; role: string }[];
-    signatures: Record<string, string>; fallback: string;
+    signatures: Record<string, SignatureFields>;
+    rendered: Record<string, string>;
+    company: string;
   }>('/api/settings/signatures'),
-  saveSignatures: (signatures: Record<string, string>) =>
-    call<{ ok: true; signatures: Record<string, string> }>(
+  saveSignatures: (signatures: Record<string, SignatureFields>) =>
+    call<{ ok: true; signatures: Record<string, SignatureFields>; rendered: Record<string, string> }>(
       '/api/settings/signatures', { method: 'PUT', body: JSON.stringify({ signatures }) }),
   saveHours: (h: { days: number[]; start: string; end: string; tz: string }) =>
     call<{ ok: true; hours: unknown; described: string; open: boolean }>(

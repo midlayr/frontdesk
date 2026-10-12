@@ -10,6 +10,7 @@ import {
   type Branch, type LastSend, type SendWindow, type Standing,
 } from '../lib/drip';
 import { hoursOf } from '../lib/hours';
+import { renderSignature, signatureFields } from '../lib/signature';
 
 /**
  * The drip runner, on the five-minute cron.
@@ -33,7 +34,7 @@ interface Due {
   deadline_at: string | null; quote_amount: string | null;
   first_name: string | null; company: string | null; email: string | null; phone: string | null;
   opted_out: boolean; rep_name: string | null; rep_phone: string | null;
-  estimate_no: string | null; rep_id: string | null;
+  estimate_no: string | null; rep_id: string | null; rep_email: string | null;
 }
 
 const MAX_PER_RUN = 50;
@@ -85,7 +86,7 @@ function load(tx: Tx, orgId: string): Promise<Due[]> {
            l.qty, l.product, l.size, l.stock, l.deadline_at, l.quote_amount,
            split_part(COALESCE(c.name, ''), ' ', 1) AS first_name,
            co.name AS company, c.email, c.phone, c.opted_out,
-           u.name AS rep_name, ${''} AS rep_phone,
+           u.name AS rep_name, u.email AS rep_email, ${''} AS rep_phone,
            l.spec->>'estimate_no' AS estimate_no,
            u.id AS rep_id
       FROM enrollments e
@@ -246,14 +247,20 @@ async function step(
       rep_name: d.rep_name, rep_phone: d.rep_phone,
       estimate_no: d.estimate_no,
       /*
-       * The rep's own sign-off, falling back to the shop's.
+       * The rep's own sign-off, built from the same helper the settings page previews with
+       * — so what an admin saw when they set it up is what the customer receives.
        *
-       * Kept as a map on the org rather than a column on users: it needs no migration, and
-       * a signature is tenant copy of the same kind as the SMS footer already stored there.
+       * Only the title and phone are stored per person; the name, company and email come
+       * from the records. A ticket with no rep on it falls back to the shop's signature.
        */
-      sender_signature: (d.rep_id
-        && (org.comms as { signatures?: Record<string, string> }).signatures?.[d.rep_id])
-        || org.comms.signature || null,
+      sender_signature: (d.rep_id && d.rep_name
+        ? renderSignature(
+            { name: d.rep_name, email: d.rep_email ?? '' },
+            org.name,
+            signatureFields((org.comms as { signatures?: Record<string, unknown> })
+              .signatures?.[d.rep_id]),
+          )
+        : null) || org.comms.signature || null,
     };
     const body = fill(body0, values);
     const subject = fill(subject0 ?? '', values);

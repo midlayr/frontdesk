@@ -909,3 +909,11 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .task-add input { flex: 1; min-width: 0; font-size: var(--text-md); padding: 8px 10px;
                   border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Signature editor on a person's row: the two stored fields, then what it will look like. */
+.sig-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.sig-preview { padding: 11px 13px; margin-bottom: 12px; background: var(--paper);
+               border: 1px solid var(--line); border-radius: var(--radius);
+               font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.sig-preview div:first-child { color: var(--ink); font-weight: 600; }
+@media (max-width: 720px) { .sig-fields { grid-template-columns: 1fr; } }

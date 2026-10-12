@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ROLES, api, type OrgUser, type ProviderCheck } from './api';
+import { flowsApi, type SignatureFields } from './flows-api';
 
 /**
  * The people who can use Front Desk, and what each of them may do.
@@ -63,6 +64,16 @@ export function Team({ me }: { me: { id: string; role: string } | null }) {
   const [draft, setDraft] = useState(BLANK);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState('');
+  /*
+   * Signatures live here rather than on the Messaging page, because a signature is a fact
+   * about a person and this is where the people are. Loaded once with the shop's fallback,
+   * so a blank box can show what that person would sign off as instead of looking unset.
+   */
+  const [sigFor, setSigFor] = useState<string | null>(null);
+  const [sigs, setSigs] = useState<Record<string, SignatureFields>>({});
+  const [rendered, setRendered] = useState<Record<string, string>>({});
+  const [sigDraft, setSigDraft] = useState<SignatureFields>({});
+  const [company, setCompany] = useState('');
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
   const [pwFor, setPwFor] = useState<string | null>(null);
@@ -92,6 +103,18 @@ export function Team({ me }: { me: { id: string; role: string } | null }) {
    * mail fails, so a send failure is "invite them again" rather than "they were never
    * added".
    */
+  useEffect(() => {
+    flowsApi.signatures()
+      .then((r) => { setSigs(r.signatures); setRendered(r.rendered); setCompany(r.company); })
+      .catch(() => {});
+  }, []);
+
+  const saveSignature = (id: string) => run('sig', async () => {
+    // The whole map is sent, so one person's edit cannot drop everyone else's.
+    const r = await flowsApi.saveSignatures({ ...sigs, [id]: sigDraft });
+    setSigs(r.signatures); setRendered(r.rendered); setSigFor(null); setSigDraft({});
+  }, 'Signature saved.');
+
   const addPerson = (invite: boolean) => run('add', async () => {
     const name = draft.name.trim(), email = draft.email.trim();
     if (!name || !email) throw new Error('Name and email are both needed');
@@ -215,6 +238,12 @@ export function Team({ me }: { me: { id: string; role: string } | null }) {
                         : u.last_seen_at || !u.invited_at ? 'Send sign-in link' : 'Resend invite'}
                     </button>
                   )}
+                  <button onClick={() => {
+                            setSigFor(sigFor === u.id ? null : u.id);
+                            setSigDraft(sigs[u.id] ?? {});
+                          }}>
+                    {sigs[u.id] ? 'Edit signature' : 'Add a signature'}
+                  </button>
                   <button onClick={() => { setPwFor(pwFor === u.id ? null : u.id); setPw(''); }}>
                     {u.password_set_at ? 'Reset password' : 'Set a password'}
                   </button>
@@ -225,6 +254,40 @@ export function Team({ me }: { me: { id: string; role: string } | null }) {
                       {off ? 'Enable' : 'Disable'}
                     </button>
                   )}
+                </div>
+              )}
+
+              {sigFor === u.id && (
+                <div className="team-pw">
+                  <span className="label">
+                    {u.name.split(/\s+/)[0]}'s sign-off
+                    <i> · used by {'{sender_signature}'} in campaigns</i>
+                  </span>
+                  {/* Only the two things we do not already know. Name, company and email
+                      come from the records, so seven signatures cannot end up disagreeing
+                      about the company's name. */}
+                  <div className="sig-fields">
+                    <label className="fb-field">
+                      <span className="label">Title</span>
+                      <input value={sigDraft.title ?? ''} autoFocus placeholder="Account Executive"
+                             onChange={(e) => setSigDraft({ ...sigDraft, title: e.target.value })} />
+                    </label>
+                    <label className="fb-field">
+                      <span className="label">Phone</span>
+                      <input value={sigDraft.phone ?? ''} placeholder="(559) 485-6311"
+                             onChange={(e) => setSigDraft({ ...sigDraft, phone: e.target.value })} />
+                    </label>
+                  </div>
+                  <div className="sig-preview">
+                    {[u.name, sigDraft.title?.trim(), company,
+                      [sigDraft.phone?.trim(), u.email].filter(Boolean).join(' | ')]
+                      .filter(Boolean).map((line, n) => <div key={n}>{line}</div>)}
+                  </div>
+                  <div className="team-pw-row">
+                    <button className="btn-primary" disabled={busy === 'sig'}
+                            onClick={() => saveSignature(u.id)}>Save</button>
+                    <button className="btn-ghost" onClick={() => { setSigFor(null); setSigDraft({}); }}>Cancel</button>
+                  </div>
                 </div>
               )}
 

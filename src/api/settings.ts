@@ -7,6 +7,7 @@ import { ulid } from 'ulid';
 import { invalidateOrg } from '../org';
 import { cleanDomains } from '../lib/domains';
 import { describe as describeHours, hoursKey, hoursOf, openAt } from '../lib/hours';
+import { renderSignature, signatureFields, type SignatureFields } from '../lib/signature';
 
 type Vars = { org: Org; sql: Sql; userId: string };
 
@@ -269,7 +270,10 @@ settings.put('/hours', async (c) => {
  * as every other setting on this page.
  */
 const Signatures = z.object({
-  signatures: z.record(z.string().max(64), z.string().max(600)),
+  signatures: z.record(z.string().max(64), z.object({
+    title: z.string().max(80).optional(),
+    phone: z.string().max(40).optional(),
+  })),
 });
 
 settings.get('/signatures', async (c) => {
@@ -278,14 +282,16 @@ settings.get('/signatures', async (c) => {
     tx<{ id: string; name: string; email: string; role: string }[]>`
       SELECT id, name, email, role FROM users
        WHERE org_id = ${org.id} AND disabled_at IS NULL ORDER BY name`);
-  const stored = (org.comms as { signatures?: Record<string, string> }).signatures ?? {};
-  return c.json({
-    people,
-    signatures: stored,
-    // What a rep with no signature of their own falls back to, so the editor can show it
-    // as the placeholder rather than implying the mail goes out unsigned.
-    fallback: org.comms.signature ?? org.name,
-  });
+
+  const stored = (org.comms as { signatures?: Record<string, unknown> }).signatures ?? {};
+  const signatures: Record<string, SignatureFields> = {};
+  const rendered: Record<string, string> = {};
+  for (const p of people) {
+    signatures[p.id] = signatureFields(stored[p.id]);
+    rendered[p.id] = renderSignature(p, org.name, signatures[p.id]);
+  }
+
+  return c.json({ people, signatures, rendered, company: org.name });
 });
 
 settings.put('/signatures', async (c) => {
@@ -293,23 +299,29 @@ settings.put('/signatures', async (c) => {
   const parsed = Signatures.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: 'bad signatures' }, 400);
 
-  // Only people who are really in this shop, and only non-empty text. A blank means "use
-  // the shop's", so it is removed rather than stored as an empty string that would send a
-  // mail signed with nothing.
-  const ids = new Set((await withOrg(c.get('sql'), org.id, (tx) =>
-    tx<{ id: string }[]>`SELECT id FROM users WHERE org_id = ${org.id}`)).map((u) => u.id));
+  // Only people really in this shop, and only the two keys. A person with neither a title
+  // nor a phone is dropped entirely rather than stored as an empty object.
+  const people = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ id: string; name: string; email: string }[]>`
+      SELECT id, name, email FROM users WHERE org_id = ${org.id}`);
+  const byId = new Map(people.map((p) => [p.id, p]));
 
-  const clean: Record<string, string> = {};
-  for (const [id, text] of Object.entries(parsed.data.signatures)) {
-    if (ids.has(id) && text.trim()) clean[id] = text.trim();
+  const clean: Record<string, SignatureFields> = {};
+  for (const [id, f] of Object.entries(parsed.data.signatures)) {
+    if (!byId.has(id)) continue;
+    const fields = signatureFields(f);
+    if (Object.keys(fields).length) clean[id] = fields;
   }
 
-  const saved = await withOrg(c.get('sql'), org.id, async (tx) => {
-    const [row] = await tx<{ comms: { signatures?: Record<string, string> } }[]>`
-      UPDATE orgs SET comms = comms || ${tx.json({ signatures: clean })}::jsonb
-       WHERE id = ${org.id} RETURNING comms`;
-    return row?.comms?.signatures ?? clean;
-  });
+  await withOrg(c.get('sql'), org.id, (tx) =>
+    tx`UPDATE orgs SET comms = comms || ${tx.json({
+         signatures: Object.fromEntries(
+           Object.entries(clean).map(([id, f]) => [id, { ...f }]),
+         ) as Record<string, Record<string, string>>,
+       })}::jsonb WHERE id = ${org.id}`);
   await invalidateOrg(c.env, c.get('sql'), org);
-  return c.json({ ok: true, signatures: saved });
+
+  const rendered: Record<string, string> = {};
+  for (const p of people) rendered[p.id] = renderSignature(p, org.name, clean[p.id] ?? {});
+  return c.json({ ok: true, signatures: clean, rendered });
 });

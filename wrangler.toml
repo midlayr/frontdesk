@@ -78,9 +78,11 @@ MAILGUN_DOMAIN = "midlayr.com"
 # Where Twilio posts delivery receipts for drip sends. A cron-triggered job has no request
 # to read its own hostname from, so it has to be told.
 PUBLIC_ORIGIN = "https://dumont-frontdesk.matt-dee.workers.dev"
-# Chat notifications are redirected here while this is being tried out, so nothing reaches
-# Dumont's reps. Set to "rep" to route live; remove the line entirely to switch them off.
-LEAD_NOTIFY_TO = "matt@tymn.com"
+# Chat notifications are redirected while this is being tried out, so nothing reaches
+# Dumont's reps. "admins" is everyone holding the admin role, which is Matt and Summer —
+# written this way so it stays right if the team changes. Add plain addresses to the list
+# for anyone else. Set to "rep" to route live; remove the line to switch them off.
+LEAD_NOTIFY_TO = "admins"
 # secrets (wrangler secret put): DATABASE_URL (local dev only; prod uses Hyperdrive),
 #   TWILIO_AUTH_TOKEN, TWILIO_SID, SESSION_SECRET,
 #   MAILGUN_API_KEY      — sending

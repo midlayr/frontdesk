@@ -398,8 +398,21 @@ internal.post('/leads/notify', async (c) => {
     ticketUrl: `${origin}/?lead=${encodeURIComponent(body.leadId)}`,
   });
 
-  const live = dest === 'rep';
-  const to = live ? (l.rep_email ?? admins.join(',')) : dest;
+  /*
+   * Who this goes to.
+   *
+   * A comma-separated list, so more than one person can watch while a shop is trying this
+   * out. Two words are special: "rep" means route it for real, and "admins" expands to
+   * whoever holds the admin role — which keeps working when somebody joins or leaves, and
+   * saves hardcoding an address that will be wrong in a month.
+   */
+  const parts = dest.split(',').map((p) => p.trim()).filter(Boolean);
+  const live = parts.includes('rep');
+
+  const to = live
+    ? (l.rep_email ?? admins.join(','))
+    : [...new Set(parts.flatMap((p) => (p === 'admins' ? admins : [p])))].join(',');
+
   if (!to) return c.json({ ok: true, sent: false, why: 'nobody to send to' });
 
   if (!live) {

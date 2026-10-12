@@ -54,6 +54,8 @@ export interface Outgoing {
   replyTo?: string | null;
   /** Threading: the message we are answering, so the customer's client nests the reply. */
   inReplyTo?: string | null;
+  /** Files to send with it — a quote letter PDF, today. */
+  attachments?: { filename: string; bytes: ArrayBuffer; mime?: string }[];
   references?: string[];
 }
 
@@ -80,6 +82,12 @@ export async function sendEmail(env: Env, m: Outgoing): Promise<Sent> {
   if (m.replyTo) form.set('h:Reply-To', m.replyTo);
   if (m.inReplyTo) form.set('h:In-Reply-To', m.inReplyTo);
   if (m.references?.length) form.set('h:References', m.references.join(' '));
+  // append, not set: Mailgun takes repeated `attachment` parts, and set() would leave only
+  // the last one — a mail that quietly loses all but one file is worse than one that fails.
+  for (const a of m.attachments ?? []) {
+    form.append('attachment',
+      new Blob([a.bytes], { type: a.mime ?? 'application/octet-stream' }), a.filename);
+  }
 
   const base = env.MAILGUN_BASE_URL || 'https://api.mailgun.net';
   const res = await fetch(`${base}/v3/${domain}/messages`, {

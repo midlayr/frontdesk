@@ -11,6 +11,7 @@ import {
 } from '../lib/drip';
 import { hoursOf } from '../lib/hours';
 import { renderSignature, signatureFields } from '../lib/signature';
+import { fetchEstimatePdf, pdfKey } from '../lib/pace';
 
 /**
  * The drip runner, on the five-minute cron.
@@ -24,7 +25,7 @@ import { renderSignature, signatureFields } from '../lib/signature';
 interface Due {
   enrollment_id: string; sequence_id: string; lead_id: string; contact_id: string;
   org_id: string; started_at: string; last_sent_at: string | null; next_step: number;
-  send_window: SendWindow | null; send_as: string; seq_name: string;
+  send_window: SendWindow | null; send_as: string; seq_name: string; attach_quote: boolean;
   step_id: string; kind: string; position: number; subject: string | null; body: string;
   /** The branches on the step we last sent — evaluated now that this one is due. */
   prev_branches: Branch[] | null; prev_subject: string | null; prev_body: string | null;
@@ -79,7 +80,7 @@ function load(tx: Tx, orgId: string): Promise<Due[]> {
     SELECT e.id AS enrollment_id, e.sequence_id, e.lead_id, e.contact_id, s.org_id,
            e.started_at, e.last_sent_at, e.next_step,
            s.send_window, s.send_as, s.name AS seq_name,
-           st.id AS step_id, st.kind, st.position, st.subject, st.body,
+           st.id AS step_id, st.kind, st.position, st.subject, st.body, st.attach_quote,
            prev.branches AS prev_branches, prev.subject AS prev_subject, prev.body AS prev_body,
            l.intent_score,
            l.status AS lead_status, (l.archived_at IS NOT NULL) AS archived, l.ticket_no,
@@ -299,6 +300,38 @@ async function step(
         body: body.text.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean),
         signature: display,
       }, org, env);
+      /*
+       * The quote letter, when the step asks for one.
+       *
+       * attach_quote has been on steps since campaigns shipped and the sender never read
+       * it, so ticking it did nothing at all.
+       *
+       * On failure the enrolment is HELD rather than sent without the file. A follow-up
+       * whose body says "your quote is attached" and has nothing attached makes the shop
+       * look careless and earns a reply asking for it — and holding is what this engine
+       * already does when a token has no value, so there is one mechanism and one place to
+       * look. The reason says which of their documented failures it was.
+       */
+      const files: { filename: string; bytes: ArrayBuffer; mime?: string }[] = [];
+      if (d.attach_quote) {
+        const got = await fetchEstimatePdf(env, d.estimate_no ?? '');
+        if (!got.ok) {
+          await hold(tx, d, `quote_pdf:${got.why}`);
+          return 'held';
+        }
+        files.push({ filename: `estimate-${(d.estimate_no ?? '').trim()}.pdf`,
+                     bytes: got.bytes, mime: 'application/pdf' });
+
+        // Kept, because the report regenerates live: what the customer received has to be
+        // recoverable later, and their server does not archive a copy for API runs.
+        const key = pdfKey(d.org_id, (d.estimate_no ?? '').trim());
+        await env.FILES.put(key, got.bytes, { httpMetadata: { contentType: 'application/pdf' } });
+        await tx`INSERT INTO attachments (id, lead_id, r2_key, filename, mime, bytes)
+                 VALUES (${ulid()}, ${d.lead_id}, ${key},
+                         ${`estimate-${(d.estimate_no ?? '').trim()}.pdf`},
+                         'application/pdf', ${got.bytesLength})`;
+      }
+
       const sent = await sendEmail(env, {
         from: `${display} <${sender}>`,
         to: d.email,
@@ -306,6 +339,7 @@ async function step(
         text: body.text,
         html: mail.html,
         replyTo: org.comms.email_inbound ?? sender,
+        attachments: files.length ? files : undefined,
       });
       providerId = sent.id;
     }

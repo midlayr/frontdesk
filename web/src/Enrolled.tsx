@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { STATE_COLOR, STATE_LABEL, enrollments, when, type Enrollment } from './campaigns-api';
+import { PDF_REASON, STATE_COLOR, STATE_LABEL, enrollments, when, type Enrollment } from './campaigns-api';
 
 /**
  * Enrolled (wireframe 1d) — who is on this campaign and where they got to.
@@ -106,7 +106,10 @@ export function Enrolled({ seqId, readOnly, onOpenLead }: {
                   <span className="enr-why">
                     {r.held_reason.startsWith('missing:')
                       ? `no ${r.held_reason.slice(8)}`
-                      : r.held_reason}
+                      : r.held_reason.startsWith('quote_pdf:')
+                        ? PDF_REASON[r.held_reason.slice(10) as keyof typeof PDF_REASON]
+                          ?? r.held_reason
+                        : r.held_reason}
                     {' · '}
                     <button className="enr-fix" onClick={() => onOpenLead(r.lead_id)}>fix on ticket →</button>
                   </span>

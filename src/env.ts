@@ -45,6 +45,13 @@ export interface Env {
    * should make the shop quieter, never start mailing seven people who were not expecting it.
    */
   LEAD_NOTIFY_TO?: string;
+  /**
+   * Dumont's own endpoint in front of Pace, which resolves an estimate to its newest quote
+   * letter and returns the PDF. Set to the collection URL; the estimate number is appended.
+   * Unset means estimate attachments are off.
+   */
+  PACE_PDF_URL?: string;
+  PACE_API_KEY?: string;
 }
 
 // Every job carries orgId: the consumer has no request to resolve a tenant from.

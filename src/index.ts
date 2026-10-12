@@ -817,6 +817,25 @@ app.get('/api/health/providers', async (c) => {
       const detail = (await r.text()).slice(0, 160);
       return r.status === 401 ? `Key rejected (401) — ${detail}` : `${r.status} — ${detail}`;
     }),
+    /*
+     * Dumont's own endpoint in front of Pace. A real call, because the failure this is
+     * meant to catch — a key that is present and rejected, or a tunnel that has stopped —
+     * looks identical to working from the configuration alone.
+     */
+    check('Estimate PDFs', env.PACE_PDF_URL ? new URL(env.PACE_PDF_URL).host : 'not set', async () => {
+      if (!env.PACE_PDF_URL || !env.PACE_API_KEY) {
+        return 'Not switched on — campaigns cannot attach a quote letter';
+      }
+      const r = await fetch(new URL('/api/crm/health', env.PACE_PDF_URL).toString(), {
+        headers: { 'x-api-key': env.PACE_API_KEY },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (r.ok) return null;
+      const detail = (await r.text().catch(() => '')).slice(0, 160);
+      return r.status === 401 || r.status === 403
+        ? `Key rejected (${r.status}) — ${detail}`
+        : `${r.status} — ${detail}`;
+    }),
     check('Database', 'Postgres via Hyperdrive', async () => {
       const [row] = await c.get('sql')<{ n: number }[]>`SELECT 1 AS n`;
       return row?.n === 1 ? null : 'unexpected reply';

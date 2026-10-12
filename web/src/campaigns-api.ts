@@ -45,6 +45,9 @@ export const STATE_COLOR: Record<string, string> = {
  * its own, so the browser can take it as it is.
  */
 export { TOKENS } from '../../src/lib/drip';
+/* Why a quote letter could not be fetched, in words a rep can act on. Same source as the
+   sender, so the held reason and the log cannot describe it differently. */
+export { PDF_REASON } from '../../src/lib/pace-reasons';
 
 /**
  * Where a clicked token chip should go, and what the field becomes.

@@ -83,6 +83,10 @@ PUBLIC_ORIGIN = "https://dumont-frontdesk.matt-dee.workers.dev"
 # written this way so it stays right if the team changes. Add plain addresses to the list
 # for anyone else. Set to "rep" to route live; remove the line to switch them off.
 LEAD_NOTIFY_TO = "admins"
+# Dumont's own endpoint in front of Pace: it resolves an estimate number to its newest
+# quote letter and returns the PDF, so none of Pace itself is exposed. The estimate number
+# is appended to this. PACE_API_KEY is a secret (wrangler secret put).
+PACE_PDF_URL = "https://crm.dumontapps.com/api/crm/estimate-pdf"
 # secrets (wrangler secret put): DATABASE_URL (local dev only; prod uses Hyperdrive),
 #   TWILIO_AUTH_TOKEN, TWILIO_SID, SESSION_SECRET,
 #   MAILGUN_API_KEY      — sending

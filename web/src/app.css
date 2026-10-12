@@ -888,3 +888,24 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .fb-when-note { margin: 0; padding: 7px 12px; background: var(--paper-2);
                 border-bottom: 1px solid var(--line);
                 font: 400 11.5px var(--font-mono); color: var(--ink-3); }
+
+/* One signature per person, two up where there is room. */
+.sig-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; }
+.sig-list .fb-field { max-width: none; }
+@media (max-width: 860px) { .sig-list { grid-template-columns: 1fr; } }
+
+/* ── tasks on the ticket ──────────────────────────────────────────── */
+.tasks { display: flex; flex-direction: column; gap: 2px; }
+.task { display: flex; align-items: baseline; gap: 10px; padding: 7px 0;
+        border-bottom: 1px solid var(--line); font-size: var(--text-md); cursor: pointer; }
+.task input { margin: 0; flex: none; }
+.task-text { flex: 1; }
+.task[data-done='true'] .task-text { text-decoration: line-through; color: var(--ink-3); }
+.task-src { font: 400 9.5px var(--font-mono); letter-spacing: .09em; text-transform: uppercase;
+            color: var(--ink-3); border: 1px solid var(--line); border-radius: 2px; padding: 2px 5px; }
+.task-count { font: 400 11px var(--font-mono); color: var(--warn); letter-spacing: .06em; }
+.task-none { margin: 0 0 4px; font-size: var(--text-md); color: var(--ink-3); }
+.task-add { display: flex; gap: 8px; margin-top: 10px; }
+.task-add input { flex: 1; min-width: 0; font-size: var(--text-md); padding: 8px 10px;
+                  border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

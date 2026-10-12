@@ -76,7 +76,19 @@ leads.get('/:id', async (c) => {
                                 FROM messages WHERE lead_id = ${id} ORDER BY sent_at`;
     const attachments = await tx`SELECT id, r2_key, filename, mime, bytes FROM attachments WHERE lead_id = ${id}`;
     const activity = await tx`SELECT id, actor, kind, detail, at FROM activity WHERE lead_id = ${id} ORDER BY at`;
-    return { lead, messages, attachments, activity };
+    /*
+     * Tasks, which until now were write-only.
+     *
+     * A campaign's "create a task" branch has always inserted a row here, and nothing in
+     * the product ever read one back — so the action appeared to work and quietly produced
+     * nothing a rep could see. Open ones first, then the done ones, newest last.
+     */
+    const tasks = await tx`
+      SELECT t.id, t.text, t.due_at, t.done_at, t.source, t.assignee_id, u.name AS assignee_name
+        FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id
+       WHERE t.lead_id = ${id}
+       ORDER BY (t.done_at IS NOT NULL), t.due_at NULLS LAST, t.created_at`;
+    return { lead, messages, attachments, activity, tasks };
   });
 
   return found ? c.json(found) : c.json({ error: 'not found' }, 404);
@@ -88,6 +100,44 @@ leads.get('/:id', async (c) => {
  * Needed whenever the prompt or model changes, or a job died into the DLQ — otherwise the
  * only way to re-extract is to ask the customer to text again.
  */
+leads.post('/:id/tasks', async (c) => {
+  const org = c.get('org');
+  const id = c.req.param('id');
+  const parsed = NewTask.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'bad task' }, 400);
+  const t = parsed.data;
+
+  const row = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [lead] = await tx<{ id: string; assignee_id: string | null }[]>`
+      SELECT id, assignee_id FROM leads WHERE id = ${id}`;
+    if (!lead) return null;
+    // Defaults to whoever owns the ticket: a task with nobody on it is one nobody does.
+    const who = t.assignee_id !== undefined ? t.assignee_id : lead.assignee_id;
+    const [made] = await tx`
+      INSERT INTO tasks (id, org_id, lead_id, assignee_id, text, due_at, source)
+      VALUES (${ulid()}, ${org.id}, ${id}, ${who}, ${t.text.trim()}, ${t.due_at ?? null}, 'manual')
+      RETURNING id, text, due_at, done_at, source, assignee_id`;
+    return made;
+  });
+  return row ? c.json({ ok: true, task: row }, 201) : c.json({ error: 'not found' }, 404);
+});
+
+/** Tick a task off, or put it back. */
+leads.patch('/:leadId/tasks/:taskId', async (c) => {
+  const org = c.get('org');
+  const body = await c.req.json<{ done?: boolean }>().catch(() => null);
+  if (!body || typeof body.done !== 'boolean') return c.json({ error: 'done is required' }, 400);
+
+  const row = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [t] = await tx`
+      UPDATE tasks SET done_at = ${body.done ? new Date().toISOString() : null}
+       WHERE id = ${c.req.param('taskId')} AND lead_id = ${c.req.param('leadId')}
+      RETURNING id, text, due_at, done_at, source, assignee_id`;
+    return t ?? null;
+  });
+  return row ? c.json({ ok: true, task: row }) : c.json({ error: 'not found' }, 404);
+});
+
 leads.post('/:id/reextract', async (c) => {
   const org = c.get('org');
   const id = c.req.param('id');
@@ -103,6 +153,19 @@ leads.post('/:id/reextract', async (c) => {
 });
 
 const SPEC_FIELDS = ['product', 'qty', 'size', 'stock', 'color', 'finish'] as const;
+
+/**
+ * Add a task to a ticket, or tick one off.
+ *
+ * Deliberately small: text, who it is for, whether it is done. A campaign can already
+ * create these; this is what lets a person see one and finish it. No separate task list —
+ * the work belongs to the job, and a rep opening the ticket is the moment they need it.
+ */
+const NewTask = z.object({
+  text: z.string().min(1).max(400),
+  assignee_id: z.string().max(64).nullable().optional(),
+  due_at: z.string().datetime().nullable().optional(),
+});
 
 const Patch = z.object({
   // Not in SPEC_FIELDS: those are the things extract_specs competes for, and a rep editing

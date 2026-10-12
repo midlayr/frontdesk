@@ -256,3 +256,60 @@ settings.put('/hours', async (c) => {
 
   return c.json({ ok: true, hours, described: describeHours(hours), open: openAt(hours) });
 });
+
+/**
+ * Each rep's sign-off, for {sender_signature}.
+ *
+ * Kept as a map on the org rather than a column on users: no migration, and a signature is
+ * tenant copy of the same kind as the SMS footer already stored alongside it.
+ *
+ * Admin-managed on purpose. Most reps here exist as routing targets and have never been
+ * asked to log in, so "each rep writes their own" would leave six of seven blank. A rep who
+ * does have an account can still have theirs changed by an admin, which is the same shape
+ * as every other setting on this page.
+ */
+const Signatures = z.object({
+  signatures: z.record(z.string().max(64), z.string().max(600)),
+});
+
+settings.get('/signatures', async (c) => {
+  const org = c.get('org');
+  const people = await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ id: string; name: string; email: string; role: string }[]>`
+      SELECT id, name, email, role FROM users
+       WHERE org_id = ${org.id} AND disabled_at IS NULL ORDER BY name`);
+  const stored = (org.comms as { signatures?: Record<string, string> }).signatures ?? {};
+  return c.json({
+    people,
+    signatures: stored,
+    // What a rep with no signature of their own falls back to, so the editor can show it
+    // as the placeholder rather than implying the mail goes out unsigned.
+    fallback: org.comms.signature ?? org.name,
+  });
+});
+
+settings.put('/signatures', async (c) => {
+  const org = c.get('org');
+  const parsed = Signatures.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: 'bad signatures' }, 400);
+
+  // Only people who are really in this shop, and only non-empty text. A blank means "use
+  // the shop's", so it is removed rather than stored as an empty string that would send a
+  // mail signed with nothing.
+  const ids = new Set((await withOrg(c.get('sql'), org.id, (tx) =>
+    tx<{ id: string }[]>`SELECT id FROM users WHERE org_id = ${org.id}`)).map((u) => u.id));
+
+  const clean: Record<string, string> = {};
+  for (const [id, text] of Object.entries(parsed.data.signatures)) {
+    if (ids.has(id) && text.trim()) clean[id] = text.trim();
+  }
+
+  const saved = await withOrg(c.get('sql'), org.id, async (tx) => {
+    const [row] = await tx<{ comms: { signatures?: Record<string, string> } }[]>`
+      UPDATE orgs SET comms = comms || ${tx.json({ signatures: clean })}::jsonb
+       WHERE id = ${org.id} RETURNING comms`;
+    return row?.comms?.signatures ?? clean;
+  });
+  await invalidateOrg(c.env, c.get('sql'), org);
+  return c.json({ ok: true, signatures: saved });
+});

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, applyBrand, orgSlug, userId, type Attachment, type Lead, type Message, type Org, PIPELINE, STATUS_LABEL, STATUS_DOT, type OrgUser } from './api';
+import { api, applyBrand, orgSlug, userId, type Attachment, type Lead, type Message, type Org, PIPELINE, STATUS_LABEL, STATUS_DOT, type OrgUser, type Task } from './api';
 import { FlowBuilder } from './FlowBuilder';
 import { FlowList } from './FlowList';
 import { Campaigns } from './Campaigns';
@@ -189,7 +189,7 @@ export function App() {
   useEffect(() => { viewRef.current = view; }, [view]);
   const [query, setQuery] = useState('');
   const [selId, setSelId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<{ lead: Lead; messages: Message[]; attachments: Attachment[] } | null>(null);
+  const [detail, setDetail] = useState<{ lead: Lead; messages: Message[]; attachments: Attachment[]; tasks: Task[] } | null>(null);
   const [live, setLive] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -294,7 +294,8 @@ export function App() {
     chatWs.current?.close();
     chatWs.current = null;
     const d = await api.lead(id);
-    setDetail({ lead: d.lead, messages: d.messages, attachments: d.attachments ?? [] });
+    setDetail({ lead: d.lead, messages: d.messages, attachments: d.attachments ?? [],
+                tasks: d.tasks ?? [] });
 
     if (d.lead.channel === 'chat' && d.lead.chat_sid) {
       const ws = await api.socket(`/api/leads/${id}/chat`);
@@ -693,7 +694,7 @@ function EditCell({ leadId, label, value, placeholder, type, onSave }: {
 }
 
 function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPatch, onArchive, onDelete, users }: {
-  d: { lead: Lead; messages: Message[]; attachments?: Attachment[] }; live: boolean; draft: string;
+  d: { lead: Lead; messages: Message[]; attachments?: Attachment[]; tasks?: Task[] }; live: boolean; draft: string;
   setDraft: (s: string) => void; send: () => void; sending: boolean;
   takeover: () => void; error: string; onPatch: (body: Record<string, unknown>) => void;
   onArchive: (on: boolean) => void; onDelete: () => void; users: OrgUser[];
@@ -864,6 +865,10 @@ function Ticket({ d, live, draft, setDraft, send, sending, takeover, error, onPa
             </div>
           </>
         )}
+
+        {/* Campaigns have always been able to create these and nothing ever showed one,
+            so a "create a task" branch produced a row no rep could see. */}
+        <Tasks leadId={l.id} tasks={d.tasks ?? []} />
 
         <div className="section">What they asked for</div>
         {live && (
@@ -1142,6 +1147,64 @@ function Files({ leadId, files }: { leadId: string; files: Attachment[] }) {
  * undone. Given permanent space they competed with the pickers used all day and forced the
  * row to wrap; behind a menu they are still one click away and no longer in the way.
  */
+/**
+ * What still has to be done on this job.
+ *
+ * On the ticket rather than in a list of its own: the task belongs to the job, and the
+ * moment a rep needs it is the moment they have the job open. Done ones stay, struck
+ * through — a task that vanishes when ticked takes the record of it with it.
+ */
+function Tasks({ leadId, tasks }: { leadId: string; tasks: Task[] }) {
+  const [rows, setRows] = useState<Task[]>(tasks);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setRows(tasks); }, [tasks]);
+
+  const toggle = async (t: Task) => {
+    const done = !t.done_at;
+    // Moved first, restored if the write fails: a tick that waits on the network feels broken.
+    setRows((p) => p.map((r) => (r.id === t.id ? { ...r, done_at: done ? new Date().toISOString() : null } : r)));
+    try { await api.setTaskDone(leadId, t.id, done); }
+    catch { setRows((p) => p.map((r) => (r.id === t.id ? t : r))); }
+  };
+
+  const add = async () => {
+    const v = text.trim();
+    if (!v || busy) return;
+    setBusy(true);
+    try { const r = await api.addTask(leadId, v); setRows((p) => [...p, r.task]); setText(''); }
+    catch { /* left in the box, so nothing is lost */ }
+    finally { setBusy(false); }
+  };
+
+  const open = rows.filter((t) => !t.done_at).length;
+
+  return (
+    <>
+      <div className="section">
+        To do{open > 0 && <span className="task-count"> · {open} open</span>}
+      </div>
+      <div className="tasks">
+        {rows.map((t) => (
+          <label key={t.id} className="task" data-done={!!t.done_at}>
+            <input type="checkbox" checked={!!t.done_at} onChange={() => void toggle(t)} />
+            <span className="task-text">{t.text}</span>
+            {t.source.startsWith('sequence:') && <span className="task-src">campaign</span>}
+          </label>
+        ))}
+        {!rows.length && <p className="task-none">Nothing outstanding.</p>}
+        <div className="task-add">
+          <label htmlFor={`nt-${leadId}`} className="sr-only">Add a task</label>
+          <input id={`nt-${leadId}`} value={text} placeholder="Add a task…"
+                 onChange={(e) => setText(e.target.value)}
+                 onKeyDown={(e) => { if (e.key === 'Enter') void add(); }} />
+          <button onClick={() => void add()} disabled={!text.trim() || busy}>Add</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function TicketMenu({ archived, onArchive, onDelete }: {
   archived: boolean; onArchive: (on: boolean) => void; onDelete: () => void;
 }) {

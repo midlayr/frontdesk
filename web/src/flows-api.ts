@@ -236,6 +236,13 @@ export const flowsApi = {
       '/api/settings/widget', { method: 'PUT', body: JSON.stringify({ allowed_domains }) }),
   /** The shop's opening hours, for the builder's out-of-hours field. */
   hours: () => call<{ hours: unknown; described: string; open: boolean }>('/api/settings/hours'),
+  signatures: () => call<{
+    people: { id: string; name: string; email: string; role: string }[];
+    signatures: Record<string, string>; fallback: string;
+  }>('/api/settings/signatures'),
+  saveSignatures: (signatures: Record<string, string>) =>
+    call<{ ok: true; signatures: Record<string, string> }>(
+      '/api/settings/signatures', { method: 'PUT', body: JSON.stringify({ signatures }) }),
   saveHours: (h: { days: number[]; start: string; end: string; tz: string }) =>
     call<{ ok: true; hours: unknown; described: string; open: boolean }>(
       '/api/settings/hours', { method: 'PUT', body: JSON.stringify(h) }),

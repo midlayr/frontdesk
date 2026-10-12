@@ -22,6 +22,11 @@ export interface Lead {
   spec?: { captured?: Record<string, string>; summary?: string; estimate_no?: string } | null;
 }
 
+export interface Task {
+  id: string; text: string; due_at: string | null; done_at: string | null;
+  source: string; assignee_id: string | null; assignee_name?: string | null;
+}
+
 export interface Message {
   id: string; channel: string; direction: 'in' | 'out';
   author: string; body: string | null; sent_at: string;
@@ -149,7 +154,22 @@ export const api = {
     return r.json();
   },
   lead: (id: string) =>
-    get<{ lead: Lead; messages: Message[]; attachments: Attachment[]; activity: unknown[] }>(`/api/leads/${id}`),
+    get<{ lead: Lead; messages: Message[]; attachments: Attachment[]; activity: unknown[];
+          tasks: Task[] }>(`/api/leads/${id}`),
+
+  addTask: async (leadId: string, text: string) => {
+    const r = await fetch(url(`/api/leads/${leadId}/tasks`),
+      { method: 'POST', headers: headers(), body: JSON.stringify({ text }) });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json() as Promise<{ ok: true; task: Task }>;
+  },
+
+  setTaskDone: async (leadId: string, taskId: string, done: boolean) => {
+    const r = await fetch(url(`/api/leads/${leadId}/tasks/${taskId}`),
+      { method: 'PATCH', headers: headers(), body: JSON.stringify({ done }) });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    return r.json() as Promise<{ ok: true; task: Task }>;
+  },
 
   /** Always resolves: the server answers the same either way, so the UI must not branch. */
   requestLoginLink: async (email: string) => {

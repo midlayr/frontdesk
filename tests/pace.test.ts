@@ -94,6 +94,18 @@ console.log('blips, which are');
   eq('never reachable', !r4.ok && r4.why, 'unreachable');
 }
 
+console.log('a 200 that is not a PDF');
+{
+  // A proxy or an error page served with the wrong status would otherwise be attached to a
+  // customer's email as a file that does not open.
+  const c = stub(new Response('<html>gateway error</html>', { status: 200 }));
+  const r = await fetchEstimatePdf(env, '1');
+  eq('refused', !r.ok && r.why, 'upstream');
+  eq('and says what it got', !r.ok && r.detail.startsWith('not a PDF'), true);
+  eq('not retried — it will not fix itself', c.length, 1);
+  eq('a real one is accepted', (await (async () => { stub(pdf()); return fetchEstimatePdf(env, '1'); })()).ok, true);
+}
+
 console.log('things that are not a PDF');
 {
   // A 200 with nothing in it would otherwise be attached as an empty file, which is worse

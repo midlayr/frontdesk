@@ -19,7 +19,7 @@ const TIMEOUT_MS = 45_000;   // their guidance; the report generates live
 const RETRIES = 2;           // on 502/504 and on not getting there at all
 
 export type PdfResult =
-  | { ok: true; bytes: ArrayBuffer; bytesLength: number }
+  | { ok: true; bytes: ArrayBuffer; bytesLength: number; isPdf: boolean }
   | { ok: false; why: PdfFailure; detail: string; tried: number };
 
 /**
@@ -55,7 +55,21 @@ export async function fetchEstimatePdf(env: Env, estimateNumber: string): Promis
         if (bytes.byteLength === 0) {
           last = 'empty body';
         } else {
-          return { ok: true, bytes, bytesLength: bytes.byteLength };
+          /*
+           * Every PDF begins "%PDF". Checked because a 200 is not a guarantee of content:
+           * a proxy or an error page served with the wrong status would otherwise be
+           * attached to a customer's email as a file that will not open.
+           */
+          const head = new Uint8Array(bytes.slice(0, 5));
+          const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+          if (!isPdf) {
+            // Not retried: a server returning the wrong thing will keep doing so, and this
+            // needs a person rather than another attempt.
+            return { ok: false, why: 'upstream',
+                     detail: `not a PDF — starts ${JSON.stringify(new TextDecoder().decode(head))}`,
+                     tried: attempt };
+          }
+          return { ok: true, bytes, bytesLength: bytes.byteLength, isPdf };
         }
       } else if (r.status === 400) {
         return { ok: false, why: 'bad_number', detail: await short(r), tried: attempt };

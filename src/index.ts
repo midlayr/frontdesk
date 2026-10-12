@@ -24,6 +24,7 @@ import { sequences } from './api/sequences';
 import { settings } from './api/settings';
 import { CHAT_JS } from './widget-asset';
 import { mailFrom } from './lib/mail-from';
+import { PDF_REASON, fetchEstimatePdf } from './lib/pace';
 import { aiProvider } from './lib/ai-json';
 import { MEDIA_TTL_MS, mintTicket, readTicket } from './ws-ticket';
 import {
@@ -905,6 +906,25 @@ app.post('/api/ws-ticket', async (c) => {
     ticket: await mintTicket(c.env.SESSION_SECRET, c.get('org').id, c.get('userId'), media ? MEDIA_TTL_MS : undefined),
     expires_in: media ? MEDIA_TTL_MS : 60_000,
   });
+});
+
+/**
+ * Does this estimate number actually fetch a quote letter?
+ *
+ * Read-only: it fetches, reports what came back, and throws the PDF away. The alternative
+ * way to find out is to send a campaign to a customer and see what happens, which is a poor
+ * way to learn that somebody mistyped a number.
+ *
+ * Open to any signed-in user, not admins only — the people typing estimate numbers onto
+ * tickets are the reps, and this is the question they will have.
+ */
+app.get('/api/estimates/:number', async (c) => {
+  const started = Date.now();
+  const r = await fetchEstimatePdf(c.env, c.req.param('number'));
+  const ms = Date.now() - started;
+  return c.json(r.ok
+    ? { ok: true, bytes: r.bytesLength, isPdf: r.isPdf, ms }
+    : { ok: false, why: r.why, says: PDF_REASON[r.why], detail: r.detail, tried: r.tried, ms });
 });
 
 app.route('/api/leads', leads);
